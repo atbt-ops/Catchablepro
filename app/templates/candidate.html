@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, match_ring %}
+{% block title %}Candidate dashboard · SkillMatch{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Welcome, {{ user.name or user.email }}</h1>
+    <p class="sub">Keep your profile sharp — your match score is recalculated on every job.</p>
+  </div>
+</div>
+
+<div class="grid2">
+  <!-- Profile -->
+  <section class="panel">
+    <h2>{{ icon('user', 18) }} Your profile</h2>
+    <p class="hint">Skills power your match score. Upload a resume and we'll detect skills automatically.</p>
+    <form action="/candidate/profile" method="post" enctype="multipart/form-data">
+      <label>Headline
+        <input type="text" name="headline" value="{{ profile.headline }}"
+               placeholder="e.g. Senior Backend Engineer">
+      </label>
+      <label>Skills <span class="muted">(comma separated)</span>
+        <textarea name="skills" rows="3"
+                  placeholder="python, fastapi, sql, docker, aws">{{ profile.skills }}</textarea>
+      </label>
+      <label>Resume <span class="muted">(.txt, .pdf, .docx — skills auto-detected on upload)</span>
+        {% if profile.resume_filename %}
+          <span class="muted" style="display:block;margin-top:4px;">Current:
+            <a href="/resume/{{ user.id }}">{{ icon('doc', 13) }} {{ profile.resume_filename }}</a></span>
+        {% endif %}
+        <input type="file" name="resume">
+      </label>
+      <button class="btn" type="submit">{{ icon('check', 16) }} Save profile</button>
+    </form>
+  </section>
+
+  <!-- Auto-apply -->
+  <section class="panel">
+    <h2>{{ icon('bolt', 18) }} Auto-Apply</h2>
+    <p class="hint">
+      When on, you're automatically applied to every job you share at least one
+      skill with — including jobs posted later. Never miss an opportunity.
+    </p>
+    <div class="autoapply {{ 'active' if profile.auto_apply else '' }}">
+      <form action="/candidate/auto-apply" method="post" class="switch {{ 'on' if profile.auto_apply else '' }}">
+        <button type="submit" aria-label="Toggle auto-apply"><span class="knob"></span></button>
+      </form>
+      <div>
+        <div class="state {{ 'on' if profile.auto_apply else 'off' }}">
+          Auto-Apply is {{ 'ON' if profile.auto_apply else 'OFF' }}
+        </div>
+        <div class="muted" style="font-size:13px;">
+          {{ 'You are auto-applied to every matching job.' if profile.auto_apply else 'Turn on to apply everywhere automatically.' }}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Jobs ranked by match -->
+<section class="panel">
+  <h2>{{ icon('target', 18) }} Jobs ranked by your skill match
+    {% if job_rows %}<span class="count-pill">{{ job_rows|length }}</span>{% endif %}
+  </h2>
+  {% if not profile.skills %}
+    <p class="hint">Add your skills above (or upload a resume) to see match percentages.</p>
+  {% endif %}
+  {% if job_rows %}
+    <div class="rows">
+      {% for r in job_rows %}
+      <div class="row">
+        {{ match_ring(r.pct) }}
+        <div class="row-main">
+          <h3>{{ r.job.title }}</h3>
+          <p class="row-sub">
+            {{ icon('building', 13) }} {{ r.job.company_name }}
+            {% if r.job.location %}<span class="dot"></span>{{ r.job.location }}{% endif %}
+          </p>
+          {% if r.job.description %}<p class="row-desc">{{ r.job.description }}</p>{% endif %}
+          <div class="chips">
+            {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
+            {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}
+          </div>
+        </div>
+        <div class="row-action">
+          {% if r.applied %}
+            <span class="applied-pill">{{ icon('check', 15) }} Applied</span>
+          {% else %}
+            <form action="/candidate/apply/{{ r.job.id }}" method="post">
+              <button class="btn small" type="submit">Apply</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('briefcase', 24) }}</span>
+      <p>No jobs posted yet. Check back soon.</p>
+    </div>
+  {% endif %}
+</section>
+
+<!-- My applications -->
+<section class="panel">
+  <h2>{{ icon('doc', 18) }} My applications
+    {% if my_apps %}<span class="count-pill">{{ my_apps|length }}</span>{% endif %}
+  </h2>
+  {% if my_apps %}
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Job</th><th>Company</th><th>Match</th><th>How</th><th>When</th></tr></thead>
+        <tbody>
+        {% for a in my_apps %}
+          <tr>
+            <td><strong>{{ a.title }}</strong></td>
+            <td class="muted">{{ a.company_name }}</td>
+            <td>{{ a.match_pct }}%</td>
+            <td>{% if a.source == 'auto' %}<span class="tag auto">Auto</span>{% else %}<span class="tag">Manual</span>{% endif %}</td>
+            <td class="mono">{{ a.created_at }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('doc', 24) }}</span>
+      <p>You haven't applied to anything yet. Apply above, or turn on Auto-Apply.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

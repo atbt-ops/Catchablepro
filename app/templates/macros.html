@@ -1,0 +1,42 @@
+{# ------------------------------------------------------------------ #}
+{# Reusable UI components: inline SVG icons + animated match-score ring #}
+{# ------------------------------------------------------------------ #}
+
+{% macro icon(name, size=18) %}
+{%- set paths = {
+  'briefcase': '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/>',
+  'user': '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  'bolt': '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  'check': '<path d="M20 6 9 17l-5-5"/>',
+  'upload': '<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>',
+  'logout': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  'building': '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01"/>',
+  'mail': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
+  'doc': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  'sun': '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  'moon': '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>',
+  'plus': '<path d="M12 5v14M5 12h14"/>',
+  'sparkle': '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/>',
+  'arrow-right': '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  'target': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'
+} -%}
+<svg class="ico" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none"
+     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+     aria-hidden="true">{{ paths.get(name, '') | safe }}</svg>
+{%- endmacro %}
+
+{% macro tier(pct) %}{{ 'high' if pct >= 70 else 'mid' if pct >= 40 else 'low' }}{% endmacro %}
+
+{% macro match_ring(pct, size=64) %}
+{%- set r = (size / 2) - 6 -%}
+{%- set circ = 2 * 3.14159265 * r -%}
+{%- set off = circ * (1 - pct / 100) -%}
+<svg class="ring {{ tier(pct) }}" width="{{ size }}" height="{{ size }}"
+     viewBox="0 0 {{ size }} {{ size }}" role="img" aria-label="{{ pct }} percent skill match">
+  <circle class="ring-track" cx="{{ size/2 }}" cy="{{ size/2 }}" r="{{ r }}" fill="none" stroke-width="5"/>
+  <circle class="ring-fill" cx="{{ size/2 }}" cy="{{ size/2 }}" r="{{ r }}" fill="none" stroke-width="5"
+          stroke-linecap="round" stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ off }}"
+          transform="rotate(-90 {{ size/2 }} {{ size/2 }})"/>
+  <text class="ring-text" x="50%" y="50%" dominant-baseline="central" text-anchor="middle">{{ pct }}%</text>
+</svg>
+{%- endmacro %}

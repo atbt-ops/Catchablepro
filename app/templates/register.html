@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Sign up · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard">
+    <h2>Create your account</h2>
+    <p class="sub">Join as a candidate looking for work, or an employer who's hiring.</p>
+    {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
+    <form action="/register" method="post">
+      <label>I am a
+        <select name="role" id="role" onchange="document.getElementById('company-row').style.display = this.value === 'employer' ? 'block' : 'none';">
+          <option value="candidate">Candidate (job seeker)</option>
+          <option value="employer">Employer (hiring)</option>
+        </select>
+      </label>
+      <label>Full name
+        <input type="text" name="name" required placeholder="Jane Doe">
+      </label>
+      <div id="company-row" style="display:none;">
+        <label>Company name
+          <input type="text" name="company_name" placeholder="Acme Inc.">
+        </label>
+      </div>
+      <label>Email
+        <input type="email" name="email" required placeholder="you@example.com">
+      </label>
+      <label>Password
+        <input type="password" name="password" required minlength="6" placeholder="At least 6 characters">
+      </label>
+      <button class="btn block" type="submit">Create account {{ icon('arrow-right', 16) }}</button>
+    </form>
+    <p class="center-note">Already have an account? <a href="/login">Log in</a></p>
+  </div>
+</div>
+{% endblock %}

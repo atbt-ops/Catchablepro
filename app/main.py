@@ -1,0 +1,456 @@
+"""SkillMatch job portal — FastAPI application.
+
+Server-rendered (Jinja) with an in-process SQLite database. Two roles:
+  * employer  — post jobs, view skill-ranked candidate matches & applications
+  * candidate — build profile + upload resume, browse jobs with match %,
+                apply manually, or flip the Auto-Apply toggle to never miss one.
+"""
+from __future__ import annotations
+
+import os
+import sqlite3
+from pathlib import Path
+from typing import Optional
+
+from fastapi import Depends, FastAPI, Form, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+
+from . import auth, db as dbmod, resume as resume_module
+from .db import (
+    AUTO_APPLY_MIN_MATCH,
+    EMPLOYER_MATCH_THRESHOLD,
+    UPLOAD_DIR,
+    get_db,
+    init_db,
+)
+from .matching import extract_skills, match_detail, match_pct, parse_skills
+
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+app = FastAPI(title="SkillMatch Job Portal")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-me"),
+    same_site="lax",
+)
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
+
+
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+def _dashboard_url(role: str) -> str:
+    return "/employer" if role == "employer" else "/candidate"
+
+
+def _require(request: Request, db: sqlite3.Connection, role: Optional[str] = None):
+    """Return the current user or a RedirectResponse to send the caller away."""
+    user = auth.current_user(request, db)
+    if user is None:
+        return None, RedirectResponse("/login", status_code=303)
+    if role and user["role"] != role:
+        return None, RedirectResponse(_dashboard_url(user["role"]), status_code=303)
+    return user, None
+
+
+def _profile(db: sqlite3.Connection, user_id: int) -> sqlite3.Row:
+    row = db.execute(
+        "SELECT * FROM candidate_profiles WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if row is None:
+        db.execute("INSERT INTO candidate_profiles (user_id) VALUES (?)", (user_id,))
+        db.commit()
+        row = db.execute(
+            "SELECT * FROM candidate_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    return row
+
+
+def _auto_apply_candidate_to_all_jobs(db: sqlite3.Connection, candidate_id: int) -> int:
+    """Apply this candidate to every sufficiently-matching job. Returns count added."""
+    prof = _profile(db, candidate_id)
+    if not prof["auto_apply"]:
+        return 0
+    jobs = db.execute("SELECT id, required_skills FROM jobs").fetchall()
+    added = 0
+    for job in jobs:
+        pct = match_pct(prof["skills"], job["required_skills"])
+        if pct < AUTO_APPLY_MIN_MATCH:
+            continue
+        cur = db.execute(
+            "INSERT OR IGNORE INTO applications "
+            "(job_id, candidate_id, match_pct, source, status) "
+            "VALUES (?, ?, ?, 'auto', 'applied')",
+            (job["id"], candidate_id, pct),
+        )
+        added += cur.rowcount
+    db.commit()
+    return added
+
+
+def _auto_apply_all_candidates_to_job(db: sqlite3.Connection, job_id: int) -> None:
+    """When a new job is posted, apply every auto-apply candidate that matches."""
+    job = db.execute("SELECT required_skills FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if job is None:
+        return
+    candidates = db.execute(
+        "SELECT p.user_id, p.skills FROM candidate_profiles p WHERE p.auto_apply = 1"
+    ).fetchall()
+    for cand in candidates:
+        pct = match_pct(cand["skills"], job["required_skills"])
+        if pct < AUTO_APPLY_MIN_MATCH:
+            continue
+        db.execute(
+            "INSERT OR IGNORE INTO applications "
+            "(job_id, candidate_id, match_pct, source, status) "
+            "VALUES (?, ?, ?, 'auto', 'applied')",
+            (job_id, cand["user_id"], pct),
+        )
+    db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Public / auth
+# --------------------------------------------------------------------------- #
+@app.get("/", response_class=HTMLResponse)
+def landing(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user = auth.current_user(request, db)
+    if user:
+        return RedirectResponse(_dashboard_url(user["role"]), status_code=303)
+    return templates.TemplateResponse(request, "landing.html", {"request": request})
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_form(request: Request):
+    return templates.TemplateResponse(
+        request, "register.html", {"request": request, "error": None}
+    )
+
+
+@app.post("/register")
+def register(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form(...),
+    name: str = Form(""),
+    company_name: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    email = email.strip().lower()
+    if role not in ("employer", "candidate"):
+        role = "candidate"
+    if db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {"request": request, "error": "That email is already registered."},
+            status_code=400,
+        )
+    cur = db.execute(
+        "INSERT INTO users (email, password_hash, role, name, company_name) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (email, auth.hash_password(password), role, name.strip(), company_name.strip()),
+    )
+    user_id = cur.lastrowid
+    if role == "candidate":
+        db.execute("INSERT INTO candidate_profiles (user_id) VALUES (?)", (user_id,))
+    db.commit()
+    request.session["user_id"] = user_id
+    return RedirectResponse(_dashboard_url(role), status_code=303)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request):
+    return templates.TemplateResponse(request, "login.html", {"request": request, "error": None})
+
+
+@app.post("/login")
+def login(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    email = email.strip().lower()
+    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if user is None or not auth.verify_password(password, user["password_hash"]):
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"request": request, "error": "Invalid email or password."},
+            status_code=401,
+        )
+    request.session["user_id"] = user["id"]
+    return RedirectResponse(_dashboard_url(user["role"]), status_code=303)
+
+
+@app.post("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Candidate
+# --------------------------------------------------------------------------- #
+@app.get("/candidate", response_class=HTMLResponse)
+def candidate_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    prof = _profile(db, user["id"])
+
+    jobs = db.execute(
+        "SELECT j.*, u.company_name FROM jobs j "
+        "JOIN users u ON u.id = j.employer_id ORDER BY j.created_at DESC"
+    ).fetchall()
+    applied_ids = {
+        r["job_id"]
+        for r in db.execute(
+            "SELECT job_id FROM applications WHERE candidate_id = ?", (user["id"],)
+        ).fetchall()
+    }
+    job_rows = []
+    for job in jobs:
+        pct, matched, missing = match_detail(prof["skills"], job["required_skills"])
+        job_rows.append(
+            {
+                "job": job,
+                "pct": pct,
+                "matched": matched,
+                "missing": missing,
+                "applied": job["id"] in applied_ids,
+            }
+        )
+    job_rows.sort(key=lambda r: r["pct"], reverse=True)
+
+    my_apps = db.execute(
+        "SELECT a.*, j.title, u.company_name FROM applications a "
+        "JOIN jobs j ON j.id = a.job_id "
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE a.candidate_id = ? ORDER BY a.created_at DESC",
+        (user["id"],),
+    ).fetchall()
+
+    return templates.TemplateResponse(
+        request,
+        "candidate.html",
+        {
+            "request": request,
+            "user": user,
+            "profile": prof,
+            "job_rows": job_rows,
+            "my_apps": my_apps,
+            "auto_min": AUTO_APPLY_MIN_MATCH,
+        },
+    )
+
+
+@app.post("/candidate/profile")
+async def candidate_update_profile(
+    request: Request,
+    headline: str = Form(""),
+    skills: str = Form(""),
+    resume: Optional[UploadFile] = None,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    prof = _profile(db, user["id"])
+    resume_filename = prof["resume_filename"]
+    final_skills = skills.strip()
+
+    if resume is not None and resume.filename:
+        ext = Path(resume.filename).suffix
+        safe_name = f"resume_{user['id']}{ext}"
+        dest = UPLOAD_DIR / safe_name
+        with open(dest, "wb") as fh:
+            fh.write(await resume.read())
+        resume_filename = safe_name
+
+        # Auto-detect skills from the resume against a vocabulary of common
+        # skills plus every skill employers currently require, then merge them
+        # into whatever the candidate typed (never removing manual entries).
+        job_skill_rows = db.execute("SELECT required_skills FROM jobs").fetchall()
+        job_vocab: set[str] = set()
+        for row in job_skill_rows:
+            job_vocab |= parse_skills(row["required_skills"])
+        resume_text = resume_module.extract_text(dest)
+        detected = extract_skills(resume_text, job_vocab)
+        merged = parse_skills(final_skills) | detected
+        final_skills = ", ".join(sorted(merged))
+
+    db.execute(
+        "UPDATE candidate_profiles SET headline = ?, skills = ?, resume_filename = ?, "
+        "updated_at = datetime('now') WHERE user_id = ?",
+        (headline.strip(), final_skills, resume_filename, user["id"]),
+    )
+    db.commit()
+    # Skills may have changed — keep auto-apply coverage current.
+    _auto_apply_candidate_to_all_jobs(db, user["id"])
+    return RedirectResponse("/candidate", status_code=303)
+
+
+@app.post("/candidate/auto-apply")
+def candidate_toggle_auto_apply(
+    request: Request, db: sqlite3.Connection = Depends(get_db)
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    prof = _profile(db, user["id"])
+    new_val = 0 if prof["auto_apply"] else 1
+    db.execute(
+        "UPDATE candidate_profiles SET auto_apply = ? WHERE user_id = ?",
+        (new_val, user["id"]),
+    )
+    db.commit()
+    if new_val:
+        _auto_apply_candidate_to_all_jobs(db, user["id"])
+    return RedirectResponse("/candidate", status_code=303)
+
+
+@app.post("/candidate/apply/{job_id}")
+def candidate_apply(
+    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    prof = _profile(db, user["id"])
+    job = db.execute("SELECT required_skills FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if job is not None:
+        pct = match_pct(prof["skills"], job["required_skills"])
+        db.execute(
+            "INSERT OR IGNORE INTO applications "
+            "(job_id, candidate_id, match_pct, source, status) "
+            "VALUES (?, ?, ?, 'manual', 'applied')",
+            (job_id, user["id"], pct),
+        )
+        db.commit()
+    return RedirectResponse("/candidate", status_code=303)
+
+
+@app.get("/resume/{candidate_id}")
+def download_resume(
+    request: Request, candidate_id: int, db: sqlite3.Connection = Depends(get_db)
+):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    # Candidates may fetch their own; employers may fetch any applicant's.
+    if user["role"] == "candidate" and user["id"] != candidate_id:
+        return RedirectResponse("/candidate", status_code=303)
+    prof = db.execute(
+        "SELECT resume_filename FROM candidate_profiles WHERE user_id = ?",
+        (candidate_id,),
+    ).fetchone()
+    if not prof or not prof["resume_filename"]:
+        return HTMLResponse("No resume on file.", status_code=404)
+    path = UPLOAD_DIR / prof["resume_filename"]
+    if not path.exists():
+        return HTMLResponse("Resume file missing.", status_code=404)
+    return FileResponse(path, filename=prof["resume_filename"])
+
+
+# --------------------------------------------------------------------------- #
+# Employer
+# --------------------------------------------------------------------------- #
+@app.get("/employer", response_class=HTMLResponse)
+def employer_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    jobs = db.execute(
+        "SELECT j.*, "
+        "(SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) AS n_apps "
+        "FROM jobs j WHERE j.employer_id = ? ORDER BY j.created_at DESC",
+        (user["id"],),
+    ).fetchall()
+    return templates.TemplateResponse(
+        request, "employer.html", {"request": request, "user": user, "jobs": jobs}
+    )
+
+
+@app.post("/employer/jobs")
+def employer_create_job(
+    request: Request,
+    title: str = Form(...),
+    location: str = Form(""),
+    required_skills: str = Form(""),
+    description: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    cur = db.execute(
+        "INSERT INTO jobs (employer_id, title, description, required_skills, location) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (user["id"], title.strip(), description.strip(), required_skills.strip(), location.strip()),
+    )
+    db.commit()
+    # Auto-apply candidates never miss a new posting.
+    _auto_apply_all_candidates_to_job(db, cur.lastrowid)
+    return RedirectResponse("/employer", status_code=303)
+
+
+@app.get("/employer/jobs/{job_id}/matches", response_class=HTMLResponse)
+def employer_job_matches(
+    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job = db.execute(
+        "SELECT * FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
+    ).fetchone()
+    if job is None:
+        return RedirectResponse("/employer", status_code=303)
+
+    # Every candidate, ranked by skill match — the "profile is sent to the
+    # employer based on the percentage of skills" requirement.
+    candidates = db.execute(
+        "SELECT u.id, u.name, u.email, p.headline, p.skills, p.resume_filename "
+        "FROM candidate_profiles p JOIN users u ON u.id = p.user_id"
+    ).fetchall()
+    applied_ids = {
+        r["candidate_id"]: r
+        for r in db.execute(
+            "SELECT candidate_id, source FROM applications WHERE job_id = ?", (job_id,)
+        ).fetchall()
+    }
+    rows = []
+    for cand in candidates:
+        pct, matched, missing = match_detail(cand["skills"], job["required_skills"])
+        if pct < EMPLOYER_MATCH_THRESHOLD:
+            continue
+        app_row = applied_ids.get(cand["id"])
+        rows.append(
+            {
+                "cand": cand,
+                "pct": pct,
+                "matched": matched,
+                "missing": missing,
+                "applied": app_row is not None,
+                "source": app_row["source"] if app_row else None,
+            }
+        )
+    rows.sort(key=lambda r: r["pct"], reverse=True)
+
+    return templates.TemplateResponse(
+        request,
+        "job_matches.html",
+        {"request": request, "user": user, "job": job, "rows": rows},
+    )

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Employer dashboard · SkillMatch{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ user.company_name or user.name or 'Employer' }}</h1>
+    <p class="sub">Post roles and see candidates ranked by how well their skills match.</p>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="panel">
+    <h2>{{ icon('plus', 18) }} Post a job</h2>
+    <p class="hint">List the required skills — candidates are scored against them automatically.</p>
+    <form action="/employer/jobs" method="post">
+      <label>Title
+        <input type="text" name="title" required placeholder="e.g. Backend Engineer">
+      </label>
+      <label>Location
+        <input type="text" name="location" placeholder="Remote / Bengaluru">
+      </label>
+      <label>Required skills <span class="muted">(comma separated)</span>
+        <textarea name="required_skills" rows="2"
+                  placeholder="python, fastapi, sql, docker"></textarea>
+      </label>
+      <label>Description
+        <textarea name="description" rows="3" placeholder="What the role involves…"></textarea>
+      </label>
+      <button class="btn" type="submit">{{ icon('plus', 16) }} Post job</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('sparkle', 18) }} How matching works</h2>
+    <p class="hint">
+      Every candidate profile is scored against each job's required skills:
+    </p>
+    <div class="autoapply" style="align-items:center;">
+      <span class="brand-mark">{{ icon('target', 20) }}</span>
+      <div>
+        <div class="state on" style="color:var(--brand);">match % = shared skills ÷ required skills</div>
+        <div class="muted" style="font-size:13px;">
+          Open a job's <strong>Matches</strong> to see candidates ranked highest-first —
+          including those who applied automatically.
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>{{ icon('briefcase', 18) }} Your jobs
+    {% if jobs %}<span class="count-pill">{{ jobs|length }}</span>{% endif %}
+  </h2>
+  {% if jobs %}
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Title</th><th>Location</th><th>Required skills</th><th>Applications</th><th></th></tr></thead>
+        <tbody>
+        {% for j in jobs %}
+          <tr>
+            <td><strong>{{ j.title }}</strong></td>
+            <td class="muted">{{ j.location or '—' }}</td>
+            <td class="muted">{{ j.required_skills or '—' }}</td>
+            <td><span class="count-pill">{{ j.n_apps }}</span></td>
+            <td><a class="btn ghost small" href="/employer/jobs/{{ j.id }}/matches">View matches {{ icon('arrow-right', 14) }}</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('briefcase', 24) }}</span>
+      <p>You haven't posted any jobs yet. Post your first role above.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

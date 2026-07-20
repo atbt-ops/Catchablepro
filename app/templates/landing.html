@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">{{ icon('sparkle', 14) }} Skill-driven matching</span>
+  <h1>Get matched by <span class="grad">skills</span>,<br>not luck.</h1>
+  <p class="lead">
+    Employers post jobs. Candidates build a profile and upload a resume.
+    Every profile is ranked against each job by <strong>skill-match percentage</strong> —
+    and with <strong>Auto-Apply</strong> on, candidates never miss a single opportunity.
+  </p>
+  <div class="cta">
+    <a class="btn" href="/register">Create an account {{ icon('arrow-right', 16) }}</a>
+    <a class="btn ghost" href="/login">Log in</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>%</b><span>Every match scored</span></div>
+    <div class="stat"><b>1-click</b><span>Auto-Apply</span></div>
+    <div class="stat"><b>0</b><span>Opportunities missed</span></div>
+  </div>
+</section>
+
+<section class="cards">
+  <div class="feature i1">
+    <span class="fico">{{ icon('briefcase', 22) }}</span>
+    <h3>For employers</h3>
+    <p>Post a role with its required skills and instantly see candidates ranked by how well they match.</p>
+  </div>
+  <div class="feature i2">
+    <span class="fico">{{ icon('user', 22) }}</span>
+    <h3>For candidates</h3>
+    <p>List your skills, upload your resume — skills are auto-detected — and see your match score on every job.</p>
+  </div>
+  <div class="feature i3">
+    <span class="fico">{{ icon('bolt', 22) }}</span>
+    <h3>Auto-Apply</h3>
+    <p>Flip one toggle and you're automatically applied to every matching job — old and newly posted.</p>
+  </div>
+</section>
+{% endblock %}

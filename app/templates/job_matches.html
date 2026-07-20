@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, match_ring %}
+{% block title %}{{ job.title }} · Matches{% endblock %}
+{% block content %}
+<a class="backlink" href="/employer">{{ icon('arrow-right', 14) }} Back to dashboard</a>
+<div class="page-head">
+  <div>
+    <h1>{{ job.title }}</h1>
+    <p class="sub">
+      {% if job.location %}{{ job.location }} · {% endif %}
+      Required: {{ job.required_skills or '—' }}
+    </p>
+  </div>
+</div>
+
+<section class="panel">
+  <h2>{{ icon('user', 18) }} Candidate matches
+    {% if rows %}<span class="count-pill">{{ rows|length }}</span>{% endif %}
+  </h2>
+  <p class="hint">Ranked by skill-match percentage. Profiles surface here automatically once they match this job.</p>
+  {% if rows %}
+    <div class="rows">
+      {% for r in rows %}
+      <div class="row">
+        {{ match_ring(r.pct) }}
+        <div class="row-main">
+          <h3>
+            <span class="avatar" style="width:26px;height:26px;font-size:12px;">{{ (r.cand.name or r.cand.email)[0] | upper }}</span>
+            {{ r.cand.name or r.cand.email }}
+            {% if r.applied %}
+              <span class="tag {{ 'auto' if r.source == 'auto' else 'applied' }}">
+                {{ 'Auto-applied' if r.source == 'auto' else 'Applied' }}
+              </span>
+            {% endif %}
+          </h3>
+          {% if r.cand.headline %}<p class="row-sub">{{ r.cand.headline }}</p>{% endif %}
+          <div class="chips">
+            {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
+            {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}
+          </div>
+        </div>
+        <div class="row-action">
+          {% if r.cand.resume_filename %}
+            <a class="btn ghost small" href="/resume/{{ r.cand.id }}">{{ icon('doc', 14) }} Resume</a>
+          {% else %}
+            <span class="muted" style="font-size:13px;">No resume</span>
+          {% endif %}
+          <a class="btn ghost small" href="mailto:{{ r.cand.email }}">{{ icon('mail', 14) }} Contact</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('user', 24) }}</span>
+      <p>No candidates match this job's skills yet.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
