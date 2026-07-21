@@ -22,7 +22,12 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
-def _register(client, email, role, **extra):
-    data = {"email": email, "password": "password123", "role": role, "name": email.split("@")[0]}
-    data.update(extra)
-    return client.post("/register", data=data, follow_redirects=False)
+@pytest.fixture()
+def register(client):
+    """Return a helper that registers (and logs in) a user via the client."""
+    def _do(email, role, **extra):
+        data = {"email": email, "password": "password123", "role": role,
+                "name": email.split("@")[0]}
+        data.update(extra)
+        return client.post("/register", data=data, follow_redirects=False)
+    return _do
