@@ -57,6 +57,28 @@ python run.py         # serves http://127.0.0.1:8000
 - Employers: `hr@acme.io`, `talent@nimbus.dev`
 - Candidates: `asha@example.com` (Auto-Apply on), `dev@example.com` (off), `sam@example.com` (on)
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+14 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+and the end-to-end flows (register/login, job posting, manual apply, and the
+Auto-Apply backfill + new-job coverage). CI runs them on every push via
+[GitHub Actions](.github/workflows/ci.yml).
+
+## Docker
+
+```bash
+docker build -t skillmatch .
+docker run -p 8000:8000 -e SECRET_KEY=change-me -v skillmatch-data:/app/data skillmatch
+```
+
+The SQLite DB and uploaded resumes live on the `/app/data` volume so they survive
+container restarts.
+
 ## Project layout
 
 ```
@@ -67,9 +89,14 @@ job-portal/
 │  ├─ auth.py        # PBKDF2 password hashing + session helper (stdlib only)
 │  ├─ matching.py    # keyword-overlap skill match
 │  ├─ templates/     # Jinja: landing, login, register, candidate, employer, matches
-│  └─ static/        # style.css
+│  ├─ static/        # style.css (design system: light/dark themes)
+│  └─ templates/     # + macros.html (SVG icons, animated match ring)
+├─ tests/            # pytest: matching unit tests + app integration tests
+├─ .github/workflows/ci.yml   # CI: tests + docker build
 ├─ data/             # portal.db + uploads/ (git-ignored)
-├─ requirements.txt
+├─ Dockerfile
+├─ requirements.txt  # runtime deps
+├─ requirements-dev.txt       # + pytest, httpx
 ├─ run.py            # uvicorn entrypoint
 └─ seed.py           # demo data
 ```

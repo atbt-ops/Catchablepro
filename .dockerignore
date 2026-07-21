@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/portal.db
+data/uploads/*
+!data/uploads/.gitkeep
+.git/
+tests/
+.github/

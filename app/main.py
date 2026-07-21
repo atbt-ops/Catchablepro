@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -31,18 +32,19 @@ from .matching import extract_skills, match_detail, match_pct, parse_skills
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-app = FastAPI(title="SkillMatch Job Portal")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="SkillMatch Job Portal", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-me"),
     same_site="lax",
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    init_db()
 
 
 # --------------------------------------------------------------------------- #
