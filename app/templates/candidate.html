@@ -194,13 +194,14 @@
   {% if my_apps %}
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead><tr><th>Job</th><th>Company</th><th>Match</th><th>How</th><th>When</th></tr></thead>
+        <thead><tr><th>Job</th><th>Company</th><th>Match</th><th>Status</th><th>How</th><th>When</th></tr></thead>
         <tbody>
         {% for a in my_apps %}
           <tr>
             <td><strong>{{ a.title }}</strong></td>
             <td class="muted">{{ a.company_name }}</td>
             <td>{{ a.match_pct }}%</td>
+            <td><span class="tag stage-{{ a.status }}">{{ stage_label(a.status) }}</span></td>
             <td>{% if a.source == 'auto' %}<span class="tag auto">Auto</span>{% else %}<span class="tag">Manual</span>{% endif %}</td>
             <td class="mono">{{ a.created_at }}</td>
           </tr>

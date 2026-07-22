@@ -96,10 +96,11 @@
         </div>
 
         <div class="jobcard-side">
-          <a class="applicants" href="/employer/jobs/{{ j.id }}/matches" title="View candidate matches">
+          <a class="applicants" href="/employer/jobs/{{ j.id }}/applicants" title="View applicants and pipeline">
             <b>{{ j.n_apps }}</b><span>Applicants</span>
           </a>
           <div class="row-actions">
+            <a class="btn ghost small" href="/employer/jobs/{{ j.id }}/applicants">Applicants</a>
             <a class="btn ghost small" href="/employer/jobs/{{ j.id }}/matches">Matches</a>
             {% if j.status == 'draft' %}
               <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">

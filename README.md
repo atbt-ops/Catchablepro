@@ -51,6 +51,26 @@ visible to candidates or eligible for Auto-Apply, so drafts stay private.
 
 Candidates can filter the job list by **work mode** and **employment type**.
 
+### Applicant tracking
+
+Each job has an **Applicants** page (`/employer/jobs/{id}/applicants`) — the
+hiring pipeline for people who actually applied, as opposed to **Matches**,
+which ranks every candidate whose skills overlap.
+
+```
+Applied → Shortlisted → Interview → Offered → Hired      (+ On hold, Rejected)
+```
+
+- Pipeline tiles show a count per stage and double as filters.
+- **Private notes** per applicant, visible only to the employer.
+- Candidates see their current stage on their own dashboard.
+- **Notifying the candidate is opt-in per change** — tick *Email the candidate*
+  when moving a stage. Nothing is ever sent automatically, so a rejection can't
+  go out by accident.
+
+Every action is ownership-checked: an employer can only view or modify
+applications belonging to their own jobs.
+
 ### How matching works (keyword overlap)
 
 ```
@@ -114,7 +134,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-68 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+77 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).

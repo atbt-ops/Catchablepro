@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, match_ring %}
+{% block title %}{{ job.title }} · Applicants{% endblock %}
+{% block container_class %}wide{% endblock %}
+{% block content %}
+<a class="backlink" href="/employer">{{ icon('arrow-right', 14) }} Back to dashboard</a>
+<div class="page-head">
+  <div>
+    <h1>{{ job.title }}</h1>
+    <p class="sub">{{ total }} applicant{{ 's' if total != 1 }} · move candidates through your hiring pipeline</p>
+  </div>
+  <a class="btn ghost" href="/employer/jobs/{{ job.id }}/matches">
+    {{ icon('target', 15) }} See all matches
+  </a>
+</div>
+
+<!-- Pipeline summary / stage filter -->
+<div class="pipeline">
+  <a class="pipe {{ 'active' if not sel_stage }}" href="/employer/jobs/{{ job.id }}/applicants">
+    <b>{{ total }}</b><span>All</span>
+  </a>
+  {% for s in pipeline_stages %}
+    <a class="pipe stage-{{ s }} {{ 'active' if sel_stage == s }}"
+       href="/employer/jobs/{{ job.id }}/applicants?stage={{ s }}">
+      <b>{{ counts.get(s, 0) }}</b><span>{{ stage_label(s) }}</span>
+    </a>
+  {% endfor %}
+  {% for s in other_stages %}
+    <a class="pipe stage-{{ s }} {{ 'active' if sel_stage == s }}"
+       href="/employer/jobs/{{ job.id }}/applicants?stage={{ s }}">
+      <b>{{ counts.get(s, 0) }}</b><span>{{ stage_label(s) }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<section class="panel">
+  <h2>
+    {{ icon('user', 18) }}
+    {% if sel_stage %}{{ stage_label(sel_stage) }} applicants{% else %}All applicants{% endif %}
+    {% if rows %}<span class="count-pill">{{ rows|length }}</span>{% endif %}
+  </h2>
+
+  {% if rows %}
+    <div class="rows">
+      {% for r in rows %}
+      <div class="row applicant stage-border-{{ r.status }}">
+        {{ match_ring(r.match_pct) }}
+        <div class="row-main">
+          <h3>
+            {{ r.name or r.email }}
+            <span class="tag stage-{{ r.status }}">{{ stage_label(r.status) }}</span>
+            {% if r.source == 'auto' %}<span class="tag auto">Auto-applied</span>{% endif %}
+          </h3>
+          {% if r.headline %}<p class="row-sub">{{ r.headline }}</p>{% endif %}
+          <p class="row-sub">
+            <a class="candmail" href="mailto:{{ r.email }}">{{ icon('mail', 12) }} {{ r.email }}</a>
+            <span class="dot"></span>
+            <span class="muted">Applied {{ r.created_at }}</span>
+          </p>
+          {% if r.skills %}
+            <div class="chips">
+              {% for s in r.skills.split(',') %}
+                {% if s.strip() %}<span class="chip">{{ s.strip() }}</span>{% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <details class="notes">
+            <summary>{{ icon('doc', 13) }} Private notes{% if r.notes %} <span class="count-pill">1</span>{% endif %}</summary>
+            <form action="/employer/applications/{{ r.id }}/notes" method="post">
+              {{ csrf_field(request) }}
+              <textarea name="notes" rows="3" placeholder="Interview feedback, salary expectations…">{{ r.notes }}</textarea>
+              <button class="btn ghost small" type="submit">Save notes</button>
+            </form>
+          </details>
+        </div>
+
+        <div class="row-action applicant-actions">
+          <form action="/employer/applications/{{ r.id }}/stage" method="post" class="stageform">
+            {{ csrf_field(request) }}
+            <label class="stage-select">
+              Move to
+              <select name="stage">
+                {% for s in all_stages %}
+                  <option value="{{ s }}" {{ 'selected' if r.status == s }}>{{ stage_label(s) }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="checkline notify">
+              <input type="checkbox" name="notify" value="1">
+              <span>Email the candidate</span>
+            </label>
+            <button class="btn small" type="submit">Update</button>
+          </form>
+          <div class="row-actions">
+            {% if r.resume_filename %}
+              <a class="btn ghost small" href="/resume/{{ r.candidate_id }}">{{ icon('doc', 13) }} Resume</a>
+            {% endif %}
+            <a class="btn ghost small" href="/employer/jobs/{{ job.id }}/contact/{{ r.candidate_id }}">
+              {{ icon('mail', 13) }} Contact
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('user', 24) }}</span>
+      <p>
+        {% if sel_stage %}
+          No applicants at the <strong>{{ stage_label(sel_stage) }}</strong> stage yet.
+        {% else %}
+          Nobody has applied to this role yet.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -514,6 +514,65 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .step.done .step-dot { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green); }
 .step-label { font-weight: 500; }
 
+/* ---------- applicant pipeline ---------- */
+.pipeline {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.pipe {
+  flex: 1 1 92px; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 12px 10px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-soft); transition: all .15s var(--ease);
+}
+.pipe:hover { border-color: var(--brand); text-decoration: none; transform: translateY(-1px); }
+.pipe b { font-size: 20px; line-height: 1.1; color: var(--text); }
+.pipe span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.pipe.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); }
+.pipe.active b, .pipe.active span { color: var(--brand); }
+
+/* stage colours, shared by pills and pipeline tiles */
+.tag.stage-applied,     .pipe.stage-applied b     { color: var(--text-soft); }
+.tag.stage-shortlisted, .pipe.stage-shortlisted b { color: var(--brand); }
+.tag.stage-interview,   .pipe.stage-interview b   { color: var(--violet); }
+.tag.stage-offered,     .pipe.stage-offered b     { color: var(--accent); }
+.tag.stage-hired,       .pipe.stage-hired b       { color: var(--green); }
+.tag.stage-on_hold,     .pipe.stage-on_hold b     { color: var(--amber); }
+.tag.stage-rejected,    .pipe.stage-rejected b    { color: var(--red); }
+.tag.stage-shortlisted { background: color-mix(in srgb, var(--brand) 15%, transparent); }
+.tag.stage-interview   { background: color-mix(in srgb, var(--violet) 18%, transparent); }
+.tag.stage-offered     { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.tag.stage-hired       { background: color-mix(in srgb, var(--green) 16%, transparent); }
+.tag.stage-on_hold     { background: color-mix(in srgb, var(--amber) 16%, transparent); }
+.tag.stage-rejected    { background: color-mix(in srgb, var(--red) 14%, transparent); }
+
+.row.applicant { align-items: start; }
+.stage-border-shortlisted { border-left: 3px solid var(--brand); }
+.stage-border-interview   { border-left: 3px solid var(--violet); }
+.stage-border-offered     { border-left: 3px solid var(--accent); }
+.stage-border-hired       { border-left: 3px solid var(--green); }
+.stage-border-on_hold     { border-left: 3px solid var(--amber); }
+.stage-border-rejected    { border-left: 3px solid var(--red); }
+
+.applicant-actions { min-width: 190px; gap: 10px; }
+.stageform {
+  display: flex; flex-direction: column; gap: 8px; width: 100%;
+  padding: 11px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.stage-select { margin: 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+.stage-select select { margin-top: 4px; padding: 7px 9px; font-size: 13px; }
+.checkline.notify { margin: 0; font-size: 12px; font-weight: 400; color: var(--muted); }
+
+.notes { margin-top: 10px; }
+.notes > summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--muted);
+}
+.notes > summary::-webkit-details-marker { display: none; }
+.notes > summary:hover { color: var(--text); }
+.notes textarea { margin-top: 8px; }
+.notes .btn { margin-top: 8px; }
+
 /* ---------- job status tags ---------- */
 .tag.status-active { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
 .tag.status-draft  { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }

@@ -105,7 +105,10 @@ CREATE TABLE IF NOT EXISTS applications (
     candidate_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     match_pct    INTEGER NOT NULL DEFAULT 0,
     source       TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'auto')),
+    -- Hiring pipeline stage; see APPLICATION_STAGES in main.py
     status       TEXT    NOT NULL DEFAULT 'applied',
+    notes        TEXT    NOT NULL DEFAULT '',
+    updated_at   TEXT    NOT NULL DEFAULT '',
     created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE (job_id, candidate_id)
 );
@@ -147,6 +150,10 @@ _ADDED_COLUMNS = {
     "company_profiles": {
         "hq_location": "TEXT NOT NULL DEFAULT ''",
         "onboarding_step": "INTEGER NOT NULL DEFAULT 1",
+    },
+    "applications": {
+        "notes": "TEXT NOT NULL DEFAULT ''",          # private employer notes
+        "updated_at": "TEXT NOT NULL DEFAULT ''",
     },
 }
 

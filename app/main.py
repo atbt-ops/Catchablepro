@@ -122,6 +122,21 @@ COMPANY_SIZES = [
     "201-500 employees", "501-1000 employees", "1000+ employees",
 ]
 
+# --- Applicant tracking pipeline ------------------------------------------- #
+# Ordered progression, then the two off-track outcomes.
+PIPELINE_STAGES = ["applied", "shortlisted", "interview", "offered", "hired"]
+OTHER_STAGES = ["on_hold", "rejected"]
+APPLICATION_STAGES = PIPELINE_STAGES + OTHER_STAGES
+STAGE_LABELS = {
+    "applied": "Applied",
+    "shortlisted": "Shortlisted",
+    "interview": "Interview",
+    "offered": "Offered",
+    "hired": "Hired",
+    "on_hold": "On hold",
+    "rejected": "Rejected",
+}
+
 EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship", "Freelance"]
 WORK_MODES = ["On-site", "Hybrid", "Remote"]
 EDUCATION_LEVELS = ["Any", "Diploma", "Graduate", "Post Graduate", "Doctorate"]
@@ -169,6 +184,7 @@ def description_html(value: str) -> Markup:
 templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["description_html"] = description_html
+templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 
 
 @asynccontextmanager
@@ -1224,6 +1240,130 @@ def employer_job_matches(
             "request": request, "user": user, "job": job, "rows": rows,
             "sent_to": request.query_params.get("sent", ""),
         },
+    )
+
+
+@app.get("/employer/jobs/{job_id}/applicants", response_class=HTMLResponse)
+def employer_applicants(
+    request: Request,
+    job_id: int,
+    stage: str = "",
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Hiring pipeline for one job — everyone who actually applied."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job = db.execute(
+        "SELECT * FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
+    ).fetchone()
+    if job is None:
+        return RedirectResponse("/employer", status_code=303)
+
+    rows = db.execute(
+        "SELECT a.*, u.name, u.email, p.headline, p.skills, p.resume_filename "
+        "FROM applications a "
+        "JOIN users u ON u.id = a.candidate_id "
+        "LEFT JOIN candidate_profiles p ON p.user_id = a.candidate_id "
+        "WHERE a.job_id = ? ORDER BY a.match_pct DESC, a.created_at",
+        (job_id,),
+    ).fetchall()
+
+    counts = {s: 0 for s in APPLICATION_STAGES}
+    for r in rows:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    if stage in APPLICATION_STAGES:
+        rows = [r for r in rows if r["status"] == stage]
+
+    return templates.TemplateResponse(
+        request,
+        "applicants.html",
+        {
+            "request": request, "user": user, "job": job, "rows": rows,
+            "counts": counts, "total": sum(counts.values()),
+            "pipeline_stages": PIPELINE_STAGES, "other_stages": OTHER_STAGES,
+            "all_stages": APPLICATION_STAGES, "sel_stage": stage,
+        },
+    )
+
+
+def _owned_application(db, employer_id: int, application_id: int):
+    """Fetch an application only if it belongs to one of this employer's jobs."""
+    return db.execute(
+        "SELECT a.*, j.title AS job_title, j.id AS job_id, u.email, u.name "
+        "FROM applications a "
+        "JOIN jobs j ON j.id = a.job_id "
+        "JOIN users u ON u.id = a.candidate_id "
+        "WHERE a.id = ? AND j.employer_id = ?",
+        (application_id, employer_id),
+    ).fetchone()
+
+
+@app.post("/employer/applications/{application_id}/stage")
+def employer_set_application_stage(
+    request: Request,
+    application_id: int,
+    _csrf: None = Depends(verify_csrf),
+    stage: str = Form(...),
+    notify: Optional[str] = Form(None),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    app_row = _owned_application(db, user["id"], application_id)
+    if app_row is None or stage not in APPLICATION_STAGES:
+        return RedirectResponse("/employer", status_code=303)
+
+    db.execute(
+        "UPDATE applications SET status = ?, updated_at = datetime('now') WHERE id = ?",
+        (stage, application_id),
+    )
+    db.commit()
+
+    # Telling the candidate is opt-in per change — never automatic.
+    if notify and user["email_verified"]:
+        allowed, _ = ratelimit.check(f"contact:{user['id']}", *CONTACT_EMAIL_LIMIT)
+        if allowed:
+            company = user["company_name"] or "the hiring team"
+            mailer.send_email(
+                to=app_row["email"],
+                subject=f"Update on your application for {app_row['job_title']}",
+                body=(
+                    f"Hi {app_row['name'] or 'there'},\n\n"
+                    f"There's an update on your application for "
+                    f"{app_row['job_title']} at {company}.\n\n"
+                    f"Current status: {STAGE_LABELS.get(stage, stage)}\n\n"
+                    f"Best regards,\n{company}\n"
+                ),
+                reply_to=user["email"],
+            )
+    return RedirectResponse(
+        f"/employer/jobs/{app_row['job_id']}/applicants", status_code=303
+    )
+
+
+@app.post("/employer/applications/{application_id}/notes")
+def employer_save_application_notes(
+    request: Request,
+    application_id: int,
+    _csrf: None = Depends(verify_csrf),
+    notes: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    app_row = _owned_application(db, user["id"], application_id)
+    if app_row is None:
+        return RedirectResponse("/employer", status_code=303)
+    db.execute(
+        "UPDATE applications SET notes = ?, updated_at = datetime('now') WHERE id = ?",
+        (notes.strip()[:4000], application_id),
+    )
+    db.commit()
+    return RedirectResponse(
+        f"/employer/jobs/{app_row['job_id']}/applicants", status_code=303
     )
 
 
