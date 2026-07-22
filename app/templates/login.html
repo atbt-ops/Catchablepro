@@ -8,6 +8,7 @@
     <p class="sub">Log in to your SkillMatch account.</p>
     {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
     <form action="/login" method="post">
+      {{ csrf_field(request) }}
       <label>Email
         <input type="email" name="email" required autofocus placeholder="you@example.com">
       </label>

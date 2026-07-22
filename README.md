@@ -43,7 +43,6 @@ payloads tiny and the app offline-friendly):
 ## Run it
 
 ```bash
-cd job-portal
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt   # Windows
 # source .venv/bin/activate && pip install -r requirements.txt  # macOS/Linux
@@ -64,10 +63,10 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-14 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
-and the end-to-end flows (register/login, job posting, manual apply, and the
-Auto-Apply backfill + new-job coverage). CI runs them on every push via
-[GitHub Actions](.github/workflows/ci.yml).
+15 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+and the end-to-end flows (register/login, job posting, manual apply, CSRF
+rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
+every push via [GitHub Actions](.github/workflows/ci.yml).
 
 ## Docker
 
@@ -78,6 +77,42 @@ docker run -p 8000:8000 -e SECRET_KEY=change-me -v skillmatch-data:/app/data ski
 
 The SQLite DB and uploaded resumes live on the `/app/data` volume so they survive
 container restarts.
+
+## Deploy
+
+The repo ships a [Render Blueprint](render.yaml). To go live:
+
+1. Push this repo to GitHub (already done).
+2. In [Render](https://dashboard.render.com): **New + → Blueprint** → connect this repo.
+3. Render reads `render.yaml`, builds the Dockerfile, and generates a strong
+   `SECRET_KEY` for you. Click **Apply**.
+4. You get a public URL. Health checks hit `/healthz`.
+
+**Persistence caveat:** the blueprint defaults to Render's **free** plan, which has
+**no persistent disk** — the SQLite DB and uploaded resumes reset on every restart
+or redeploy. That's fine for a demo. To keep data, change `plan: free` to
+`plan: starter` in `render.yaml` and uncomment the `disk:` block (mounts at
+`/app/data`).
+
+Any Docker host works too — the image needs only `ENV=production` and a
+`SECRET_KEY`, with a volume on `/app/data` for persistence.
+
+### Production configuration
+
+| Variable | Purpose |
+|----------|---------|
+| `ENV` | Set to `production` to enable `Secure` cookies. |
+| `SECRET_KEY` | Session-cookie signing key. **Required** in production — the app refuses to start with the dev default. Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+
+## Security
+
+- **Passwords**: PBKDF2-HMAC-SHA256 with a per-user salt (stdlib only).
+- **Sessions**: signed cookies with `HttpOnly` + `SameSite=Lax`, plus `Secure`
+  when `ENV=production`.
+- **CSRF**: every state-changing form carries a per-session token
+  (`csrf_field()`); the `verify_csrf` dependency rejects any POST with a
+  missing or mismatched token (HTTP 403), verified by a test.
+- **Access control**: resumes are downloadable only by their owner or an employer.
 
 ## Project layout
 

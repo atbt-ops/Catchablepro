@@ -8,6 +8,7 @@
     <p class="sub">Join as a candidate looking for work, or an employer who's hiring.</p>
     {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
     <form action="/register" method="post">
+      {{ csrf_field(request) }}
       <label>I am a
         <select name="role" id="role" onchange="document.getElementById('company-row').style.display = this.value === 'employer' ? 'block' : 'none';">
           <option value="candidate">Candidate (job seeker)</option>

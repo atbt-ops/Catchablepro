@@ -1,8 +1,19 @@
 """Shared pytest fixtures: an app client backed by a throwaway SQLite DB."""
 import importlib
+import re
 
 import pytest
 from fastapi.testclient import TestClient
+
+_CSRF_RE = re.compile(r'name="csrf_token" value="([^"]+)"')
+
+
+def csrf_token(client) -> str:
+    """Fetch the current session's CSRF token from a rendered form."""
+    html = client.get("/login").text
+    m = _CSRF_RE.search(html)
+    assert m, "no CSRF token found on /login"
+    return m.group(1)
 
 
 @pytest.fixture()
@@ -23,11 +34,21 @@ def client(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def register(client):
+def post(client):
+    """POST helper that auto-injects the session CSRF token into the form."""
+    def _post(path, data=None, follow_redirects=False, **kw):
+        data = dict(data or {})
+        data.setdefault("csrf_token", csrf_token(client))
+        return client.post(path, data=data, follow_redirects=follow_redirects, **kw)
+    return _post
+
+
+@pytest.fixture()
+def register(post):
     """Return a helper that registers (and logs in) a user via the client."""
     def _do(email, role, **extra):
         data = {"email": email, "password": "password123", "role": role,
                 "name": email.split("@")[0]}
         data.update(extra)
-        return client.post("/register", data=data, follow_redirects=False)
+        return post("/register", data=data)
     return _do

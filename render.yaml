@@ -1,0 +1,26 @@
+# Render Blueprint — deploy SkillMatch from this repo.
+# In Render: New + > Blueprint > connect this repo. Render reads this file.
+services:
+  - type: web
+    name: skillmatch
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free              # free tier: no persistent disk, spins down when idle
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production   # enables Secure cookies + requires a real SECRET_KEY
+      - key: SECRET_KEY
+        generateValue: true # Render generates a strong random value for you
+
+    # ---------------------------------------------------------------------
+    # PERSISTENCE: the free plan has no disk, so the SQLite database and any
+    # uploaded resumes are LOST on every restart/redeploy. To keep data,
+    # upgrade `plan` above to `starter` and uncomment the disk below.
+    # ---------------------------------------------------------------------
+    # disk:
+    #   name: skillmatch-data
+    #   mountPath: /app/data
+    #   sizeGB: 1

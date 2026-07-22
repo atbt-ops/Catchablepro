@@ -8,15 +8,17 @@ Server-rendered (Jinja) with an in-process SQLite database. Two roles:
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Form, Request, UploadFile
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import auth, db as dbmod, resume as resume_module
@@ -32,6 +34,48 @@ from .matching import extract_skills, match_detail, match_pct, parse_skills
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+# --------------------------------------------------------------------------- #
+# Environment / security config
+# --------------------------------------------------------------------------- #
+IS_PROD = os.environ.get("ENV", "dev").lower() == "production"
+_DEV_SECRET = "dev-secret-change-me"
+SECRET_KEY = os.environ.get("SECRET_KEY", _DEV_SECRET)
+if IS_PROD and SECRET_KEY == _DEV_SECRET:
+    raise RuntimeError(
+        "SECRET_KEY must be set to a strong random value when ENV=production."
+    )
+
+
+# --------------------------------------------------------------------------- #
+# CSRF protection (double-submit token stored in the signed session)
+# --------------------------------------------------------------------------- #
+def get_csrf(request: Request) -> str:
+    token = request.session.get("csrf")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        request.session["csrf"] = token
+    return token
+
+
+def csrf_field(request: Request) -> Markup:
+    """Hidden <input> carrying the session CSRF token, for use inside forms."""
+    return Markup(
+        f'<input type="hidden" name="csrf_token" value="{get_csrf(request)}">'
+    )
+
+
+async def verify_csrf(request: Request) -> None:
+    """Dependency for state-changing routes: reject a missing/mismatched token."""
+    form = await request.form()
+    submitted = form.get("csrf_token")
+    expected = request.session.get("csrf")
+    if not expected or not submitted or not secrets.compare_digest(str(submitted), expected):
+        raise HTTPException(status_code=403, detail="Invalid or missing CSRF token.")
+
+
+templates.env.globals["csrf_field"] = csrf_field
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -41,8 +85,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="SkillMatch Job Portal", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-me"),
+    secret_key=SECRET_KEY,
     same_site="lax",
+    https_only=IS_PROD,  # Secure cookie flag when served over HTTPS in production
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
@@ -123,6 +168,12 @@ def _auto_apply_all_candidates_to_job(db: sqlite3.Connection, job_id: int) -> No
 # --------------------------------------------------------------------------- #
 # Public / auth
 # --------------------------------------------------------------------------- #
+@app.get("/healthz")
+def healthz():
+    """Liveness probe for the hosting platform."""
+    return {"status": "ok"}
+
+
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request, db: sqlite3.Connection = Depends(get_db)):
     user = auth.current_user(request, db)
@@ -141,6 +192,7 @@ def register_form(request: Request):
 @app.post("/register")
 def register(
     request: Request,
+    _csrf: None = Depends(verify_csrf),
     email: str = Form(...),
     password: str = Form(...),
     role: str = Form(...),
@@ -179,6 +231,7 @@ def login_form(request: Request):
 @app.post("/login")
 def login(
     request: Request,
+    _csrf: None = Depends(verify_csrf),
     email: str = Form(...),
     password: str = Form(...),
     db: sqlite3.Connection = Depends(get_db),
@@ -197,7 +250,7 @@ def login(
 
 
 @app.post("/logout")
-def logout(request: Request):
+def logout(request: Request, _csrf: None = Depends(verify_csrf)):
     request.session.clear()
     return RedirectResponse("/", status_code=303)
 
@@ -261,6 +314,7 @@ def candidate_dashboard(request: Request, db: sqlite3.Connection = Depends(get_d
 @app.post("/candidate/profile")
 async def candidate_update_profile(
     request: Request,
+    _csrf: None = Depends(verify_csrf),
     headline: str = Form(""),
     skills: str = Form(""),
     resume: Optional[UploadFile] = None,
@@ -306,7 +360,9 @@ async def candidate_update_profile(
 
 @app.post("/candidate/auto-apply")
 def candidate_toggle_auto_apply(
-    request: Request, db: sqlite3.Connection = Depends(get_db)
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "candidate")
     if redirect:
@@ -325,7 +381,10 @@ def candidate_toggle_auto_apply(
 
 @app.post("/candidate/apply/{job_id}")
 def candidate_apply(
-    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+    request: Request,
+    job_id: int,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "candidate")
     if redirect:
@@ -388,6 +447,7 @@ def employer_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db
 @app.post("/employer/jobs")
 def employer_create_job(
     request: Request,
+    _csrf: None = Depends(verify_csrf),
     title: str = Form(...),
     location: str = Form(""),
     required_skills: str = Form(""),

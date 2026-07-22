@@ -1,6 +1,9 @@
 .venv/
 __pycache__/
 *.pyc
+.env
+.env.local
+.pytest_cache/
 data/portal.db
 data/uploads/*
 !data/uploads/.gitkeep

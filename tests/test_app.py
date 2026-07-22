@@ -20,41 +20,50 @@ def test_duplicate_email_rejected(register):
     assert r.status_code == 400
 
 
-def test_manual_apply_records_match_percentage(client, register):
+def test_post_without_csrf_is_rejected(client):
+    # No csrf_token in the body -> forbidden.
+    r = client.post("/register", data={
+        "email": "nocsrf@x.io", "password": "password123",
+        "role": "candidate", "name": "no",
+    })
+    assert r.status_code == 403
+
+
+def test_manual_apply_records_match_percentage(client, register, post):
     register("emp@x.io", "employer", company_name="X")
-    client.post("/employer/jobs", data={
+    post("/employer/jobs", data={
         "title": "Backend", "location": "Remote",
         "required_skills": "python, sql, docker, aws", "description": "",
     })
     # New candidate session.
-    client.post("/logout")
+    post("/logout")
     register("cand@x.io", "candidate")
-    client.post("/candidate/profile", data={"headline": "", "skills": "python, sql"})
-    client.post("/candidate/apply/1")
+    post("/candidate/profile", data={"headline": "", "skills": "python, sql"})
+    post("/candidate/apply/1")
     page = client.get("/candidate").text
     assert "50%" in page  # 2 of 4 required skills
 
 
-def test_auto_apply_backfills_and_covers_new_jobs(client, register):
+def test_auto_apply_backfills_and_covers_new_jobs(client, register, post):
     # Employer posts one job.
     register("e2@x.io", "employer", company_name="E2")
-    client.post("/employer/jobs", data={
+    post("/employer/jobs", data={
         "title": "Data Eng", "location": "", "required_skills": "python, sql", "description": "",
     })
-    client.post("/logout")
+    post("/logout")
 
     # Candidate with matching skills turns Auto-Apply ON -> backfilled to existing job.
     register("c2@x.io", "candidate")
-    client.post("/candidate/profile", data={"headline": "", "skills": "python, sql"})
-    client.post("/candidate/auto-apply")
+    post("/candidate/profile", data={"headline": "", "skills": "python, sql"})
+    post("/candidate/auto-apply")
     assert "My applications" in client.get("/candidate").text
     # One auto application exists now.
     assert client.get("/candidate").text.count("Auto") >= 1
 
     # A brand-new job posted later should also auto-apply this candidate.
-    client.post("/logout")
-    client.post("/login", data={"email": "e2@x.io", "password": "password123"})
-    client.post("/employer/jobs", data={
+    post("/logout")
+    post("/login", data={"email": "e2@x.io", "password": "password123"})
+    post("/employer/jobs", data={
         "title": "Platform", "location": "", "required_skills": "python", "description": "",
     })
     matches = client.get("/employer/jobs/2/matches").text

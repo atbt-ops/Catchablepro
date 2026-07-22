@@ -15,6 +15,7 @@
     <h2>{{ icon('user', 18) }} Your profile</h2>
     <p class="hint">Skills power your match score. Upload a resume and we'll detect skills automatically.</p>
     <form action="/candidate/profile" method="post" enctype="multipart/form-data">
+      {{ csrf_field(request) }}
       <label>Headline
         <input type="text" name="headline" value="{{ profile.headline }}"
                placeholder="e.g. Senior Backend Engineer">
@@ -43,6 +44,7 @@
     </p>
     <div class="autoapply {{ 'active' if profile.auto_apply else '' }}">
       <form action="/candidate/auto-apply" method="post" class="switch {{ 'on' if profile.auto_apply else '' }}">
+        {{ csrf_field(request) }}
         <button type="submit" aria-label="Toggle auto-apply"><span class="knob"></span></button>
       </form>
       <div>
@@ -87,6 +89,7 @@
             <span class="applied-pill">{{ icon('check', 15) }} Applied</span>
           {% else %}
             <form action="/candidate/apply/{{ r.job.id }}" method="post">
+              {{ csrf_field(request) }}
               <button class="btn small" type="submit">Apply</button>
             </form>
           {% endif %}
