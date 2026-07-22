@@ -16,6 +16,16 @@ def csrf_token(client) -> str:
     return m.group(1)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_ratelimits():
+    """Rate-limit counters live in-process; reset them between tests."""
+    from app import ratelimit
+
+    ratelimit.clear_all()
+    yield
+    ratelimit.clear_all()
+
+
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     # Point the data layer at a temp DB before the app starts up.

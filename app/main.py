@@ -24,7 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from html import escape
 
-from . import auth, db as dbmod, mailer, resume as resume_module
+from . import auth, db as dbmod, mailer, ratelimit, resume as resume_module
 from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
@@ -89,6 +89,15 @@ ONBOARDING_DONE = 3  # step 1 = company details, 2 = first job, 3 = complete
 # in rupees (e.g. 800000) instead of lakhs (8).
 SALARY_MIN_LPA = 0.5
 SALARY_MAX_LPA = 100.0
+
+# --- Rate limits: (max attempts, window in seconds) ------------------------- #
+LOGIN_LIMIT = (8, 15 * 60)        # per email — slows password guessing
+RESET_REQUEST_LIMIT = (5, 60 * 60)  # per email — stops reset-mail spam
+CONTACT_EMAIL_LIMIT = (30, 60 * 60)  # per employer — stops mass mailing
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 COMPANY_SIZES = [
     "1-10 employees", "11-50 employees", "51-200 employees",
     "201-500 employees", "501-1000 employees", "1000+ employees",
@@ -296,6 +305,11 @@ def register(
 ):
     """Candidate signup. Employers register at /employer/register."""
     email = email.strip().lower()
+    weak = auth.validate_password(password)
+    if weak:
+        return templates.TemplateResponse(
+            request, "register.html", {"request": request, "error": weak}, status_code=400
+        )
     if db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
         return templates.TemplateResponse(
             request,
@@ -329,6 +343,15 @@ def login(
     db: sqlite3.Connection = Depends(get_db),
 ):
     email = email.strip().lower()
+    allowed, retry = ratelimit.check(f"login:{email}", *LOGIN_LIMIT)
+    if not allowed:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"request": request,
+             "error": f"Too many failed attempts. Try again in {retry // 60 + 1} minute(s)."},
+            status_code=429,
+        )
     user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if user is None or not auth.verify_password(password, user["password_hash"]):
         return templates.TemplateResponse(
@@ -337,6 +360,7 @@ def login(
             {"request": request, "error": "Invalid email or password."},
             status_code=401,
         )
+    ratelimit.reset(f"login:{email}")
     request.session["user_id"] = user["id"]
     return RedirectResponse(_post_login_url(db, user), status_code=303)
 
@@ -364,6 +388,12 @@ def employer_register(
     db: sqlite3.Connection = Depends(get_db),
 ):
     email = email.strip().lower()
+    weak = auth.validate_password(password)
+    if weak:
+        return templates.TemplateResponse(
+            request, "employer_register.html",
+            {"request": request, "error": weak}, status_code=400,
+        )
     if db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
         return templates.TemplateResponse(
             request,
@@ -403,6 +433,15 @@ def employer_login(
     db: sqlite3.Connection = Depends(get_db),
 ):
     email = email.strip().lower()
+    allowed, retry = ratelimit.check(f"login:{email}", *LOGIN_LIMIT)
+    if not allowed:
+        return templates.TemplateResponse(
+            request,
+            "employer_login.html",
+            {"request": request,
+             "error": f"Too many failed attempts. Try again in {retry // 60 + 1} minute(s)."},
+            status_code=429,
+        )
     user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if user is None or not auth.verify_password(password, user["password_hash"]):
         return templates.TemplateResponse(
@@ -419,8 +458,159 @@ def employer_login(
              "error": "That's a candidate account — please use the candidate login."},
             status_code=403,
         )
+    ratelimit.reset(f"login:{email}")
     request.session["user_id"] = user["id"]
     return RedirectResponse(_post_login_url(db, user), status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Account & password management (shared by both roles)
+# --------------------------------------------------------------------------- #
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_form(request: Request):
+    return templates.TemplateResponse(
+        request, "forgot_password.html", {"request": request, "sent": False, "error": None}
+    )
+
+
+@app.post("/forgot-password")
+def forgot_password(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    email: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    email = email.strip().lower()
+    # Always render the same confirmation so this cannot be used to discover
+    # which email addresses have accounts.
+    done = templates.TemplateResponse(
+        request, "forgot_password.html", {"request": request, "sent": True, "error": None}
+    )
+
+    allowed, _ = ratelimit.check(f"reset:{email}", *RESET_REQUEST_LIMIT)
+    if not allowed:
+        return done
+
+    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if user is None:
+        return done
+
+    token = auth.create_reset_token(db, user["id"])
+    link = str(request.base_url).rstrip("/") + f"/reset-password?token={token}"
+    mailer.send_email(
+        to=user["email"],
+        subject="Reset your SkillMatch password",
+        body=(
+            f"Hi {user['name'] or 'there'},\n\n"
+            f"We received a request to reset your SkillMatch password.\n"
+            f"Use the link below within {auth.RESET_TOKEN_TTL_MINUTES} minutes:\n\n"
+            f"{link}\n\n"
+            f"If you didn't ask for this, you can safely ignore this email — "
+            f"your password will not change.\n"
+        ),
+    )
+    return done
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_form(
+    request: Request, token: str = "", db: sqlite3.Connection = Depends(get_db)
+):
+    _, error = auth.consume_reset_token(db, token)
+    return templates.TemplateResponse(
+        request,
+        "reset_password.html",
+        {"request": request, "token": token, "error": error, "valid": error is None},
+    )
+
+
+@app.post("/reset-password")
+def reset_password(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    token: str = Form(""),
+    password: str = Form(...),
+    confirm: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user_id, error = auth.consume_reset_token(db, token)
+    if error:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {"request": request, "token": token, "error": error, "valid": False},
+            status_code=400,
+        )
+    problem = auth.validate_password(password) or (
+        None if password == confirm else "Passwords do not match."
+    )
+    if problem:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {"request": request, "token": token, "error": problem, "valid": True},
+            status_code=400,
+        )
+
+    db.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (auth.hash_password(password), user_id),
+    )
+    db.commit()
+    auth.mark_reset_token_used(db, token)
+    # Drop any existing session so a stolen session cannot outlive the reset.
+    request.session.clear()
+    return RedirectResponse("/login?reset=1", status_code=303)
+
+
+@app.get("/account", response_class=HTMLResponse)
+def account_page(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "account.html",
+        {"request": request, "user": user, "error": None,
+         "changed": request.query_params.get("changed") == "1"},
+    )
+
+
+@app.post("/account/password")
+def account_change_password(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    current_password: str = Form(...),
+    password: str = Form(...),
+    confirm: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+
+    def fail(message: str):
+        return templates.TemplateResponse(
+            request,
+            "account.html",
+            {"request": request, "user": user, "error": message, "changed": False},
+            status_code=400,
+        )
+
+    if not auth.verify_password(current_password, user["password_hash"]):
+        return fail("Your current password is incorrect.")
+    problem = auth.validate_password(password) or (
+        None if password == confirm else "Passwords do not match."
+    )
+    if problem:
+        return fail(problem)
+
+    db.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (auth.hash_password(password), user["id"]),
+    )
+    db.commit()
+    return RedirectResponse("/account?changed=1", status_code=303)
 
 
 @app.post("/logout")
@@ -1012,6 +1202,24 @@ def employer_contact_send(
     job, cand = _contact_target(db, user, job_id, candidate_id)
     if job is None or cand is None:
         return RedirectResponse("/employer", status_code=303)
+
+    allowed, retry = ratelimit.check(f"contact:{user['id']}", *CONTACT_EMAIL_LIMIT)
+    if not allowed:
+        return templates.TemplateResponse(
+            request,
+            "contact.html",
+            {
+                "request": request, "user": user, "job": job, "cand": cand,
+                "subject": subject, "body": body,
+                "mail_configured": mailer.is_configured(),
+                "backend": mailer.backend(),
+                "error": (
+                    f"You've sent a lot of emails recently. "
+                    f"Please try again in {retry // 60 + 1} minute(s)."
+                ),
+            },
+            status_code=429,
+        )
 
     ok, error = mailer.send_email(
         to=cand["email"],

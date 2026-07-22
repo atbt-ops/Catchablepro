@@ -91,7 +91,12 @@ def send_email(
 
 def _send_console(to, subject, body, reply_to):
     outbox.append(SentMessage(to=to, subject=subject, body=body, reply_to=reply_to))
-    log.info("[console-email] to=%s reply_to=%s subject=%s", to, reply_to, subject)
+    # The full body is logged so flows that depend on emailed links (password
+    # reset) can actually be completed during local development.
+    log.info(
+        "[console-email]\n  To: %s\n  Reply-To: %s\n  Subject: %s\n  ---\n%s\n  ---",
+        to, reply_to or "-", subject, body,
+    )
     return True, None
 
 

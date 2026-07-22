@@ -1,7 +1,56 @@
-{% extends "base.html" %}
-{% from "macros.html" import icon, match_ring %}
+{% extends "shell.html" %}
+{% from "macros.html" import icon, match_ring, navitem %}
 {% block title %}Candidate dashboard · SkillMatch{% endblock %}
-{% block content %}
+
+{% block sidebar %}
+  <div class="nav-heading">Candidate</div>
+  {{ navitem('/candidate', 'target', 'Job matches', true) }}
+  {{ navitem('#profile', 'user', 'My profile') }}
+  {{ navitem('#applications', 'doc', 'Applications') }}
+  <div class="nav-heading">Account</div>
+  {{ navitem('/account', 'building', 'Settings') }}
+{% endblock %}
+
+{% block rightrail %}
+  {% set applied_count = my_apps | length %}
+  {% set best = (job_rows | map(attribute='pct') | max) if job_rows else 0 %}
+  <div class="railcard">
+    <h4>{{ icon('sparkle', 13) }} Your snapshot</h4>
+    <div class="statrow"><span class="k">Applications</span><span class="v brand">{{ applied_count }}</span></div>
+    <div class="statrow"><span class="k">Live jobs</span><span class="v">{{ job_rows | length }}</span></div>
+    <div class="statrow"><span class="k">Best match</span><span class="v green">{{ best }}%</span></div>
+  </div>
+
+  <div class="railcard">
+    <h4>{{ icon('user', 13) }} Profile strength</h4>
+    {% set score = (40 if profile.skills else 0) + (30 if profile.resume_filename else 0)
+                   + (15 if profile.headline else 0) + (15 if profile.auto_apply else 0) %}
+    <div class="meter"><i style="width: {{ score }}%"></i></div>
+    <p class="tip"><strong>{{ score }}% complete</strong></p>
+    <p class="tip">
+      {% if not profile.skills %}Add your skills to start matching.
+      {% elif not profile.resume_filename %}Upload a resume — we'll detect skills for you.
+      {% elif not profile.headline %}Add a headline so employers know your focus.
+      {% elif not profile.auto_apply %}Turn on Auto-Apply so you never miss a role.
+      {% else %}Your profile is complete. Nice work.{% endif %}
+    </p>
+  </div>
+
+  <div class="railcard">
+    <h4>{{ icon('bolt', 13) }} Auto-Apply</h4>
+    <p class="tip">
+      {% if profile.auto_apply %}
+        <strong style="color:var(--green)">ON</strong> — you're applied automatically
+        to every matching job, including new ones.
+      {% else %}
+        <strong>OFF</strong> — turn it on to be applied automatically to every
+        job you match.
+      {% endif %}
+    </p>
+  </div>
+{% endblock %}
+
+{% block main %}
 <div class="page-head">
   <div>
     <h1>Welcome, {{ user.name or user.email }}</h1>
@@ -11,7 +60,7 @@
 
 <div class="grid2">
   <!-- Profile -->
-  <section class="panel">
+  <section class="panel" id="profile">
     <h2>{{ icon('user', 18) }} Your profile</h2>
     <p class="hint">Skills power your match score. Upload a resume and we'll detect skills automatically.</p>
     <form action="/candidate/profile" method="post" enctype="multipart/form-data">
@@ -138,7 +187,7 @@
 </section>
 
 <!-- My applications -->
-<section class="panel">
+<section class="panel" id="applications">
   <h2>{{ icon('doc', 18) }} My applications
     {% if my_apps %}<span class="count-pill">{{ my_apps|length }}</span>{% endif %}
   </h2>

@@ -34,7 +34,7 @@
             <span class="who-role">{{ user.role }}</span>
           </span>
         </span>
-        <a class="btn ghost small" href="{{ '/employer' if user.role == 'employer' else '/candidate' }}">Dashboard</a>
+        <a class="navlink" href="/account">Account</a>
         <form action="/logout" method="post" class="inline">
           {{ csrf_field(request) }}
           <button class="iconbtn" title="Log out" aria-label="Log out">{{ icon('logout', 18) }}</button>
@@ -45,7 +45,7 @@
       {% endif %}
     </nav>
   </header>
-  <main class="container">
+  <main class="container {% block container_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
   <footer class="foot">

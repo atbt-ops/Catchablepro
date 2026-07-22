@@ -25,6 +25,12 @@
      aria-hidden="true">{{ paths.get(name, '') | safe }}</svg>
 {%- endmacro %}
 
+{% macro navitem(href, name, label, active=false) %}
+  <a class="navitem {{ 'active' if active }}" href="{{ href }}">
+    {{ icon(name, 17) }} <span>{{ label }}</span>
+  </a>
+{% endmacro %}
+
 {% macro tier(pct) %}{{ 'high' if pct >= 70 else 'mid' if pct >= 40 else 'low' }}{% endmacro %}
 
 {% macro match_ring(pct, size=64) %}

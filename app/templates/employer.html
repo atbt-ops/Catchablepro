@@ -1,7 +1,47 @@
-{% extends "base.html" %}
-{% from "macros.html" import icon %}
+{% extends "shell.html" %}
+{% from "macros.html" import icon, navitem %}
 {% block title %}Employer dashboard · SkillMatch{% endblock %}
-{% block content %}
+{% block sidebar %}
+  <div class="nav-heading">Employer</div>
+  {{ navitem('/employer', 'briefcase', 'Your jobs', true) }}
+  {{ navitem('/employer/jobs/new', 'plus', 'Post a job') }}
+  {{ navitem('#company', 'building', 'Company profile') }}
+  <div class="nav-heading">Account</div>
+  {{ navitem('/account', 'user', 'Settings') }}
+{% endblock %}
+
+{% block rightrail %}
+  {% set active_jobs = jobs | selectattr('status', 'equalto', 'active') | list %}
+  {% set drafts = jobs | selectattr('status', 'equalto', 'draft') | list %}
+  {% set total_apps = jobs | sum(attribute='n_apps') %}
+  <div class="railcard">
+    <h4>{{ icon('sparkle', 13) }} Hiring snapshot</h4>
+    <div class="statrow"><span class="k">Active jobs</span><span class="v green">{{ active_jobs | length }}</span></div>
+    <div class="statrow"><span class="k">Drafts</span><span class="v amber">{{ drafts | length }}</span></div>
+    <div class="statrow"><span class="k">Applicants</span><span class="v brand">{{ total_apps }}</span></div>
+  </div>
+
+  <div class="railcard">
+    <h4>{{ icon('plus', 13) }} Quick actions</h4>
+    <a class="btn small block" href="/employer/jobs/new">Post a job</a>
+    {% if drafts %}
+      <p class="tip" style="margin-top:10px;">
+        You have <strong>{{ drafts | length }}</strong> draft{{ 's' if drafts | length != 1 }}
+        not visible to candidates yet.
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="railcard">
+    <h4>{{ icon('target', 13) }} How matching works</h4>
+    <p class="tip">
+      match % = shared skills ÷ required skills. Listing precise required skills
+      gives you sharper candidate rankings.
+    </p>
+  </div>
+{% endblock %}
+
+{% block main %}
 <div class="page-head">
   <div>
     <h1>{{ user.company_name or user.name or 'Employer' }}</h1>
@@ -95,7 +135,7 @@
 </section>
 
 <!-- Company profile: secondary, collapsed by default -->
-<details class="panel collapse">
+<details class="panel collapse" id="company">
   <summary>
     <span>{{ icon('building', 18) }} Company profile</span>
     <span class="chev">Edit ▾</span>

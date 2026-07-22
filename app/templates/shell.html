@@ -1,0 +1,22 @@
+{# Three-column app shell for signed-in dashboards: nav rail | content | context rail #}
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block container_class %}wide{% endblock %}
+
+{% block content %}
+<div class="shell">
+  <aside class="rail rail-left">
+    <nav class="navlist">
+      {% block sidebar %}{% endblock %}
+    </nav>
+  </aside>
+
+  <div class="shell-main">
+    {% block main %}{% endblock %}
+  </div>
+
+  <aside class="rail rail-right">
+    {% block rightrail %}{% endblock %}
+  </aside>
+</div>
+{% endblock %}

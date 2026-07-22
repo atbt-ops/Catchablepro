@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Account settings · SkillMatch{% endblock %}
+{% block content %}
+<a class="backlink" href="{{ '/employer' if user.role == 'employer' else '/candidate' }}">
+  {{ icon('arrow-right', 14) }} Back to dashboard
+</a>
+<div class="page-head">
+  <div>
+    <h1>Account settings</h1>
+    <p class="sub">Manage your sign-in details.</p>
+  </div>
+</div>
+
+{% if changed %}
+  <div class="flash-ok">{{ icon('check', 15) }} Your password has been updated.</div>
+{% endif %}
+
+<div class="grid2">
+  <section class="panel">
+    <h2>{{ icon('user', 18) }} Profile</h2>
+    <table class="tbl">
+      <tbody>
+        <tr><th>Name</th><td>{{ user.name or '—' }}</td></tr>
+        <tr><th>Email</th><td>{{ user.email }}</td></tr>
+        <tr><th>Account type</th><td class="mono">{{ user.role | capitalize }}</td></tr>
+        {% if user.role == 'employer' %}
+          <tr><th>Company</th><td>{{ user.company_name or '—' }}</td></tr>
+          <tr><th>Designation</th><td>{{ user.designation or '—' }}</td></tr>
+          <tr><th>Phone</th><td>{{ user.phone or '—' }}</td></tr>
+        {% endif %}
+        <tr><th>Member since</th><td class="mono">{{ user.created_at }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('bolt', 18) }} Change password</h2>
+    {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
+    <form action="/account/password" method="post">
+      {{ csrf_field(request) }}
+      <label>Current password
+        <input type="password" name="current_password" required>
+      </label>
+      <label>New password
+        <input type="password" name="password" required minlength="8">
+        <span class="field-help">Minimum 8 characters, with both letters and numbers.</span>
+      </label>
+      <label>Confirm new password
+        <input type="password" name="confirm" required minlength="8">
+      </label>
+      <button class="btn" type="submit">{{ icon('check', 16) }} Update password</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

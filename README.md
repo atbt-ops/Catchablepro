@@ -80,6 +80,17 @@ payloads tiny and the app offline-friendly):
   a real toggle switch for Auto-Apply, friendly empty states, and a responsive layout.
 - Components live in `app/templates/macros.html`; tokens/themes in `app/static/style.css`.
 
+**Three-column app shell** (`app/templates/shell.html`) for signed-in dashboards,
+so wide screens aren't mostly empty margin:
+
+- **Left rail** — section navigation per role (jobs, profile, applications, settings).
+- **Centre** — the main workspace.
+- **Right rail** — contextual cards: candidate snapshot and a profile-strength
+  meter, or the employer's hiring stats and quick actions.
+
+The rails collapse away below 1180px and 900px respectively, so the layout
+degrades to a single column on tablets and phones. Auth pages stay centred.
+
 ## Run it
 
 ```bash
@@ -103,7 +114,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-44 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+59 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
@@ -175,6 +186,35 @@ EMAIL_FROM=no-reply@yourdomain.com
 `console` is the deliberate default so a misconfigured deploy can never mail real
 candidates by accident — the compose page shows a warning banner when no provider
 is configured. Sending failures are surfaced in the UI rather than swallowed.
+
+## Accounts & IAM
+
+Shared by both roles:
+
+| Route | Purpose |
+|-------|---------|
+| `/forgot-password` | Request a reset link by email |
+| `/reset-password?token=…` | Set a new password from the emailed link |
+| `/account` | View account details and change password |
+
+- **Password policy** — minimum 8 characters, must mix letters and numbers.
+  Enforced on signup, reset, and change.
+- **Reset tokens** — random 32-byte values, stored **hashed** (a database leak
+  can't be used to reset accounts), **single-use**, and expiring after 60
+  minutes. Issuing a new token invalidates earlier ones, and completing a reset
+  clears the session.
+- **No account enumeration** — `/forgot-password` returns the same confirmation
+  whether or not the address exists.
+- **Brute-force protection** — 8 failed logins per email in 15 minutes returns
+  HTTP 429; a successful login clears the counter.
+- **Rate limits** — password-reset requests (5/hour per email) and outbound
+  contact emails (30/hour per employer) are throttled.
+
+Counters are in-process, so with multiple workers each keeps its own; a shared
+store (Redis) would be needed to scale out.
+
+**Not yet implemented:** email-address verification at signup, 2FA, SSO/OAuth,
+and an admin role. See `app/auth.py` and `app/ratelimit.py`.
 
 ## Security
 

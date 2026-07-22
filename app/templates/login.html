@@ -6,6 +6,9 @@
   <div class="formcard">
     <h2>Welcome back</h2>
     <p class="sub">Log in to your SkillMatch account.</p>
+    {% if request.query_params.get('reset') %}
+      <p class="flash-ok">{{ icon('check', 15) }} Password updated — please log in.</p>
+    {% endif %}
     {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
     <form action="/login" method="post">
       {{ csrf_field(request) }}
@@ -17,7 +20,10 @@
       </label>
       <button class="btn block" type="submit">Log in</button>
     </form>
-    <p class="center-note">New here? <a href="/register">Create an account</a></p>
+    <p class="center-note">
+      <a href="/forgot-password">Forgot your password?</a><br>
+      New here? <a href="/register">Create an account</a>
+    </p>
   </div>
 </div>
 {% endblock %}
