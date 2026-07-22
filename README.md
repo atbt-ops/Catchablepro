@@ -134,15 +134,15 @@ Any Docker host works too — the image needs only `ENV=production` and a
 ## Project layout
 
 ```
-job-portal/
+.
 ├─ app/
 │  ├─ main.py        # FastAPI app + all routes + auto-apply logic
-│  ├─ db.py          # SQLite schema, connection, thresholds
+│  ├─ db.py          # SQLite schema, migration, thresholds
 │  ├─ auth.py        # PBKDF2 password hashing + session helper (stdlib only)
-│  ├─ matching.py    # keyword-overlap skill match
-│  ├─ templates/     # Jinja: landing, login, register, candidate, employer, matches
+│  ├─ matching.py    # keyword-overlap skill match + resume skill extraction
+│  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
 │  ├─ static/        # style.css (design system: light/dark themes)
-│  └─ templates/     # + macros.html (SVG icons, animated match ring)
+│  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
 ├─ .github/workflows/ci.yml   # CI: tests + docker build
 ├─ data/             # portal.db + uploads/ (git-ignored)
