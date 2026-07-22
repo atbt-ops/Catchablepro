@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Email verification · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard">
+    {% if ok %}
+      <h2>{{ icon('check', 20) }} Email confirmed</h2>
+      <p class="sub">
+        Thanks — your address is verified. You now have full access to
+        {% if user and user.role == 'employer' %}publish jobs and contact candidates.
+        {% else %}apply to jobs and use Auto-Apply.{% endif %}
+      </p>
+      <p class="center-note">
+        {% if user %}
+          <a class="btn" href="{{ '/employer' if user.role == 'employer' else '/candidate' }}">
+            Go to dashboard
+          </a>
+        {% else %}
+          <a class="btn" href="/login">Log in</a>
+        {% endif %}
+      </p>
+    {% else %}
+      <h2>Verification failed</h2>
+      <p class="error">{{ icon('bolt', 15) }} {{ error }}</p>
+      <p class="sub">
+        Verification links are valid for 48 hours and work only once. You can
+        send yourself a fresh one from your dashboard.
+      </p>
+      <p class="center-note">
+        {% if user %}
+          <a class="btn" href="{{ '/employer' if user.role == 'employer' else '/candidate' }}">
+            Go to dashboard
+          </a>
+        {% else %}
+          <a class="btn" href="/login">Log in</a>
+        {% endif %}
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

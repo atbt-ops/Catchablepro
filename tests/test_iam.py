@@ -172,3 +172,121 @@ def test_successful_login_clears_the_counter(client, register, post):
     # Counter was reset, so a fresh wrong attempt is 401 (not 429).
     assert post("/login", data={
         "email": "clear@x.io", "password": "wrongpass1"}).status_code == 401
+
+
+# --------------------------------------------------------------------------- #
+# Email verification
+# --------------------------------------------------------------------------- #
+def _verify_link():
+    assert mailer.outbox, "no verification email was sent"
+    m = re.search(r"(http://\S*/verify-email\?token=\S+)", mailer.outbox[-1].body)
+    assert m, f"no verify link in email:\n{mailer.outbox[-1].body}"
+    return m.group(1)
+
+
+def test_signup_sends_verification_email_and_link_verifies(client, register, post):
+    mailer.outbox.clear()
+    register("newbie@x.io", "candidate", verified=False)
+    assert mailer.outbox, "signup should send a verification email"
+    assert mailer.outbox[-1].to == "newbie@x.io"
+
+    token = _verify_link().split("token=", 1)[1]
+    page = client.get(f"/verify-email?token={token}").text
+    assert "Email confirmed" in page
+
+    # The banner is gone and applying is unlocked.
+    assert "Confirm your email address" not in client.get("/candidate").text
+    mailer.outbox.clear()
+
+
+def test_unverified_candidate_sees_banner_and_cannot_apply(
+    client, register, post, post_job
+):
+    register("emp-v@x.io", "employer", company_name="V")
+    post_job(title="Gated Role", required_skills="python")
+    post("/logout")
+
+    register("unver@x.io", "candidate", verified=False)
+    assert "Confirm your email address" in client.get("/candidate").text
+
+    r = post("/candidate/apply/1")
+    assert r.headers["location"] == "/candidate?verify_required=1"
+    # No application was recorded.
+    assert "My applications" in client.get("/candidate").text
+    assert "Gated Role" not in client.get("/candidate").text.split("My applications")[1]
+
+
+def test_unverified_candidate_cannot_enable_auto_apply(client, register, post):
+    register("noauto@x.io", "candidate", verified=False)
+    r = post("/candidate/auto-apply")
+    assert r.headers["location"] == "/candidate?verify_required=1"
+    assert "Auto-Apply is OFF" in client.get("/candidate").text
+
+
+def test_unverified_employer_can_draft_but_not_publish(client, register, post, post_job):
+    register("unvemp@x.io", "employer", company_name="UnvCo", verified=False)
+
+    # Publishing is refused...
+    r = post_job(title="Blocked Role", required_skills="python")
+    assert r.status_code == 403
+    assert "before publishing a job" in r.text
+
+    # ...but saving a draft still works.
+    r = post_job(title="Drafted Role", required_skills="python", action="draft")
+    assert r.status_code == 303
+    page = client.get("/employer").text
+    assert "Drafted Role" in page
+    assert "Blocked Role" not in page
+
+
+def test_unverified_employer_cannot_publish_existing_draft(client, register, post, post_job):
+    register("unvemp2@x.io", "employer", company_name="Unv2", verified=False)
+    post_job(title="Sitting Draft", required_skills="python", action="draft")
+    r = post("/employer/jobs/1/status", data={"status": "active"})
+    assert r.headers["location"] == "/employer?verify_required=1"
+    assert "Draft" in client.get("/employer").text
+
+
+def test_unverified_candidate_is_skipped_by_auto_apply(client, register, post, post_job):
+    """A verified employer posting a job must not pull in unverified candidates."""
+    from tests.conftest import mark_verified
+
+    register("unv-auto@x.io", "candidate", verified=False)
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+    # Force auto_apply on directly — the route would refuse while unverified.
+    import sqlite3
+    from app import db as dbmod
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.execute("UPDATE candidate_profiles SET auto_apply = 1")
+    conn.commit()
+    conn.close()
+    post("/logout")
+
+    register("verified-emp@x.io", "employer", company_name="VE")
+    post_job(title="Auto Role", required_skills="python")
+    matches = client.get("/employer/jobs/1/matches").text
+    assert "Auto-applied" not in matches
+
+
+def test_resend_verification(client, register, post):
+    register("resend@x.io", "candidate", verified=False)
+    mailer.outbox.clear()
+    r = post("/resend-verification")
+    assert r.status_code == 303
+    assert "verification_sent=1" in r.headers["location"]
+    assert len(mailer.outbox) == 1
+    assert mailer.outbox[-1].to == "resend@x.io"
+    mailer.outbox.clear()
+
+
+def test_verification_token_is_single_use(client, register, post):
+    mailer.outbox.clear()
+    register("single@x.io", "candidate", verified=False)
+    token = _verify_link().split("token=", 1)[1]
+    assert "Email confirmed" in client.get(f"/verify-email?token={token}").text
+    assert "already been used" in client.get(f"/verify-email?token={token}").text
+    mailer.outbox.clear()
+
+
+def test_invalid_verification_token(client):
+    assert "Verification failed" in client.get("/verify-email?token=nonsense").text

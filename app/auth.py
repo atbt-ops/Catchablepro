@@ -15,6 +15,7 @@ _PBKDF2_ROUNDS = 200_000
 
 PASSWORD_MIN_LENGTH = 8
 RESET_TOKEN_TTL_MINUTES = 60
+VERIFY_TOKEN_TTL_HOURS = 48
 
 
 def validate_password(password: str) -> Optional[str]:
@@ -90,6 +91,49 @@ def mark_reset_token_used(db: sqlite3.Connection, token: str) -> None:
         "UPDATE password_resets SET used = 1 WHERE token_hash = ?", (_hash_token(token),)
     )
     db.commit()
+
+
+def create_verification_token(db: sqlite3.Connection, user_id: int) -> str:
+    """Issue a single-use email-verification token and return the raw value."""
+    token = secrets.token_urlsafe(32)
+    expires = datetime.now(timezone.utc) + timedelta(hours=VERIFY_TOKEN_TTL_HOURS)
+    db.execute("UPDATE email_verifications SET used = 1 WHERE user_id = ?", (user_id,))
+    db.execute(
+        "INSERT INTO email_verifications (user_id, token_hash, expires_at) "
+        "VALUES (?, ?, ?)",
+        (user_id, _hash_token(token), expires.isoformat()),
+    )
+    db.commit()
+    return token
+
+
+def verify_email_token(
+    db: sqlite3.Connection, token: str
+) -> Tuple[Optional[int], Optional[str]]:
+    """Validate and consume a verification token. Returns ``(user_id, error)``."""
+    if not token:
+        return None, "This verification link is invalid."
+    row = db.execute(
+        "SELECT * FROM email_verifications WHERE token_hash = ?", (_hash_token(token),)
+    ).fetchone()
+    if row is None:
+        return None, "This verification link is invalid."
+    if row["used"]:
+        return None, "This link has already been used. Your email may already be verified."
+    try:
+        expires = datetime.fromisoformat(row["expires_at"])
+    except ValueError:
+        return None, "This verification link is invalid."
+    if expires < datetime.now(timezone.utc):
+        return None, "This link has expired. Request a new one from your dashboard."
+
+    db.execute(
+        "UPDATE email_verifications SET used = 1 WHERE token_hash = ?",
+        (_hash_token(token),),
+    )
+    db.execute("UPDATE users SET email_verified = 1 WHERE id = ?", (row["user_id"],))
+    db.commit()
+    return row["user_id"], None
 
 
 def current_user(request: Request, db: sqlite3.Connection) -> Optional[sqlite3.Row]:

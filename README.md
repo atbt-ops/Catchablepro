@@ -114,7 +114,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-59 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+68 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
@@ -195,7 +195,28 @@ Shared by both roles:
 |-------|---------|
 | `/forgot-password` | Request a reset link by email |
 | `/reset-password?token=…` | Set a new password from the emailed link |
-| `/account` | View account details and change password |
+| `/verify-email?token=…` | Confirm an email address from the signup link |
+| `/resend-verification` | Send a fresh verification link |
+| `/account` | View account details, verification status, change password |
+
+### Email verification
+
+Signing up sends a confirmation link (valid 48 hours, single-use). Until it's
+used the account works, but the actions that carry weight are **locked** — this
+is enforced server-side, not just hidden in the UI:
+
+| Role | Blocked while unverified | Still allowed |
+|------|--------------------------|---------------|
+| **Employer** | Publishing a job, reopening a draft, contacting candidates | Signing in, onboarding, saving **drafts** |
+| **Candidate** | Applying to jobs, enabling Auto-Apply | Signing in, editing profile, browsing jobs |
+
+Unverified candidates are also skipped by Auto-Apply entirely, so an
+unconfirmed address can never generate applications. A banner on every page
+explains what's locked and offers a **Resend link** button (throttled to
+5/hour).
+
+Accounts created *before* this feature are grandfathered in as verified by the
+migration, so upgrading never locks existing users out.
 
 - **Password policy** — minimum 8 characters, must mix letters and numbers.
   Enforced on signup, reset, and change.
@@ -213,8 +234,8 @@ Shared by both roles:
 Counters are in-process, so with multiple workers each keeps its own; a shared
 store (Redis) would be needed to scale out.
 
-**Not yet implemented:** email-address verification at signup, 2FA, SSO/OAuth,
-and an admin role. See `app/auth.py` and `app/ratelimit.py`.
+**Not yet implemented:** 2FA, SSO/OAuth, an admin role, and session revocation
+across devices. See `app/auth.py` and `app/ratelimit.py`.
 
 ## Security
 

@@ -64,15 +64,28 @@ def post_job(post):
     return _do
 
 
+def mark_verified(email: str) -> None:
+    """Flip a user's email to verified, as clicking the emailed link would."""
+    import sqlite3
+
+    from app import db as dbmod
+
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.execute("UPDATE users SET email_verified = 1 WHERE email = ?", (email,))
+    conn.commit()
+    conn.close()
+
+
 @pytest.fixture()
 def register(post):
     """Register (and log in) a user through the right portal for their role.
 
     Employers go through /employer/register and land in the onboarding wizard;
     unless ``onboard=False``, the wizard is completed so tests reach the
-    dashboard directly.
+    dashboard directly. Accounts are marked email-verified unless
+    ``verified=False``, since most tests exercise fully-activated users.
     """
-    def _do(email, role, onboard=True, **extra):
+    def _do(email, role, onboard=True, verified=True, **extra):
         data = {"email": email, "password": "password123",
                 "name": email.split("@")[0]}
         data.update(extra)
@@ -81,6 +94,9 @@ def register(post):
             resp = post("/employer/register", data=data)
             if onboard and resp.status_code == 303:
                 post("/employer/onboarding/finish")
-            return resp
-        return post("/register", data=data)
+        else:
+            resp = post("/register", data=data)
+        if verified and resp.status_code == 303:
+            mark_verified(email)
+        return resp
     return _do

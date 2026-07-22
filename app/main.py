@@ -96,8 +96,27 @@ RESET_REQUEST_LIMIT = (5, 60 * 60)  # per email — stops reset-mail spam
 CONTACT_EMAIL_LIMIT = (30, 60 * 60)  # per employer — stops mass mailing
 
 
+VERIFY_RESEND_LIMIT = (5, 60 * 60)  # per user — stops verification-mail spam
+
+
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
+
+
+def _send_verification_email(request: Request, db: sqlite3.Connection, user) -> None:
+    token = auth.create_verification_token(db, user["id"])
+    link = str(request.base_url).rstrip("/") + f"/verify-email?token={token}"
+    mailer.send_email(
+        to=user["email"],
+        subject="Confirm your SkillMatch email address",
+        body=(
+            f"Hi {user['name'] or 'there'},\n\n"
+            f"Please confirm your email address to activate your SkillMatch "
+            f"account. This link is valid for {auth.VERIFY_TOKEN_TTL_HOURS} hours:\n\n"
+            f"{link}\n\n"
+            f"If you didn't create this account, you can ignore this email.\n"
+        ),
+    )
 COMPANY_SIZES = [
     "1-10 employees", "11-50 employees", "51-200 employees",
     "201-500 employees", "501-1000 employees", "1000+ employees",
@@ -227,6 +246,11 @@ def _auto_apply_candidate_to_all_jobs(db: sqlite3.Connection, candidate_id: int)
     prof = _profile(db, candidate_id)
     if not prof["auto_apply"]:
         return 0
+    owner = db.execute(
+        "SELECT email_verified FROM users WHERE id = ?", (candidate_id,)
+    ).fetchone()
+    if owner is None or not owner["email_verified"]:
+        return 0  # unverified accounts never auto-apply
     # Only live postings — drafts and closed roles are not applied to.
     jobs = db.execute(
         "SELECT id, required_skills FROM jobs WHERE status = 'active'"
@@ -255,7 +279,9 @@ def _auto_apply_all_candidates_to_job(db: sqlite3.Connection, job_id: int) -> No
     if job is None or job["status"] != "active":
         return
     candidates = db.execute(
-        "SELECT p.user_id, p.skills FROM candidate_profiles p WHERE p.auto_apply = 1"
+        "SELECT p.user_id, p.skills FROM candidate_profiles p "
+        "JOIN users u ON u.id = p.user_id "
+        "WHERE p.auto_apply = 1 AND u.email_verified = 1"
     ).fetchall()
     for cand in candidates:
         pct = match_pct(cand["skills"], job["required_skills"])
@@ -326,6 +352,8 @@ def register(
     db.execute("INSERT INTO candidate_profiles (user_id) VALUES (?)", (user_id,))
     db.commit()
     request.session["user_id"] = user_id
+    new_user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    _send_verification_email(request, db, new_user)
     return RedirectResponse("/candidate", status_code=303)
 
 
@@ -414,6 +442,8 @@ def employer_register(
     )
     db.commit()
     request.session["user_id"] = user_id
+    new_user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    _send_verification_email(request, db, new_user)
     return RedirectResponse("/employer/onboarding", status_code=303)
 
 
@@ -466,6 +496,38 @@ def employer_login(
 # --------------------------------------------------------------------------- #
 # Account & password management (shared by both roles)
 # --------------------------------------------------------------------------- #
+@app.get("/verify-email", response_class=HTMLResponse)
+def verify_email(
+    request: Request, token: str = "", db: sqlite3.Connection = Depends(get_db)
+):
+    user_id, error = auth.verify_email_token(db, token)
+    user = auth.current_user(request, db)
+    return templates.TemplateResponse(
+        request,
+        "verify_email.html",
+        {"request": request, "user": user, "error": error, "ok": error is None},
+    )
+
+
+@app.post("/resend-verification")
+def resend_verification(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    back = _dashboard_url(user["role"])
+    if user["email_verified"]:
+        return RedirectResponse(back, status_code=303)
+    allowed, _ = ratelimit.check(f"verify:{user['id']}", *VERIFY_RESEND_LIMIT)
+    if allowed:
+        _send_verification_email(request, db, user)
+    # Same response either way — no signal about the throttle.
+    return RedirectResponse(f"{back}?verification_sent=1", status_code=303)
+
+
 @app.get("/forgot-password", response_class=HTMLResponse)
 def forgot_password_form(request: Request):
     return templates.TemplateResponse(
@@ -753,6 +815,9 @@ def candidate_toggle_auto_apply(
         return redirect
     prof = _profile(db, user["id"])
     new_val = 0 if prof["auto_apply"] else 1
+    # Turning it ON requires a confirmed address; turning it OFF is always fine.
+    if new_val and not user["email_verified"]:
+        return RedirectResponse("/candidate?verify_required=1", status_code=303)
     db.execute(
         "UPDATE candidate_profiles SET auto_apply = ? WHERE user_id = ?",
         (new_val, user["id"]),
@@ -773,6 +838,8 @@ def candidate_apply(
     user, redirect = _require(request, db, "candidate")
     if redirect:
         return redirect
+    if not user["email_verified"]:
+        return RedirectResponse("/candidate?verify_required=1", status_code=303)
     prof = _profile(db, user["id"])
     job = db.execute("SELECT required_skills FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if job is not None:
@@ -989,6 +1056,27 @@ def employer_create_job(
         return redirect
 
     status = "draft" if action == "draft" else "active"
+    # An unverified employer may draft roles but not publish them to candidates.
+    if status == "active" and not user["email_verified"]:
+        form = {
+            "title": title, "location": location, "required_skills": required_skills,
+            "description": sanitize_html(description), "employment_type": employment_type,
+            "work_mode": work_mode, "exp_min": exp_min, "exp_max": exp_max,
+            "salary_min": salary_min, "salary_max": salary_max,
+            "hide_salary": bool(hide_salary), "vacancies": vacancies,
+            "education": education, "department": department, "deadline": deadline,
+        }
+        return templates.TemplateResponse(
+            request,
+            "job_new.html",
+            _job_form_context(request, user, form, [
+                "Confirm your email address before publishing a job. "
+                "You can still save this role as a draft — check your inbox for "
+                "the verification link, or resend it from your dashboard."
+            ]),
+            status_code=403,
+        )
+
     # Keep experience ranges sane rather than rejecting the whole form.
     exp_min, exp_max = max(0, exp_min), max(0, exp_max)
     if exp_max and exp_max < exp_min:
@@ -1071,6 +1159,8 @@ def employer_set_job_status(
         return redirect
     if status not in ("draft", "active", "closed"):
         return RedirectResponse("/employer", status_code=303)
+    if status == "active" and not user["email_verified"]:
+        return RedirectResponse("/employer?verify_required=1", status_code=303)
     owned = db.execute(
         "SELECT id FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
     ).fetchone()
@@ -1202,6 +1292,20 @@ def employer_contact_send(
     job, cand = _contact_target(db, user, job_id, candidate_id)
     if job is None or cand is None:
         return RedirectResponse("/employer", status_code=303)
+
+    if not user["email_verified"]:
+        return templates.TemplateResponse(
+            request,
+            "contact.html",
+            {
+                "request": request, "user": user, "job": job, "cand": cand,
+                "subject": subject, "body": body,
+                "mail_configured": mailer.is_configured(),
+                "backend": mailer.backend(),
+                "error": "Confirm your email address before contacting candidates.",
+            },
+            status_code=403,
+        )
 
     allowed, retry = ratelimit.check(f"contact:{user['id']}", *CONTACT_EMAIL_LIMIT)
     if not allowed:

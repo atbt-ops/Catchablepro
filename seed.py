@@ -61,8 +61,8 @@ def main() -> None:
     email_to_id = {}
     for email, company, name in EMPLOYERS:
         cur = conn.execute(
-            "INSERT OR IGNORE INTO users (email, password_hash, role, name, company_name) "
-            "VALUES (?, ?, 'employer', ?, ?)", (email, pw, name, company))
+            "INSERT OR IGNORE INTO users (email, password_hash, role, name, company_name, email_verified) "
+            "VALUES (?, ?, 'employer', ?, ?, 1)", (email, pw, name, company))
         email_to_id[email] = cur.lastrowid or conn.execute(
             "SELECT id FROM users WHERE email = ?", (email,)).fetchone()[0]
         industry, size, website, about = COMPANIES[email]
@@ -75,8 +75,8 @@ def main() -> None:
 
     for email, name, headline, skills, auto in CANDIDATES:
         cur = conn.execute(
-            "INSERT OR IGNORE INTO users (email, password_hash, role, name) "
-            "VALUES (?, ?, 'candidate', ?)", (email, pw, name))
+            "INSERT OR IGNORE INTO users (email, password_hash, role, name, email_verified) "
+            "VALUES (?, ?, 'candidate', ?, 1)", (email, pw, name))
         cid = cur.lastrowid or conn.execute(
             "SELECT id FROM users WHERE email = ?", (email,)).fetchone()[0]
         conn.execute(

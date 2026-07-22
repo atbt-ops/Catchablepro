@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     company_name  TEXT    NOT NULL DEFAULT '',
     phone         TEXT    NOT NULL DEFAULT '',
     designation   TEXT    NOT NULL DEFAULT '',
+    email_verified INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -89,6 +90,15 @@ CREATE TABLE IF NOT EXISTS password_resets (
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS email_verifications (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT    NOT NULL UNIQUE,
+    expires_at TEXT    NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS applications (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id       INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -132,6 +142,7 @@ _ADDED_COLUMNS = {
     "users": {
         "phone": "TEXT NOT NULL DEFAULT ''",
         "designation": "TEXT NOT NULL DEFAULT ''",
+        "email_verified": "INTEGER NOT NULL DEFAULT 0",
     },
     "company_profiles": {
         "hq_location": "TEXT NOT NULL DEFAULT ''",
@@ -152,6 +163,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 # Employers that predate the wizard have already set themselves
                 # up — don't trap them in onboarding on their next login.
                 conn.execute("UPDATE company_profiles SET onboarding_step = 3")
+            elif name == "email_verified":
+                # Accounts that predate verification are grandfathered in, so an
+                # upgrade never locks existing users out of applying or posting.
+                conn.execute("UPDATE users SET email_verified = 1")
 
 
 def init_db() -> None:

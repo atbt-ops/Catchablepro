@@ -46,6 +46,34 @@
     </nav>
   </header>
   <main class="container {% block container_class %}{% endblock %}">
+    {% if user and not user.email_verified %}
+      <div class="notice verify-banner">
+        {{ icon('mail', 16) }}
+        <div>
+          <strong>Confirm your email address.</strong>
+          We sent a link to <code>{{ user.email }}</code>.
+          {% if user.role == 'employer' %}
+            You can draft jobs, but publishing and contacting candidates stay
+            locked until it's confirmed.
+          {% else %}
+            Applying to jobs and Auto-Apply stay locked until it's confirmed.
+          {% endif %}
+        </div>
+        <form action="/resend-verification" method="post" class="inline">
+          {{ csrf_field(request) }}
+          <button class="btn ghost small" type="submit">Resend link</button>
+        </form>
+      </div>
+    {% endif %}
+    {% if request.query_params.get('verification_sent') %}
+      <div class="flash-ok">{{ icon('check', 15) }} Verification email sent — check your inbox.</div>
+    {% endif %}
+    {% if request.query_params.get('verify_required') %}
+      <div class="notice">
+        {{ icon('bolt', 16) }}
+        <div>Confirm your email address first — use the <strong>Resend link</strong> button above.</div>
+      </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
   <footer class="foot">

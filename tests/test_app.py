@@ -327,6 +327,9 @@ def test_contact_form_prefills_candidate_and_sends(client, register, post, post_
     assert "Backend Engineer" in form
     assert "Hi Asha Verma" in form
 
+    # Ignore the verification emails sent during signup.
+    mailer.outbox.clear()
+
     # Sending delivers to the candidate, with replies routed to the employer.
     r = post("/employer/jobs/1/contact/2", data={
         "subject": "About the Backend Engineer role", "body": "Hi Asha, let's talk.",
@@ -354,6 +357,7 @@ def test_employer_cannot_contact_through_another_employers_job(client, register,
 
     # Employer B tries to use A's job to reach the candidate.
     register("b@x.io", "employer", company_name="B")
+    mailer.outbox.clear()  # drop signup verification mails
     r = post("/employer/jobs/1/contact/2", data={"subject": "Hi", "body": "Hello"})
     assert r.status_code == 303
     assert r.headers["location"] == "/employer"

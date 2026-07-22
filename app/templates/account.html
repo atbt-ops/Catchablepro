@@ -22,7 +22,17 @@
     <table class="tbl">
       <tbody>
         <tr><th>Name</th><td>{{ user.name or '—' }}</td></tr>
-        <tr><th>Email</th><td>{{ user.email }}</td></tr>
+        <tr>
+          <th>Email</th>
+          <td>
+            {{ user.email }}
+            {% if user.email_verified %}
+              <span class="tag applied">Verified</span>
+            {% else %}
+              <span class="tag status-draft">Unverified</span>
+            {% endif %}
+          </td>
+        </tr>
         <tr><th>Account type</th><td class="mono">{{ user.role | capitalize }}</td></tr>
         {% if user.role == 'employer' %}
           <tr><th>Company</th><td>{{ user.company_name or '—' }}</td></tr>

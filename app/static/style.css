@@ -428,6 +428,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--amber); background: color-mix(in srgb, var(--amber) 11%, transparent);
   border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
 }
+.verify-banner { align-items: center; }
+.verify-banner > div { flex: 1; }
+.verify-banner form { flex: none; }
 .notice code {
   padding: 1px 6px; border-radius: 5px; font-size: 12px;
   background: color-mix(in srgb, var(--amber) 16%, transparent);
