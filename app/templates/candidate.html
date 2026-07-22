@@ -162,6 +162,11 @@
           {% endif %}
           <div class="chips">
             {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
+            {% for p in r.partial %}
+              <span class="chip part" title="{{ p.pct }}% credit via {{ p.via }}">
+                {{ p.skill }} <em>≈ {{ p.via }}</em>
+              </span>
+            {% endfor %}
             {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}
           </div>
         </div>

@@ -1,11 +1,20 @@
-"""Skill matching via keyword overlap.
+"""Semantic skill matching.
 
-match% = |candidate_skills ∩ required_skills| / |required_skills| * 100
+Each required skill is scored 0..1 against the candidate's skills — exact and
+alias hits score 1.0, related skills earn partial credit from a knowledge graph
+(React counts toward JavaScript), and near-identical strings survive typos.
+
+    match% = sum(best score per required skill) / |required skills| * 100
+
+With no aliases, related skills or typos in play this reduces to the original
+keyword overlap, so existing scores are unchanged.
 """
 from __future__ import annotations
 
 import re
-from typing import Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
+
+from .semantics import canonical, score_skill
 
 # A base vocabulary of common skills used to auto-detect skills in resume text.
 # It is combined at runtime with every skill employers actually require, so the
@@ -33,14 +42,24 @@ def parse_skills(raw: str) -> Set[str]:
     return {p.strip().lower() for p in parts if p.strip()}
 
 
+def _score_all(candidate_raw: str, required_raw: str):
+    """Score every required skill against the candidate's skill set."""
+    required = parse_skills(required_raw)
+    candidate = parse_skills(candidate_raw)
+    results = []
+    for want in sorted(required):
+        score, via, kind = score_skill(candidate, want)
+        results.append((want, score, via, kind))
+    return results
+
+
 def match_pct(candidate_raw: str, required_raw: str) -> int:
     """Return the integer match percentage of a candidate against a job."""
-    required = parse_skills(required_raw)
-    if not required:
+    results = _score_all(candidate_raw, required_raw)
+    if not results:
         return 0
-    candidate = parse_skills(candidate_raw)
-    overlap = candidate & required
-    return round(len(overlap) / len(required) * 100)
+    total = sum(score for _, score, _, _ in results)
+    return round(total / len(results) * 100)
 
 
 def extract_skills(text: str, extra_vocab: Iterable[str] = ()) -> Set[str]:
@@ -64,11 +83,30 @@ def extract_skills(text: str, extra_vocab: Iterable[str] = ()) -> Set[str]:
     return found
 
 
-def match_detail(candidate_raw: str, required_raw: str) -> Tuple[int, List[str], List[str]]:
-    """Return (pct, matched_skills, missing_skills) sorted for display."""
-    required = parse_skills(required_raw)
-    candidate = parse_skills(candidate_raw)
-    matched = sorted(candidate & required)
-    missing = sorted(required - candidate)
-    pct = 0 if not required else round(len(matched) / len(required) * 100)
-    return pct, matched, missing
+def match_detail(
+    candidate_raw: str, required_raw: str
+) -> Tuple[int, List[str], List[Dict[str, str]], List[str]]:
+    """Return ``(pct, matched, partial, missing)`` for display.
+
+    ``matched`` are required skills the candidate has outright. ``partial`` are
+    dicts of ``{skill, via, kind}`` explaining where the partial credit came
+    from (e.g. javascript via react). ``missing`` are unmet requirements.
+    """
+    results = _score_all(candidate_raw, required_raw)
+    if not results:
+        return 0, [], [], []
+
+    matched: List[str] = []
+    partial: List[Dict[str, str]] = []
+    missing: List[str] = []
+    for want, score, via, kind in results:
+        if score >= 1.0:
+            matched.append(want)
+        elif score > 0:
+            partial.append({"skill": want, "via": via or "", "kind": kind,
+                            "pct": str(round(score * 100))})
+        else:
+            missing.append(want)
+
+    total = sum(score for _, score, _, _ in results)
+    return round(total / len(results) * 100), matched, partial, missing

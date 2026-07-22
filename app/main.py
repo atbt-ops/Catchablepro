@@ -756,12 +756,15 @@ def candidate_dashboard(
     }
     job_rows = []
     for job in jobs:
-        pct, matched, missing = match_detail(prof["skills"], job["required_skills"])
+        pct, matched, partial, missing = match_detail(
+            prof["skills"], job["required_skills"]
+        )
         job_rows.append(
             {
                 "job": job,
                 "pct": pct,
                 "matched": matched,
+                "partial": partial,
                 "missing": missing,
                 "applied": job["id"] in applied_ids,
             }
@@ -1276,7 +1279,9 @@ def employer_job_matches(
     }
     rows = []
     for cand in candidates:
-        pct, matched, missing = match_detail(cand["skills"], job["required_skills"])
+        pct, matched, partial, missing = match_detail(
+            cand["skills"], job["required_skills"]
+        )
         if pct < EMPLOYER_MATCH_THRESHOLD:
             continue
         app_row = applied_ids.get(cand["id"])
@@ -1285,6 +1290,7 @@ def employer_job_matches(
                 "cand": cand,
                 "pct": pct,
                 "matched": matched,
+                "partial": partial,
                 "missing": missing,
                 "applied": app_row is not None,
                 "source": app_row["source"] if app_row else None,

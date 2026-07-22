@@ -24,9 +24,12 @@ def test_match_pct_full_and_none():
 
 
 def test_match_detail_splits_matched_and_missing():
-    pct, matched, missing = match_detail("python, docker", "python, sql, docker, aws")
+    pct, matched, partial, missing = match_detail(
+        "python, docker", "python, sql, docker, aws"
+    )
     assert pct == 50
     assert matched == ["docker", "python"]
+    assert partial == []
     assert missing == ["aws", "sql"]
 
 

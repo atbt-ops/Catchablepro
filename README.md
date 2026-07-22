@@ -96,14 +96,38 @@ Counts shown in headings, stage tiles and the right-rail stats reflect the
 deterministic tiebreaker (`… , id DESC`); without it, rows sharing a timestamp
 could repeat on one page and vanish from another.
 
-### How matching works (keyword overlap)
+### How matching works (semantic)
+
+Every required skill is scored 0–1 against the candidate's skills, and the
+average becomes the match percentage:
 
 ```
-match % = |candidate_skills ∩ job_required_skills| / |job_required_skills| × 100
+match % = Σ(best score per required skill) / |required skills| × 100
 ```
 
-Skills are comma-separated, case-insensitive. A candidate profile "is sent to the
-employer" by surfacing on that job's **Matches** page, ranked highest-first.
+| Signal | Score | Example |
+|--------|-------|---------|
+| Exact / alias | **1.0** | `k8s` → `kubernetes`, `JS` → `javascript`, `postgres` → `postgresql` |
+| Related skill | **0.35–0.9** | `react` earns 0.6 toward `javascript`; `postgresql` earns 0.8 toward `sql` |
+| Near-identical | **~0.85** | `kubernets` → `kubernetes` (typo) |
+| Unrelated | **0** | `java` vs `javascript` — deliberately *not* a match |
+
+Partial credit is shown to both sides as an amber chip explaining where it came
+from (`javascript ≈ react`), so nobody has to guess why a score is what it is.
+
+**Why not an LLM or embeddings?** Matching runs for every candidate × job pair
+on every page render. The knowledge graph in `app/semantics.py` scores a pair in
+~36 µs (≈7 ms for a 200-candidate page) with no API key, no network call and no
+per-request cost — and it's deterministic, so scores are reproducible and
+testable. An embedding or LLM backend could slot in behind `score_skill()` later
+if the vocabulary outgrows a curated graph; it would need precomputed vectors
+and caching to keep page renders fast.
+
+With no aliases, related skills or typos involved the formula reduces to plain
+keyword overlap, so previously-computed scores are unchanged.
+
+A candidate profile "is sent to the employer" by surfacing on that job's
+**Matches** page, ranked highest-first.
 
 ### Auto-Apply
 
@@ -159,7 +183,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-94 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+123 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
