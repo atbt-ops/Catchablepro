@@ -1,5 +1,5 @@
 {% extends "shell.html" %}
-{% from "macros.html" import icon, navitem %}
+{% from "macros.html" import icon, navitem, pager %}
 {% block title %}Employer dashboard · SkillMatch{% endblock %}
 {% block sidebar %}
   <div class="nav-heading">Employer</div>
@@ -11,22 +11,20 @@
 {% endblock %}
 
 {% block rightrail %}
-  {% set active_jobs = jobs | selectattr('status', 'equalto', 'active') | list %}
-  {% set drafts = jobs | selectattr('status', 'equalto', 'draft') | list %}
-  {% set total_apps = jobs | sum(attribute='n_apps') %}
+
   <div class="railcard">
     <h4>{{ icon('sparkle', 13) }} Hiring snapshot</h4>
-    <div class="statrow"><span class="k">Active jobs</span><span class="v green">{{ active_jobs | length }}</span></div>
-    <div class="statrow"><span class="k">Drafts</span><span class="v amber">{{ drafts | length }}</span></div>
-    <div class="statrow"><span class="k">Applicants</span><span class="v brand">{{ total_apps }}</span></div>
+    <div class="statrow"><span class="k">Active jobs</span><span class="v green">{{ stat_active }}</span></div>
+    <div class="statrow"><span class="k">Drafts</span><span class="v amber">{{ stat_drafts }}</span></div>
+    <div class="statrow"><span class="k">Applicants</span><span class="v brand">{{ stat_applicants }}</span></div>
   </div>
 
   <div class="railcard">
     <h4>{{ icon('plus', 13) }} Quick actions</h4>
     <a class="btn small block" href="/employer/jobs/new">Post a job</a>
-    {% if drafts %}
+    {% if stat_drafts %}
       <p class="tip" style="margin-top:10px;">
-        You have <strong>{{ drafts | length }}</strong> draft{{ 's' if drafts | length != 1 }}
+        You have <strong>{{ stat_drafts }}</strong> draft{{ 's' if stat_drafts != 1 }}
         not visible to candidates yet.
       </p>
     {% endif %}
@@ -60,7 +58,7 @@
 <!-- Jobs first: this is the primary workspace -->
 <section class="panel">
   <h2>{{ icon('briefcase', 18) }} Your jobs
-    {% if jobs %}<span class="count-pill">{{ jobs|length }}</span>{% endif %}
+    {% if jobs_page.total %}<span class="count-pill">{{ jobs_page.total }}</span>{% endif %}
   </h2>
   {% if jobs %}
     <div class="rows">
@@ -126,6 +124,7 @@
       </div>
       {% endfor %}
     </div>
+    {{ pager(request, jobs_page, 'page', 'jobs') }}
   {% else %}
     <div class="empty">
       <span class="eico">{{ icon('briefcase', 24) }}</span>

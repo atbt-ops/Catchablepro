@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import icon, match_ring %}
+{% from "macros.html" import icon, match_ring, pager %}
 {% block title %}{{ job.title }} · Applicants{% endblock %}
 {% block container_class %}wide{% endblock %}
 {% block content %}
@@ -37,7 +37,7 @@
   <h2>
     {{ icon('user', 18) }}
     {% if sel_stage %}{{ stage_label(sel_stage) }} applicants{% else %}All applicants{% endif %}
-    {% if rows %}<span class="count-pill">{{ rows|length }}</span>{% endif %}
+    {% if apps_page.total %}<span class="count-pill">{{ apps_page.total }}</span>{% endif %}
   </h2>
 
   {% if rows %}
@@ -104,6 +104,7 @@
       </div>
       {% endfor %}
     </div>
+    {{ pager(request, apps_page, 'page', 'applicants') }}
   {% else %}
     <div class="empty">
       <span class="eico">{{ icon('user', 24) }}</span>

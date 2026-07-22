@@ -31,6 +31,44 @@
   </a>
 {% endmacro %}
 
+{# Pager. `p` is a Page; `param` is the query key holding the page number. #}
+{% macro pager(request, p, param='page', noun='results') %}
+  {% if p.pages > 1 %}
+  <nav class="pager" aria-label="Pagination">
+    <span class="pager-info">
+      {{ p.first_item }}–{{ p.last_item }} of {{ p.total }} {{ noun }}
+    </span>
+    <span class="pager-links">
+      {% if p.has_prev %}
+        <a class="pagebtn" href="{{ page_url(request, p.prev_page, param) }}" rel="prev">← Prev</a>
+      {% else %}
+        <span class="pagebtn disabled">← Prev</span>
+      {% endif %}
+      {% if 1 not in p.window() %}
+        <a class="pagebtn" href="{{ page_url(request, 1, param) }}">1</a>
+        <span class="pagegap">…</span>
+      {% endif %}
+      {% for n in p.window() %}
+        {% if n == p.page %}
+          <span class="pagebtn current" aria-current="page">{{ n }}</span>
+        {% else %}
+          <a class="pagebtn" href="{{ page_url(request, n, param) }}">{{ n }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if p.pages not in p.window() %}
+        <span class="pagegap">…</span>
+        <a class="pagebtn" href="{{ page_url(request, p.pages, param) }}">{{ p.pages }}</a>
+      {% endif %}
+      {% if p.has_next %}
+        <a class="pagebtn" href="{{ page_url(request, p.next_page, param) }}" rel="next">Next →</a>
+      {% else %}
+        <span class="pagebtn disabled">Next →</span>
+      {% endif %}
+    </span>
+  </nav>
+  {% endif %}
+{% endmacro %}
+
 {% macro tier(pct) %}{{ 'high' if pct >= 70 else 'mid' if pct >= 40 else 'low' }}{% endmacro %}
 
 {% macro match_ring(pct, size=64) %}

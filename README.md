@@ -71,6 +71,31 @@ Applied → Shortlisted → Interview → Offered → Hired      (+ On hold, Rej
 Every action is ownership-checked: an employer can only view or modify
 applications belonging to their own jobs.
 
+### Pagination
+
+Every list view is paged, with the page number in the query string so links are
+shareable and the back button works. Existing filters (work mode, employment
+type, pipeline stage) are preserved across pages, and an out-of-range `?page=`
+clamps to a valid page rather than erroring.
+
+| View | Per page | Paged in |
+|------|----------|----------|
+| Candidate job list | 10 | memory (after match ranking) |
+| Candidate applications | 10 | SQL |
+| Employer job list | 10 | SQL |
+| Job matches | 20 | memory (after match ranking) |
+| Applicants pipeline | 20 | SQL |
+
+The two ranked lists sort by match %, which isn't a stored column, so every
+candidate row is scored before slicing — that bounds the HTML rendered, not the
+rows scanned. Moving matching into SQL is the next step if those tables get
+large.
+
+Counts shown in headings, stage tiles and the right-rail stats reflect the
+**whole** result set, not just the visible page. All paged queries carry a
+deterministic tiebreaker (`… , id DESC`); without it, rows sharing a timestamp
+could repeat on one page and vanish from another.
+
 ### How matching works (keyword overlap)
 
 ```
@@ -134,7 +159,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-77 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+94 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).

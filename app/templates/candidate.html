@@ -1,5 +1,5 @@
 {% extends "shell.html" %}
-{% from "macros.html" import icon, match_ring, navitem %}
+{% from "macros.html" import icon, match_ring, navitem, pager %}
 {% block title %}Candidate dashboard · SkillMatch{% endblock %}
 
 {% block sidebar %}
@@ -12,12 +12,12 @@
 {% endblock %}
 
 {% block rightrail %}
-  {% set applied_count = my_apps | length %}
+  {% set applied_count = apps_page.total %}
   {% set best = (job_rows | map(attribute='pct') | max) if job_rows else 0 %}
   <div class="railcard">
     <h4>{{ icon('sparkle', 13) }} Your snapshot</h4>
     <div class="statrow"><span class="k">Applications</span><span class="v brand">{{ applied_count }}</span></div>
-    <div class="statrow"><span class="k">Live jobs</span><span class="v">{{ job_rows | length }}</span></div>
+    <div class="statrow"><span class="k">Live jobs</span><span class="v">{{ jobs_page.total }}</span></div>
     <div class="statrow"><span class="k">Best match</span><span class="v green">{{ best }}%</span></div>
   </div>
 
@@ -111,7 +111,7 @@
 <!-- Jobs ranked by match -->
 <section class="panel">
   <h2>{{ icon('target', 18) }} Jobs ranked by your skill match
-    {% if job_rows %}<span class="count-pill">{{ job_rows|length }}</span>{% endif %}
+    {% if jobs_page.total %}<span class="count-pill">{{ jobs_page.total }}</span>{% endif %}
   </h2>
   {% if not profile.skills %}
     <p class="hint">Add your skills above (or upload a resume) to see match percentages.</p>
@@ -178,6 +178,7 @@
       </div>
       {% endfor %}
     </div>
+    {{ pager(request, jobs_page, 'page', 'jobs') }}
   {% else %}
     <div class="empty">
       <span class="eico">{{ icon('briefcase', 24) }}</span>
@@ -189,7 +190,7 @@
 <!-- My applications -->
 <section class="panel" id="applications">
   <h2>{{ icon('doc', 18) }} My applications
-    {% if my_apps %}<span class="count-pill">{{ my_apps|length }}</span>{% endif %}
+    {% if apps_page.total %}<span class="count-pill">{{ apps_page.total }}</span>{% endif %}
   </h2>
   {% if my_apps %}
     <div class="tbl-wrap">
@@ -209,6 +210,7 @@
         </tbody>
       </table>
     </div>
+    {{ pager(request, apps_page, 'apps_page', 'applications') }}
   {% else %}
     <div class="empty">
       <span class="eico">{{ icon('doc', 24) }}</span>

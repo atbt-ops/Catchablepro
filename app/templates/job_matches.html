@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import icon, match_ring %}
+{% from "macros.html" import icon, match_ring, pager %}
 {% block title %}{{ job.title }} · Matches{% endblock %}
 {% block content %}
 <a class="backlink" href="/employer">{{ icon('arrow-right', 14) }} Back to dashboard</a>
@@ -19,7 +19,7 @@
 
 <section class="panel">
   <h2>{{ icon('user', 18) }} Candidate matches
-    {% if rows %}<span class="count-pill">{{ rows|length }}</span>{% endif %}
+    {% if matches_page.total %}<span class="count-pill">{{ matches_page.total }}</span>{% endif %}
   </h2>
   <p class="hint">Ranked by skill-match percentage. Profiles surface here automatically once they match this job.</p>
   {% if rows %}
@@ -60,6 +60,7 @@
       </div>
       {% endfor %}
     </div>
+    {{ pager(request, matches_page, 'page', 'candidates') }}
   {% else %}
     <div class="empty">
       <span class="eico">{{ icon('user', 24) }}</span>

@@ -13,6 +13,7 @@ import sqlite3
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
@@ -34,6 +35,14 @@ from .db import (
     init_db,
 )
 from .matching import extract_skills, match_detail, match_pct, parse_skills
+from .pagination import paginate
+
+# --- Page sizes ------------------------------------------------------------- #
+JOBS_PER_PAGE = 10        # candidate's ranked job list
+MY_APPS_PER_PAGE = 10     # candidate's own applications
+EMPLOYER_JOBS_PER_PAGE = 10
+MATCHES_PER_PAGE = 20     # ranked candidates for a job
+APPLICANTS_PER_PAGE = 20  # applicants in the hiring pipeline
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -185,6 +194,16 @@ templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
+
+
+def page_url(request: Request, page: int, param: str = "page") -> str:
+    """Current URL with ``param`` set to ``page``, preserving other filters."""
+    params = dict(request.query_params)
+    params[param] = str(page)
+    return f"{request.url.path}?{urlencode(params)}"
+
+
+templates.env.globals["page_url"] = page_url
 
 
 @asynccontextmanager
@@ -705,6 +724,8 @@ def candidate_dashboard(
     request: Request,
     work_mode: str = "",
     employment_type: str = "",
+    page: int = 1,
+    apps_page: int = 1,
     db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "candidate")
@@ -724,7 +745,7 @@ def candidate_dashboard(
     if employment_type:
         sql += " AND j.employment_type = ?"
         params.append(employment_type)
-    sql += " ORDER BY j.created_at DESC"
+    sql += " ORDER BY j.created_at DESC, j.id DESC"
     jobs = db.execute(sql, params).fetchall()
 
     applied_ids = {
@@ -745,14 +766,23 @@ def candidate_dashboard(
                 "applied": job["id"] in applied_ids,
             }
         )
+    # Ranking depends on every job's score, so the list is ordered in memory and
+    # then sliced. This bounds what is rendered, not what is scanned.
     job_rows.sort(key=lambda r: r["pct"], reverse=True)
+    jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
+    job_rows = jobs_page.slice(job_rows)
 
+    # Applications paginate in SQL — no ranking involved.
+    apps_total = db.execute(
+        "SELECT COUNT(*) AS n FROM applications WHERE candidate_id = ?", (user["id"],)
+    ).fetchone()["n"]
+    apps_pg = paginate(apps_total, apps_page, MY_APPS_PER_PAGE)
     my_apps = db.execute(
         "SELECT a.*, j.title, u.company_name FROM applications a "
         "JOIN jobs j ON j.id = a.job_id "
         "JOIN users u ON u.id = j.employer_id "
-        "WHERE a.candidate_id = ? ORDER BY a.created_at DESC",
-        (user["id"],),
+        "WHERE a.candidate_id = ? ORDER BY a.created_at DESC, a.id DESC LIMIT ? OFFSET ?",
+        (user["id"], apps_pg.per_page, apps_pg.offset),
     ).fetchall()
 
     return templates.TemplateResponse(
@@ -764,6 +794,8 @@ def candidate_dashboard(
             "profile": prof,
             "job_rows": job_rows,
             "my_apps": my_apps,
+            "jobs_page": jobs_page,
+            "apps_page": apps_pg,
             "auto_min": AUTO_APPLY_MIN_MATCH,
             "work_modes": WORK_MODES,
             "employment_types": EMPLOYMENT_TYPES,
@@ -969,23 +1001,49 @@ def employer_onboarding_finish(
 
 
 @app.get("/employer", response_class=HTMLResponse)
-def employer_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db)):
+def employer_dashboard(
+    request: Request, page: int = 1, db: sqlite3.Connection = Depends(get_db)
+):
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
     company = _company(db, user["id"])
     if company["onboarding_step"] < ONBOARDING_DONE:
         return RedirectResponse("/employer/onboarding", status_code=303)
+
+    total = db.execute(
+        "SELECT COUNT(*) AS n FROM jobs WHERE employer_id = ?", (user["id"],)
+    ).fetchone()["n"]
+    jobs_page = paginate(total, page, EMPLOYER_JOBS_PER_PAGE)
     jobs = db.execute(
         "SELECT j.*, "
         "(SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) AS n_apps "
-        "FROM jobs j WHERE j.employer_id = ? ORDER BY j.created_at DESC",
-        (user["id"],),
+        "FROM jobs j WHERE j.employer_id = ? ORDER BY j.created_at DESC, j.id DESC "
+        "LIMIT ? OFFSET ?",
+        (user["id"], jobs_page.per_page, jobs_page.offset),
     ).fetchall()
+
+    # Rail stats must reflect every job, not just this page.
+    stats = db.execute(
+        "SELECT "
+        "SUM(status = 'active') AS active, "
+        "SUM(status = 'draft') AS drafts, "
+        "(SELECT COUNT(*) FROM applications a JOIN jobs j2 ON j2.id = a.job_id "
+        " WHERE j2.employer_id = ?) AS applicants "
+        "FROM jobs WHERE employer_id = ?",
+        (user["id"], user["id"]),
+    ).fetchone()
+
     return templates.TemplateResponse(
         request,
         "employer.html",
-        {"request": request, "user": user, "jobs": jobs, "company": company},
+        {
+            "request": request, "user": user, "jobs": jobs, "company": company,
+            "jobs_page": jobs_page,
+            "stat_active": stats["active"] or 0,
+            "stat_drafts": stats["drafts"] or 0,
+            "stat_applicants": stats["applicants"] or 0,
+        },
     )
 
 
@@ -1192,7 +1250,8 @@ def employer_set_job_status(
 
 @app.get("/employer/jobs/{job_id}/matches", response_class=HTMLResponse)
 def employer_job_matches(
-    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+    request: Request, job_id: int, page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "employer")
     if redirect:
@@ -1207,7 +1266,7 @@ def employer_job_matches(
     # employer based on the percentage of skills" requirement.
     candidates = db.execute(
         "SELECT u.id, u.name, u.email, p.headline, p.skills, p.resume_filename "
-        "FROM candidate_profiles p JOIN users u ON u.id = p.user_id"
+        "FROM candidate_profiles p JOIN users u ON u.id = p.user_id ORDER BY u.id"
     ).fetchall()
     applied_ids = {
         r["candidate_id"]: r
@@ -1231,13 +1290,17 @@ def employer_job_matches(
                 "source": app_row["source"] if app_row else None,
             }
         )
+    # Ranked in memory (match % isn't a stored column), then sliced.
     rows.sort(key=lambda r: r["pct"], reverse=True)
+    matches_page = paginate(len(rows), page, MATCHES_PER_PAGE)
+    rows = matches_page.slice(rows)
 
     return templates.TemplateResponse(
         request,
         "job_matches.html",
         {
             "request": request, "user": user, "job": job, "rows": rows,
+            "matches_page": matches_page,
             "sent_to": request.query_params.get("sent", ""),
         },
     )
@@ -1248,6 +1311,7 @@ def employer_applicants(
     request: Request,
     job_id: int,
     stage: str = "",
+    page: int = 1,
     db: sqlite3.Connection = Depends(get_db),
 ):
     """Hiring pipeline for one job — everyone who actually applied."""
@@ -1260,20 +1324,32 @@ def employer_applicants(
     if job is None:
         return RedirectResponse("/employer", status_code=303)
 
+    # Stage tallies always cover the whole job, independent of the current page.
+    counts = {s: 0 for s in APPLICATION_STAGES}
+    for row in db.execute(
+        "SELECT status, COUNT(*) AS n FROM applications WHERE job_id = ? "
+        "GROUP BY status", (job_id,),
+    ):
+        counts[row["status"]] = row["n"]
+
+    where, params = "a.job_id = ?", [job_id]
+    if stage in APPLICATION_STAGES:
+        where += " AND a.status = ?"
+        params.append(stage)
+
+    shown_total = db.execute(
+        f"SELECT COUNT(*) AS n FROM applications a WHERE {where}", params
+    ).fetchone()["n"]
+    apps_page = paginate(shown_total, page, APPLICANTS_PER_PAGE)
     rows = db.execute(
         "SELECT a.*, u.name, u.email, p.headline, p.skills, p.resume_filename "
         "FROM applications a "
         "JOIN users u ON u.id = a.candidate_id "
         "LEFT JOIN candidate_profiles p ON p.user_id = a.candidate_id "
-        "WHERE a.job_id = ? ORDER BY a.match_pct DESC, a.created_at",
-        (job_id,),
+        f"WHERE {where} ORDER BY a.match_pct DESC, a.created_at, a.id "
+        "LIMIT ? OFFSET ?",
+        (*params, apps_page.per_page, apps_page.offset),
     ).fetchall()
-
-    counts = {s: 0 for s in APPLICATION_STAGES}
-    for r in rows:
-        counts[r["status"]] = counts.get(r["status"], 0) + 1
-    if stage in APPLICATION_STAGES:
-        rows = [r for r in rows if r["status"] == stage]
 
     return templates.TemplateResponse(
         request,
@@ -1281,6 +1357,7 @@ def employer_applicants(
         {
             "request": request, "user": user, "job": job, "rows": rows,
             "counts": counts, "total": sum(counts.values()),
+            "apps_page": apps_page,
             "pipeline_stages": PIPELINE_STAGES, "other_stages": OTHER_STAGES,
             "all_stages": APPLICATION_STAGES, "sel_stage": stage,
         },
