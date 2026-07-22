@@ -61,10 +61,12 @@ def main() -> None:
         email_to_id[email] = cur.lastrowid or conn.execute(
             "SELECT id FROM users WHERE email = ?", (email,)).fetchone()[0]
         industry, size, website, about = COMPANIES[email]
+        # onboarding_step 3 = complete, so demo logins land on the dashboard.
         conn.execute(
             "INSERT OR REPLACE INTO company_profiles "
-            "(user_id, industry, size, website, about) VALUES (?, ?, ?, ?, ?)",
-            (email_to_id[email], industry, size, website, about))
+            "(user_id, industry, size, website, about, hq_location, onboarding_step) "
+            "VALUES (?, ?, ?, ?, ?, ?, 3)",
+            (email_to_id[email], industry, size, website, about, "Bengaluru, India"))
 
     for email, name, headline, skills, auto in CANDIDATES:
         cur = conn.execute(

@@ -79,6 +79,12 @@ templates.env.globals["csrf_field"] = csrf_field
 # --------------------------------------------------------------------------- #
 # Display helpers (exposed to templates)
 # --------------------------------------------------------------------------- #
+ONBOARDING_DONE = 3  # step 1 = company details, 2 = first job, 3 = complete
+COMPANY_SIZES = [
+    "1-10 employees", "11-50 employees", "51-200 employees",
+    "201-500 employees", "501-1000 employees", "1000+ employees",
+]
+
 EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship", "Freelance"]
 WORK_MODES = ["On-site", "Hybrid", "Remote"]
 EDUCATION_LEVELS = ["Any", "Diploma", "Graduate", "Post Graduate", "Doctorate"]
@@ -135,6 +141,16 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 # --------------------------------------------------------------------------- #
 def _dashboard_url(role: str) -> str:
     return "/employer" if role == "employer" else "/candidate"
+
+
+def _post_login_url(db: sqlite3.Connection, user: sqlite3.Row) -> str:
+    """Employers with unfinished onboarding land in the wizard, not the dashboard."""
+    if user["role"] == "employer":
+        company = _company(db, user["id"])
+        if company["onboarding_step"] < ONBOARDING_DONE:
+            return "/employer/onboarding"
+        return "/employer"
+    return "/candidate"
 
 
 def _require(request: Request, db: sqlite3.Connection, role: Optional[str] = None):
@@ -252,14 +268,11 @@ def register(
     _csrf: None = Depends(verify_csrf),
     email: str = Form(...),
     password: str = Form(...),
-    role: str = Form(...),
     name: str = Form(""),
-    company_name: str = Form(""),
     db: sqlite3.Connection = Depends(get_db),
 ):
+    """Candidate signup. Employers register at /employer/register."""
     email = email.strip().lower()
-    if role not in ("employer", "candidate"):
-        role = "candidate"
     if db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
         return templates.TemplateResponse(
             request,
@@ -268,16 +281,15 @@ def register(
             status_code=400,
         )
     cur = db.execute(
-        "INSERT INTO users (email, password_hash, role, name, company_name) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (email, auth.hash_password(password), role, name.strip(), company_name.strip()),
+        "INSERT INTO users (email, password_hash, role, name) "
+        "VALUES (?, ?, 'candidate', ?)",
+        (email, auth.hash_password(password), name.strip()),
     )
     user_id = cur.lastrowid
-    if role == "candidate":
-        db.execute("INSERT INTO candidate_profiles (user_id) VALUES (?)", (user_id,))
+    db.execute("INSERT INTO candidate_profiles (user_id) VALUES (?)", (user_id,))
     db.commit()
     request.session["user_id"] = user_id
-    return RedirectResponse(_dashboard_url(role), status_code=303)
+    return RedirectResponse("/candidate", status_code=303)
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -303,7 +315,89 @@ def login(
             status_code=401,
         )
     request.session["user_id"] = user["id"]
-    return RedirectResponse(_dashboard_url(user["role"]), status_code=303)
+    return RedirectResponse(_post_login_url(db, user), status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Employer portal — separate signup/login, like a dedicated recruiter site
+# --------------------------------------------------------------------------- #
+@app.get("/employer/register", response_class=HTMLResponse)
+def employer_register_form(request: Request):
+    return templates.TemplateResponse(
+        request, "employer_register.html", {"request": request, "error": None}
+    )
+
+
+@app.post("/employer/register")
+def employer_register(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    email: str = Form(...),
+    password: str = Form(...),
+    name: str = Form(""),
+    company_name: str = Form(""),
+    phone: str = Form(""),
+    designation: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    email = email.strip().lower()
+    if db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+        return templates.TemplateResponse(
+            request,
+            "employer_register.html",
+            {"request": request, "error": "That email is already registered."},
+            status_code=400,
+        )
+    cur = db.execute(
+        "INSERT INTO users (email, password_hash, role, name, company_name, phone, designation) "
+        "VALUES (?, ?, 'employer', ?, ?, ?, ?)",
+        (email, auth.hash_password(password), name.strip(), company_name.strip(),
+         phone.strip(), designation.strip()),
+    )
+    user_id = cur.lastrowid
+    # Start the onboarding wizard at step 1 (company details).
+    db.execute(
+        "INSERT INTO company_profiles (user_id, onboarding_step) VALUES (?, 1)", (user_id,)
+    )
+    db.commit()
+    request.session["user_id"] = user_id
+    return RedirectResponse("/employer/onboarding", status_code=303)
+
+
+@app.get("/employer/login", response_class=HTMLResponse)
+def employer_login_form(request: Request):
+    return templates.TemplateResponse(
+        request, "employer_login.html", {"request": request, "error": None}
+    )
+
+
+@app.post("/employer/login")
+def employer_login(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    email: str = Form(...),
+    password: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    email = email.strip().lower()
+    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if user is None or not auth.verify_password(password, user["password_hash"]):
+        return templates.TemplateResponse(
+            request,
+            "employer_login.html",
+            {"request": request, "error": "Invalid email or password."},
+            status_code=401,
+        )
+    if user["role"] != "employer":
+        return templates.TemplateResponse(
+            request,
+            "employer_login.html",
+            {"request": request,
+             "error": "That's a candidate account — please use the candidate login."},
+            status_code=403,
+        )
+    request.session["user_id"] = user["id"]
+    return RedirectResponse(_post_login_url(db, user), status_code=303)
 
 
 @app.post("/logout")
@@ -505,12 +599,87 @@ def download_resume(
 # --------------------------------------------------------------------------- #
 # Employer
 # --------------------------------------------------------------------------- #
+@app.get("/employer/onboarding", response_class=HTMLResponse)
+def employer_onboarding(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    """Multi-step wizard shown after employer signup."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    company = _company(db, user["id"])
+    if company["onboarding_step"] >= ONBOARDING_DONE:
+        return RedirectResponse("/employer", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "onboarding.html",
+        {
+            "request": request,
+            "user": user,
+            "company": company,
+            "step": company["onboarding_step"],
+            "company_sizes": COMPANY_SIZES,
+        },
+    )
+
+
+@app.post("/employer/onboarding/company")
+def employer_onboarding_company(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    company_name: str = Form(""),
+    industry: str = Form(""),
+    size: str = Form(""),
+    website: str = Form(""),
+    hq_location: str = Form(""),
+    about: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Step 1 -> 2: save company details."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    _company(db, user["id"])
+    db.execute(
+        "UPDATE users SET company_name = ? WHERE id = ?",
+        (company_name.strip(), user["id"]),
+    )
+    db.execute(
+        "UPDATE company_profiles SET industry = ?, size = ?, website = ?, "
+        "hq_location = ?, about = ?, onboarding_step = 2, "
+        "updated_at = datetime('now') WHERE user_id = ?",
+        (industry.strip(), size.strip(), website.strip(), hq_location.strip(),
+         about.strip(), user["id"]),
+    )
+    db.commit()
+    return RedirectResponse("/employer/onboarding", status_code=303)
+
+
+@app.post("/employer/onboarding/finish")
+def employer_onboarding_finish(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Complete onboarding (posting the first job is optional)."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    _company(db, user["id"])
+    db.execute(
+        "UPDATE company_profiles SET onboarding_step = ? WHERE user_id = ?",
+        (ONBOARDING_DONE, user["id"]),
+    )
+    db.commit()
+    return RedirectResponse("/employer", status_code=303)
+
+
 @app.get("/employer", response_class=HTMLResponse)
 def employer_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db)):
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
     company = _company(db, user["id"])
+    if company["onboarding_step"] < ONBOARDING_DONE:
+        return RedirectResponse("/employer/onboarding", status_code=303)
     jobs = db.execute(
         "SELECT j.*, "
         "(SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) AS n_apps "
@@ -532,6 +701,7 @@ def employer_update_company(
     industry: str = Form(""),
     size: str = Form(""),
     website: str = Form(""),
+    hq_location: str = Form(""),
     about: str = Form(""),
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -544,9 +714,10 @@ def employer_update_company(
         (company_name.strip(), user["id"]),
     )
     db.execute(
-        "UPDATE company_profiles SET industry = ?, size = ?, website = ?, about = ?, "
-        "updated_at = datetime('now') WHERE user_id = ?",
-        (industry.strip(), size.strip(), website.strip(), about.strip(), user["id"]),
+        "UPDATE company_profiles SET industry = ?, size = ?, website = ?, "
+        "hq_location = ?, about = ?, updated_at = datetime('now') WHERE user_id = ?",
+        (industry.strip(), size.strip(), website.strip(), hq_location.strip(),
+         about.strip(), user["id"]),
     )
     db.commit()
     return RedirectResponse("/employer", status_code=303)
@@ -616,6 +787,13 @@ def employer_create_job(
             salary_min, salary_max, 1 if hide_salary else 0, max(1, vacancies),
             education.strip(), department.strip(), deadline.strip(), status,
         ),
+    )
+    db.commit()
+    # Posting a job satisfies the final onboarding step.
+    _company(db, user["id"])
+    db.execute(
+        "UPDATE company_profiles SET onboarding_step = ? WHERE user_id = ?",
+        (ONBOARDING_DONE, user["id"]),
     )
     db.commit()
     # Auto-apply candidates never miss a new posting (drafts are skipped).

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS users (
     role          TEXT    NOT NULL CHECK (role IN ('employer', 'candidate')),
     name          TEXT    NOT NULL DEFAULT '',
     company_name  TEXT    NOT NULL DEFAULT '',
+    phone         TEXT    NOT NULL DEFAULT '',
+    designation   TEXT    NOT NULL DEFAULT '',
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -44,12 +46,15 @@ CREATE TABLE IF NOT EXISTS candidate_profiles (
 );
 
 CREATE TABLE IF NOT EXISTS company_profiles (
-    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    industry    TEXT NOT NULL DEFAULT '',
-    size        TEXT NOT NULL DEFAULT '',
-    website     TEXT NOT NULL DEFAULT '',
-    about       TEXT NOT NULL DEFAULT '',
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    user_id         INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    industry        TEXT NOT NULL DEFAULT '',
+    size            TEXT NOT NULL DEFAULT '',
+    website         TEXT NOT NULL DEFAULT '',
+    about           TEXT NOT NULL DEFAULT '',
+    hq_location     TEXT NOT NULL DEFAULT '',
+    -- Onboarding wizard: 1 = company details, 2 = first job, 3 = complete
+    onboarding_step INTEGER NOT NULL DEFAULT 1,
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
@@ -100,28 +105,44 @@ def _connect() -> sqlite3.Connection:
 
 # Columns added after the first release. SQLite cannot change an existing
 # table via CREATE TABLE IF NOT EXISTS, so they are added on startup instead.
-_JOB_COLUMNS = {
-    "employment_type": "TEXT NOT NULL DEFAULT 'Full-time'",
-    "work_mode": "TEXT NOT NULL DEFAULT 'On-site'",
-    "exp_min": "INTEGER NOT NULL DEFAULT 0",
-    "exp_max": "INTEGER NOT NULL DEFAULT 0",
-    "salary_min": "REAL NOT NULL DEFAULT 0",
-    "salary_max": "REAL NOT NULL DEFAULT 0",
-    "hide_salary": "INTEGER NOT NULL DEFAULT 0",
-    "vacancies": "INTEGER NOT NULL DEFAULT 1",
-    "education": "TEXT NOT NULL DEFAULT ''",
-    "department": "TEXT NOT NULL DEFAULT ''",
-    "deadline": "TEXT NOT NULL DEFAULT ''",
-    "status": "TEXT NOT NULL DEFAULT 'active'",
+_ADDED_COLUMNS = {
+    "jobs": {
+        "employment_type": "TEXT NOT NULL DEFAULT 'Full-time'",
+        "work_mode": "TEXT NOT NULL DEFAULT 'On-site'",
+        "exp_min": "INTEGER NOT NULL DEFAULT 0",
+        "exp_max": "INTEGER NOT NULL DEFAULT 0",
+        "salary_min": "REAL NOT NULL DEFAULT 0",
+        "salary_max": "REAL NOT NULL DEFAULT 0",
+        "hide_salary": "INTEGER NOT NULL DEFAULT 0",
+        "vacancies": "INTEGER NOT NULL DEFAULT 1",
+        "education": "TEXT NOT NULL DEFAULT ''",
+        "department": "TEXT NOT NULL DEFAULT ''",
+        "deadline": "TEXT NOT NULL DEFAULT ''",
+        "status": "TEXT NOT NULL DEFAULT 'active'",
+    },
+    "users": {
+        "phone": "TEXT NOT NULL DEFAULT ''",
+        "designation": "TEXT NOT NULL DEFAULT ''",
+    },
+    "company_profiles": {
+        "hq_location": "TEXT NOT NULL DEFAULT ''",
+        "onboarding_step": "INTEGER NOT NULL DEFAULT 1",
+    },
 }
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add any columns introduced after a database was first created."""
-    existing = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)")}
-    for name, ddl in _JOB_COLUMNS.items():
-        if name not in existing:
-            conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {ddl}")
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, ddl in columns.items():
+            if name in existing:
+                continue
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+            if name == "onboarding_step":
+                # Employers that predate the wizard have already set themselves
+                # up — don't trap them in onboarding on their next login.
+                conn.execute("UPDATE company_profiles SET onboarding_step = 3")
 
 
 def init_db() -> None:

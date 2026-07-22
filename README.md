@@ -11,6 +11,29 @@ FastAPI + Uvicorn, an **in-process SQLite** database (no network hop), and
 | **Employer** | Register, maintain a **company profile** (industry, size, website, about), post detailed jobs, and see **candidates ranked by skill-match %** for each job — including who applied automatically. Download applicant resumes. |
 | **Candidate** | Register, build a profile (headline + skills), **upload a resume**, browse jobs with a live **match %**, apply manually, or flip **Auto-Apply** to be applied to every matching job — now and in the future. |
 
+### Employer portal (separate from the candidate side)
+
+Employers get their own entry points, like a dedicated recruiter site:
+
+| Route | Purpose |
+|-------|---------|
+| `/employer/register` | Recruiter signup — name, designation, company, phone, work email |
+| `/employer/login` | Employer login (rejects candidate accounts with a clear message) |
+| `/employer/onboarding` | Multi-step setup wizard |
+
+`/register` and `/login` are the **candidate** side. The landing page offers both
+paths ("Find a job" vs "Hire talent").
+
+**Onboarding wizard** — new employers are routed through it and the dashboard stays
+gated until it's finished:
+
+1. **Account created** — done at signup
+2. **Company details** — name, industry, size, HQ location, website, about
+3. **Post your first job** — or skip; posting a job also completes onboarding
+
+Progress is stored per employer (`company_profiles.onboarding_step`), so it resumes
+where they left off.
+
 ### Job posting (Naukri-style)
 
 Employers post from a dedicated page (`/employer/jobs/new`) with:
@@ -80,7 +103,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-21 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+26 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).

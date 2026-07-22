@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Employer sign up · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard wide">
+    <span class="portal-chip">{{ icon('building', 13) }} For Employers</span>
+    <h2>Start hiring on SkillMatch</h2>
+    <p class="sub">Create your recruiter account — it takes about a minute.</p>
+    {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
+    <form action="/employer/register" method="post">
+      {{ csrf_field(request) }}
+      <div class="grid2">
+        <label>Your name *
+          <input type="text" name="name" required placeholder="Priya Nair">
+        </label>
+        <label>Designation
+          <input type="text" name="designation" placeholder="Talent Acquisition Lead">
+        </label>
+        <label>Company name *
+          <input type="text" name="company_name" required placeholder="Acme Inc.">
+        </label>
+        <label>Phone
+          <input type="tel" name="phone" placeholder="+91 98765 43210">
+        </label>
+      </div>
+      <label>Work email *
+        <input type="email" name="email" required placeholder="you@acme.com">
+      </label>
+      <label>Password *
+        <input type="password" name="password" required minlength="6" placeholder="At least 6 characters">
+      </label>
+      <button class="btn block" type="submit">Create employer account {{ icon('arrow-right', 16) }}</button>
+    </form>
+    <p class="center-note">
+      Already hiring with us? <a href="/employer/login">Employer login</a><br>
+      <span class="muted">Looking for a job instead? <a href="/register">Create a candidate account</a></span>
+    </p>
+  </div>
+</div>
+{% endblock %}

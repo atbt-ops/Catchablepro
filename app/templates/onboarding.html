@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Set up your account · SkillMatch for Employers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Welcome, {{ user.name or user.email }}</h1>
+    <p class="sub">A couple of quick steps and you'll be ready to hire.</p>
+  </div>
+</div>
+
+<ol class="stepper">
+  <li class="step done">
+    <span class="step-dot">{{ icon('check', 14) }}</span>
+    <span class="step-label">Account created</span>
+  </li>
+  <li class="step {{ 'done' if step > 1 else 'current' }}">
+    <span class="step-dot">{% if step > 1 %}{{ icon('check', 14) }}{% else %}2{% endif %}</span>
+    <span class="step-label">Company details</span>
+  </li>
+  <li class="step {{ 'current' if step == 2 else '' }}">
+    <span class="step-dot">3</span>
+    <span class="step-label">Post your first job</span>
+  </li>
+</ol>
+
+{% if step == 1 %}
+  <section class="panel">
+    <h2>{{ icon('building', 18) }} Tell us about your company</h2>
+    <p class="hint">Candidates see this on every job you post.</p>
+    <form action="/employer/onboarding/company" method="post">
+      {{ csrf_field(request) }}
+      <div class="grid2">
+        <label>Company name *
+          <input type="text" name="company_name" value="{{ user.company_name }}" required
+                 placeholder="Acme Inc.">
+        </label>
+        <label>Industry
+          <input type="text" name="industry" value="{{ company.industry }}"
+                 placeholder="IT Services / Fintech">
+        </label>
+        <label>Company size
+          <select name="size">
+            <option value="">Select…</option>
+            {% for s in company_sizes %}
+              <option value="{{ s }}" {{ 'selected' if company.size == s }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Head office location
+          <input type="text" name="hq_location" value="{{ company.hq_location }}"
+                 placeholder="Bengaluru, India">
+        </label>
+      </div>
+      <label>Website
+        <input type="url" name="website" value="{{ company.website }}" placeholder="https://acme.com">
+      </label>
+      <label>About the company
+        <textarea name="about" rows="3" placeholder="What your company does…">{{ company.about }}</textarea>
+      </label>
+      <div class="form-actions">
+        <button class="btn" type="submit">Continue {{ icon('arrow-right', 16) }}</button>
+      </div>
+    </form>
+  </section>
+
+{% else %}
+  <section class="panel">
+    <h2>{{ icon('briefcase', 18) }} Post your first job</h2>
+    <p class="hint">
+      This is how candidates find you — we'll rank them against your required skills
+      the moment you publish.
+    </p>
+    <div class="autoapply" style="align-items:center;">
+      <span class="brand-mark">{{ icon('target', 20) }}</span>
+      <div>
+        <div class="state on" style="color:var(--brand);">You're all set up</div>
+        <div class="muted" style="font-size:13px;">
+          Post a role now, or skip and do it from your dashboard whenever you're ready.
+        </div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <a class="btn" href="/employer/jobs/new">{{ icon('plus', 16) }} Post a job</a>
+      <form action="/employer/onboarding/finish" method="post" class="inline">
+        {{ csrf_field(request) }}
+        <button class="btn ghost" type="submit">Skip for now</button>
+      </form>
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

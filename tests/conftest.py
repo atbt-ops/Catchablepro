@@ -45,10 +45,21 @@ def post(client):
 
 @pytest.fixture()
 def register(post):
-    """Return a helper that registers (and logs in) a user via the client."""
-    def _do(email, role, **extra):
-        data = {"email": email, "password": "password123", "role": role,
+    """Register (and log in) a user through the right portal for their role.
+
+    Employers go through /employer/register and land in the onboarding wizard;
+    unless ``onboard=False``, the wizard is completed so tests reach the
+    dashboard directly.
+    """
+    def _do(email, role, onboard=True, **extra):
+        data = {"email": email, "password": "password123",
                 "name": email.split("@")[0]}
         data.update(extra)
+        if role == "employer":
+            data.setdefault("company_name", "TestCo")
+            resp = post("/employer/register", data=data)
+            if onboard and resp.status_code == 303:
+                post("/employer/onboarding/finish")
+            return resp
         return post("/register", data=data)
     return _do

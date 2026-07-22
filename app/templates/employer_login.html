@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Employer login · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard">
+    <span class="portal-chip">{{ icon('building', 13) }} For Employers</span>
+    <h2>Employer login</h2>
+    <p class="sub">Access your job postings and candidate matches.</p>
+    {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
+    <form action="/employer/login" method="post">
+      {{ csrf_field(request) }}
+      <label>Work email
+        <input type="email" name="email" required autofocus placeholder="you@acme.com">
+      </label>
+      <label>Password
+        <input type="password" name="password" required placeholder="••••••••">
+      </label>
+      <button class="btn block" type="submit">Log in</button>
+    </form>
+    <p class="center-note">
+      New here? <a href="/employer/register">Create an employer account</a><br>
+      <span class="muted">Looking for a job? <a href="/login">Candidate login</a></span>
+    </p>
+  </div>
+</div>
+{% endblock %}

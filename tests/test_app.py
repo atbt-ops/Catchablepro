@@ -6,12 +6,67 @@ def test_public_pages_ok(client):
         assert client.get(path).status_code == 200
 
 
-def test_register_logs_in_and_routes_by_role(client, register):
-    r = register("boss@acme.io", "employer", company_name="Acme")
+def test_employer_register_goes_to_onboarding(client, register):
+    r = register("boss@acme.io", "employer", company_name="Acme", onboard=False)
     assert r.status_code == 303
-    assert r.headers["location"] == "/employer"
-    # Session cookie is set, so the employer dashboard is reachable.
+    assert r.headers["location"] == "/employer/onboarding"
+    # Dashboard is gated until onboarding finishes.
+    assert client.get("/employer", follow_redirects=False).headers["location"] \
+        == "/employer/onboarding"
+
+
+def test_candidate_register_goes_to_dashboard(client, register):
+    r = register("seeker@x.io", "candidate")
+    assert r.status_code == 303
+    assert r.headers["location"] == "/candidate"
+    assert client.get("/candidate").status_code == 200
+
+
+def test_onboarding_wizard_completes(client, register, post):
+    register("wiz@acme.io", "employer", company_name="Wiz", onboard=False)
+    page = client.get("/employer/onboarding").text
+    assert "Tell us about your company" in page
+
+    # Step 1 -> 2: company details saved, wizard advances.
+    post("/employer/onboarding/company", data={
+        "company_name": "Wizard Corp", "industry": "Fintech",
+        "size": "51-200 employees", "website": "https://wiz.co",
+        "hq_location": "Bengaluru", "about": "We wiz.",
+    })
+    step2 = client.get("/employer/onboarding").text
+    assert "Post your first job" in step2
+
+    # Skipping finishes onboarding and unlocks the dashboard.
+    post("/employer/onboarding/finish")
+    dash = client.get("/employer")
+    assert dash.status_code == 200
+    assert "Wizard Corp" in dash.text
+    assert "Fintech" in dash.text
+
+
+def test_posting_first_job_completes_onboarding(client, register, post):
+    register("job1@acme.io", "employer", company_name="J1", onboard=False)
+    post("/employer/onboarding/company", data={"company_name": "J1 Corp"})
+    post("/employer/jobs", data={"title": "First Role", "required_skills": "python"})
+    # Onboarding is done, so /employer renders instead of redirecting.
     assert client.get("/employer").status_code == 200
+
+
+def test_employer_login_rejects_candidate_account(client, register, post):
+    register("cand2@x.io", "candidate")
+    post("/logout")
+    r = post("/employer/login", data={"email": "cand2@x.io", "password": "password123"})
+    assert r.status_code == 403
+
+
+def test_candidate_cannot_register_as_employer_via_candidate_form(client, register, post):
+    # The candidate form has no role field; passing one must not grant employer.
+    post("/register", data={
+        "email": "sneaky@x.io", "password": "password123",
+        "name": "Sneaky", "role": "employer",
+    })
+    # Employer area stays out of reach; they are routed to the candidate side.
+    assert client.get("/employer", follow_redirects=False).headers["location"] == "/candidate"
 
 
 def test_duplicate_email_rejected(register):
