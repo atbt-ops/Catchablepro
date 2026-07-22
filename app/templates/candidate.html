@@ -108,7 +108,9 @@
             {% if r.job.department %}<span class="meta">{{ r.job.department }}</span>{% endif %}
             {% if r.job.vacancies > 1 %}<span class="meta">{{ r.job.vacancies }} openings</span>{% endif %}
           </p>
-          {% if r.job.description %}<p class="row-desc">{{ r.job.description }}</p>{% endif %}
+          {% if r.job.description %}
+            <div class="row-desc jobdesc">{{ description_html(r.job.description) }}</div>
+          {% endif %}
           <div class="chips">
             {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
             {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}

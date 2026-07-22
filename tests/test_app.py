@@ -44,10 +44,10 @@ def test_onboarding_wizard_completes(client, register, post):
     assert "Fintech" in dash.text
 
 
-def test_posting_first_job_completes_onboarding(client, register, post):
+def test_posting_first_job_completes_onboarding(client, register, post, post_job):
     register("job1@acme.io", "employer", company_name="J1", onboard=False)
     post("/employer/onboarding/company", data={"company_name": "J1 Corp"})
-    post("/employer/jobs", data={"title": "First Role", "required_skills": "python"})
+    post_job(**{"title": "First Role", "required_skills": "python"})
     # Onboarding is done, so /employer renders instead of redirecting.
     assert client.get("/employer").status_code == 200
 
@@ -84,9 +84,9 @@ def test_post_without_csrf_is_rejected(client):
     assert r.status_code == 403
 
 
-def test_manual_apply_records_match_percentage(client, register, post):
+def test_manual_apply_records_match_percentage(client, register, post, post_job):
     register("emp@x.io", "employer", company_name="X")
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Backend", "location": "Remote",
         "required_skills": "python, sql, docker, aws", "description": "",
     })
@@ -99,9 +99,9 @@ def test_manual_apply_records_match_percentage(client, register, post):
     assert "50%" in page  # 2 of 4 required skills
 
 
-def test_rich_job_fields_are_saved_and_shown(client, register, post):
+def test_rich_job_fields_are_saved_and_shown(client, register, post, post_job):
     register("rich@x.io", "employer", company_name="RichCo")
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Senior Backend Engineer", "location": "Bengaluru",
         "required_skills": "python, sql", "description": "Build APIs.",
         "employment_type": "Full-time", "work_mode": "Hybrid",
@@ -115,9 +115,9 @@ def test_rich_job_fields_are_saved_and_shown(client, register, post):
     assert "Hybrid" in page
 
 
-def test_hidden_salary_is_not_disclosed(client, register, post):
+def test_hidden_salary_is_not_disclosed(client, register, post, post_job):
     register("hide@x.io", "employer", company_name="HideCo")
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Secret Pay Role", "required_skills": "python",
         "salary_min": 20, "salary_max": 40, "hide_salary": "1",
     })
@@ -137,10 +137,10 @@ def test_company_profile_saves(client, register, post):
     assert "We do money things." in page
 
 
-def test_draft_job_is_hidden_from_candidates_and_auto_apply(client, register, post):
+def test_draft_job_is_hidden_from_candidates_and_auto_apply(client, register, post, post_job):
     # Employer saves a draft rather than publishing.
     register("draft@x.io", "employer", company_name="DraftCo")
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Draft Role", "required_skills": "python, sql", "action": "draft",
     })
     assert "Draft" in client.get("/employer").text
@@ -160,9 +160,9 @@ def test_draft_job_is_hidden_from_candidates_and_auto_apply(client, register, po
     assert "Auto-applied" in client.get("/employer/jobs/1/matches").text
 
 
-def test_closed_job_disappears_for_candidates(client, register, post):
+def test_closed_job_disappears_for_candidates(client, register, post, post_job):
     register("cl@x.io", "employer", company_name="CloseCo")
-    post("/employer/jobs", data={"title": "Closing Role", "required_skills": "python"})
+    post_job(**{"title": "Closing Role", "required_skills": "python"})
     post("/employer/jobs/1/status", data={"status": "closed"})
     post("/logout")
     register("cc@x.io", "candidate")
@@ -170,12 +170,12 @@ def test_closed_job_disappears_for_candidates(client, register, post):
     assert "Closing Role" not in client.get("/candidate").text
 
 
-def test_candidate_can_filter_by_work_mode(client, register, post):
+def test_candidate_can_filter_by_work_mode(client, register, post, post_job):
     register("f@x.io", "employer", company_name="FilterCo")
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Remote Role", "required_skills": "python", "work_mode": "Remote",
     })
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Onsite Role", "required_skills": "python", "work_mode": "On-site",
     })
     post("/logout")
@@ -190,10 +190,10 @@ def test_candidate_can_filter_by_work_mode(client, register, post):
     assert "Onsite Role" not in filtered
 
 
-def test_auto_apply_backfills_and_covers_new_jobs(client, register, post):
+def test_auto_apply_backfills_and_covers_new_jobs(client, register, post, post_job):
     # Employer posts one job.
     register("e2@x.io", "employer", company_name="E2")
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Data Eng", "location": "", "required_skills": "python, sql", "description": "",
     })
     post("/logout")
@@ -209,8 +209,96 @@ def test_auto_apply_backfills_and_covers_new_jobs(client, register, post):
     # A brand-new job posted later should also auto-apply this candidate.
     post("/logout")
     post("/login", data={"email": "e2@x.io", "password": "password123"})
-    post("/employer/jobs", data={
+    post_job(**{
         "title": "Platform", "location": "", "required_skills": "python", "description": "",
     })
     matches = client.get("/employer/jobs/2/matches").text
     assert "Auto-applied" in matches
+
+
+def test_salary_is_mandatory(client, register, post):
+    register("nosal@x.io", "employer", company_name="NoSal")
+    r = post("/employer/jobs", data={"title": "No Salary", "required_skills": "python"})
+    assert r.status_code == 400
+    assert "lakhs per annum" in r.text
+    # The job must not have been created.
+    assert "No Salary" not in client.get("/employer").text
+
+
+def test_salary_entered_in_rupees_is_rejected(client, register, post):
+    register("rupees@x.io", "employer", company_name="Rup")
+    r = post("/employer/jobs", data={
+        "title": "Rupee Role", "required_skills": "python",
+        "salary_min": 800000, "salary_max": 1200000,
+    })
+    assert r.status_code == 400
+    # The error tells them the lakhs equivalent of what they typed.
+    assert "if that was rupees, enter 8 instead" in r.text
+    assert "Rupee Role" not in client.get("/employer").text
+
+
+def test_salary_max_below_min_is_rejected(register, post):
+    register("badrange@x.io", "employer", company_name="BR")
+    r = post("/employer/jobs", data={
+        "title": "Bad Range", "required_skills": "python",
+        "salary_min": 20, "salary_max": 10,
+    })
+    assert r.status_code == 400
+    assert "cannot be less than" in r.text
+
+
+def test_rejected_form_preserves_entered_values(register, post):
+    register("keep@x.io", "employer", company_name="Keep")
+    r = post("/employer/jobs", data={
+        "title": "Kept Title", "required_skills": "python, sql",
+        "location": "Pune", "salary_min": 0, "salary_max": 0,
+    })
+    assert r.status_code == 400
+    assert "Kept Title" in r.text     # title survived the round trip
+    assert "Pune" in r.text
+
+
+def test_description_formatting_is_kept_but_scripts_are_stripped(
+    client, register, post, post_job
+):
+    import re
+
+    register("rt@x.io", "employer", company_name="RT")
+    post_job(
+        title="Formatted Role", required_skills="python",
+        description='<p>We need <strong>Python</strong></p><ul><li>APIs</li></ul>'
+                    '<script>alert("xss")</script><img src=x onerror=alert(2)>',
+    )
+    post("/logout")
+    register("rtc@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+
+    page = client.get("/candidate").text
+    # Inspect only the rendered description block, not the whole page (the
+    # layout has its own legitimate <script> for the theme toggle).
+    block = re.search(r'<div class="row-desc jobdesc">(.*?)</div>', page, re.S)
+    assert block, "job description block not rendered"
+    desc = block.group(1)
+
+    assert "<strong>Python</strong>" in desc   # bold survives
+    assert "<li>APIs</li>" in desc             # bullets survive
+    assert "<script" not in desc               # script tag stripped
+    assert "alert(\"xss\")" not in desc        # and not executable
+    assert "onerror" not in desc               # event handler stripped
+
+
+def test_stored_description_is_sanitized_in_db(client, register, post_job, tmp_path):
+    register("dbrt@x.io", "employer", company_name="DBRT")
+    post_job(
+        title="Sanitized Role", required_skills="python",
+        description='<p>Hi <b>there</b></p><script>alert(1)</script>',
+    )
+    from app import db as dbmod
+    import sqlite3
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    desc = conn.execute(
+        "SELECT description FROM jobs WHERE title = 'Sanitized Role'"
+    ).fetchone()[0]
+    conn.close()
+    assert "<b>there</b>" in desc      # formatting preserved
+    assert "<script>" not in desc      # script tag removed

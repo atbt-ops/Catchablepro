@@ -10,36 +10,51 @@
   </div>
 </div>
 
-<form action="/employer/jobs" method="post">
+{% if errors %}
+  <div class="errorlist">
+    <strong>Please fix the following before posting:</strong>
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<form action="/employer/jobs" method="post" id="job-form">
   {{ csrf_field(request) }}
 
   <section class="panel">
     <h2>{{ icon('briefcase', 18) }} Role basics</h2>
     <div class="grid2">
-      <label>Job title *
-        <input type="text" name="title" required placeholder="e.g. Senior Backend Engineer">
+      <label>Job title <span class="req">*</span>
+        <input type="text" name="title" required value="{{ form.get('title', '') }}"
+               placeholder="e.g. Senior Backend Engineer">
       </label>
       <label>Department
         <select name="department">
           <option value="">Select…</option>
-          {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+          {% for d in departments %}
+            <option value="{{ d }}" {{ 'selected' if form.get('department') == d }}>{{ d }}</option>
+          {% endfor %}
         </select>
       </label>
       <label>Employment type
         <select name="employment_type">
-          {% for t in employment_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+          {% for t in employment_types %}
+            <option value="{{ t }}" {{ 'selected' if form.get('employment_type') == t }}>{{ t }}</option>
+          {% endfor %}
         </select>
       </label>
       <label>Work mode
         <select name="work_mode">
-          {% for w in work_modes %}<option value="{{ w }}">{{ w }}</option>{% endfor %}
+          {% for w in work_modes %}
+            <option value="{{ w }}" {{ 'selected' if form.get('work_mode') == w }}>{{ w }}</option>
+          {% endfor %}
         </select>
       </label>
       <label>Location
-        <input type="text" name="location" placeholder="e.g. Bengaluru / Remote">
+        <input type="text" name="location" value="{{ form.get('location', '') }}"
+               placeholder="e.g. Bengaluru / Remote">
       </label>
       <label>Number of vacancies
-        <input type="number" name="vacancies" value="1" min="1">
+        <input type="number" name="vacancies" value="{{ form.get('vacancies', 1) }}" min="1">
       </label>
     </div>
   </section>
@@ -47,50 +62,81 @@
   <section class="panel">
     <h2>{{ icon('target', 18) }} Skills &amp; experience</h2>
     <p class="hint">Required skills drive the match score — list them comma separated.</p>
-    <label>Required skills *
+    <label>Required skills <span class="req">*</span>
       <textarea name="required_skills" rows="2" required
-                placeholder="python, fastapi, sql, docker, aws"></textarea>
+                placeholder="python, fastapi, sql, docker, aws">{{ form.get('required_skills', '') }}</textarea>
     </label>
     <div class="grid2">
       <label>Minimum experience (years)
-        <input type="number" name="exp_min" value="0" min="0" max="50">
+        <input type="number" name="exp_min" value="{{ form.get('exp_min', 0) }}" min="0" max="50">
       </label>
       <label>Maximum experience (years)
-        <input type="number" name="exp_max" value="0" min="0" max="50">
+        <input type="number" name="exp_max" value="{{ form.get('exp_max', 0) }}" min="0" max="50">
       </label>
       <label>Minimum education
         <select name="education">
-          {% for e in education_levels %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+          {% for e in education_levels %}
+            <option value="{{ e }}" {{ 'selected' if form.get('education') == e }}>{{ e }}</option>
+          {% endfor %}
         </select>
       </label>
       <label>Application deadline
-        <input type="date" name="deadline">
+        <input type="date" name="deadline" value="{{ form.get('deadline', '') }}" min="{{ today }}">
+        <span class="field-help">Click the calendar icon to pick a date.</span>
       </label>
     </div>
   </section>
 
   <section class="panel">
-    <h2>{{ icon('sparkle', 18) }} Compensation</h2>
+    <h2>{{ icon('sparkle', 18) }} Compensation <span class="req">*</span></h2>
+    <p class="hint">
+      Enter salary in <strong>lakhs per annum (LPA)</strong> — type <strong>12</strong>
+      for ₹12,00,000 a year, not 1200000. Accepted range: {{ salary_min_lpa }}–{{ salary_max_lpa }} LPA.
+    </p>
     <div class="grid2">
-      <label>Minimum salary (₹ LPA)
-        <input type="number" name="salary_min" value="0" min="0" step="0.5">
+      <label>Minimum salary (₹ LPA) <span class="req">*</span>
+        <input type="number" name="salary_min" required
+               value="{{ form.get('salary_min', '') }}"
+               min="{{ salary_min_lpa }}" max="{{ salary_max_lpa }}" step="0.5"
+               placeholder="e.g. 8">
+        <span class="field-help">In lakhs, e.g. 8 = ₹8,00,000</span>
       </label>
-      <label>Maximum salary (₹ LPA)
-        <input type="number" name="salary_max" value="0" min="0" step="0.5">
+      <label>Maximum salary (₹ LPA) <span class="req">*</span>
+        <input type="number" name="salary_max" required
+               value="{{ form.get('salary_max', '') }}"
+               min="{{ salary_min_lpa }}" max="{{ salary_max_lpa }}" step="0.5"
+               placeholder="e.g. 14">
+        <span class="field-help">In lakhs, e.g. 14 = ₹14,00,000</span>
       </label>
     </div>
     <label class="checkline">
-      <input type="checkbox" name="hide_salary" value="1">
+      <input type="checkbox" name="hide_salary" value="1" {{ 'checked' if form.get('hide_salary') }}>
       <span>Hide salary from candidates (shows “Not disclosed”)</span>
     </label>
   </section>
 
   <section class="panel">
     <h2>{{ icon('doc', 18) }} Job description</h2>
-    <label>Describe the role
-      <textarea name="description" rows="6"
-                placeholder="Responsibilities, team, tech stack, what success looks like…"></textarea>
-    </label>
+    <p class="hint">Use the toolbar to add headings, <strong>bold</strong> text and bullet points.</p>
+    <div class="rt-wrap">
+      <div class="rt-toolbar" role="toolbar" aria-label="Formatting">
+        <button type="button" class="rt-btn" data-cmd="bold" title="Bold (Ctrl+B)">B</button>
+        <button type="button" class="rt-btn italic" data-cmd="italic" title="Italic (Ctrl+I)">I</button>
+        <button type="button" class="rt-btn underline" data-cmd="underline" title="Underline (Ctrl+U)">U</button>
+        <span class="rt-sep"></span>
+        <button type="button" class="rt-btn" data-cmd="insertUnorderedList" title="Bulleted list">• List</button>
+        <button type="button" class="rt-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+        <span class="rt-sep"></span>
+        <button type="button" class="rt-btn" data-cmd="formatBlock" data-value="h3" title="Heading">H</button>
+        <button type="button" class="rt-btn" data-cmd="createLink" title="Insert link">Link</button>
+        <span class="rt-sep"></span>
+        <button type="button" class="rt-btn" data-cmd="removeFormat" title="Clear formatting">Clear</button>
+      </div>
+      <div id="rt-editor" class="rt-editor" contenteditable="true" role="textbox" aria-multiline="true"
+           data-placeholder="Responsibilities, team, tech stack, what success looks like…"></div>
+    </div>
+    <input type="hidden" name="description" id="description-input"
+           value="{{ form.get('description', '') }}">
   </section>
 
   <div class="form-actions">
@@ -101,4 +147,39 @@
     <a class="btn ghost" href="/employer">Cancel</a>
   </div>
 </form>
+
+<script>
+(function () {
+  var editor = document.getElementById('rt-editor');
+  var hidden = document.getElementById('description-input');
+  var form = document.getElementById('job-form');
+  if (!editor || !hidden || !form) return;
+
+  // Restore previous content (e.g. after a validation error).
+  editor.innerHTML = hidden.value || '';
+
+  document.querySelectorAll('.rt-btn').forEach(function (btn) {
+    // Keep the caret/selection in the editor when a button is pressed.
+    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    btn.addEventListener('click', function () {
+      var cmd = btn.dataset.cmd;
+      editor.focus();
+      if (cmd === 'createLink') {
+        var url = window.prompt('Link URL (https://…)');
+        if (!url) return;
+        document.execCommand('createLink', false, url);
+      } else if (cmd === 'formatBlock') {
+        document.execCommand('formatBlock', false, btn.dataset.value);
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+    });
+  });
+
+  // Ship the markup with the form; the server sanitizes it before storing.
+  form.addEventListener('submit', function () {
+    hidden.value = editor.innerHTML.trim();
+  });
+})();
+</script>
 {% endblock %}

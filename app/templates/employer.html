@@ -5,13 +5,101 @@
 <div class="page-head">
   <div>
     <h1>{{ user.company_name or user.name or 'Employer' }}</h1>
-    <p class="sub">Post roles and see candidates ranked by how well their skills match.</p>
+    <p class="sub">
+      {% if company.industry %}{{ company.industry }}{% endif %}
+      {%- if company.industry and company.hq_location %} · {% endif -%}
+      {% if company.hq_location %}{{ company.hq_location }}{% endif %}
+      {% if not company.industry and not company.hq_location %}
+        Post roles and see candidates ranked by how well their skills match.
+      {% endif %}
+    </p>
   </div>
   <a class="btn" href="/employer/jobs/new">{{ icon('plus', 16) }} Post a job</a>
 </div>
 
+<!-- Jobs first: this is the primary workspace -->
 <section class="panel">
-  <h2>{{ icon('building', 18) }} Company profile</h2>
+  <h2>{{ icon('briefcase', 18) }} Your jobs
+    {% if jobs %}<span class="count-pill">{{ jobs|length }}</span>{% endif %}
+  </h2>
+  {% if jobs %}
+    <div class="rows">
+      {% for j in jobs %}
+      <div class="jobcard is-{{ j.status }}">
+        <div>
+          <h3>
+            {{ j.title }}
+            <span class="tag status-{{ j.status }}">{{ j.status | capitalize }}</span>
+          </h3>
+          <p class="row-sub">
+            {{ j.employment_type }} · {{ j.work_mode }}
+            {% if j.location %}<span class="dot"></span>{{ j.location }}{% endif %}
+            {% if j.department %}<span class="dot"></span>{{ j.department }}{% endif %}
+          </p>
+          <div class="jobcard-meta">
+            <span class="m">{{ icon('user', 12) }} <b>{{ fmt_exp(j) }}</b></span>
+            <span class="m">{{ icon('sparkle', 12) }} <b>{{ fmt_salary(j) }}</b></span>
+            {% if j.vacancies > 1 %}
+              <span class="m">{{ icon('briefcase', 12) }} <b>{{ j.vacancies }}</b> openings</span>
+            {% endif %}
+            {% if j.deadline %}
+              <span class="m">{{ icon('doc', 12) }} Apply by <b>{{ j.deadline }}</b></span>
+            {% endif %}
+          </div>
+          {% if j.required_skills %}
+            <div class="chips" style="margin-top:10px;">
+              {% for s in j.required_skills.split(',') %}
+                {% if s.strip() %}<span class="chip">{{ s.strip() }}</span>{% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="jobcard-side">
+          <a class="applicants" href="/employer/jobs/{{ j.id }}/matches" title="View candidate matches">
+            <b>{{ j.n_apps }}</b><span>Applicants</span>
+          </a>
+          <div class="row-actions">
+            <a class="btn ghost small" href="/employer/jobs/{{ j.id }}/matches">Matches</a>
+            {% if j.status == 'draft' %}
+              <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <input type="hidden" name="status" value="active">
+                <button class="btn small" type="submit">Publish</button>
+              </form>
+            {% elif j.status == 'active' %}
+              <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <input type="hidden" name="status" value="closed">
+                <button class="btn ghost small" type="submit">Close</button>
+              </form>
+            {% else %}
+              <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <input type="hidden" name="status" value="active">
+                <button class="btn ghost small" type="submit">Reopen</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('briefcase', 24) }}</span>
+      <p>You haven't posted any jobs yet.</p>
+      <p style="margin-top:12px;"><a class="btn" href="/employer/jobs/new">{{ icon('plus', 16) }} Post your first job</a></p>
+    </div>
+  {% endif %}
+</section>
+
+<!-- Company profile: secondary, collapsed by default -->
+<details class="panel collapse">
+  <summary>
+    <span>{{ icon('building', 18) }} Company profile</span>
+    <span class="chev">Edit ▾</span>
+  </summary>
   <p class="hint">Candidates see this on your job postings.</p>
   <form action="/employer/company" method="post">
     {{ csrf_field(request) }}
@@ -37,83 +125,5 @@
     </label>
     <button class="btn" type="submit">{{ icon('check', 16) }} Save company profile</button>
   </form>
-</section>
-
-<section class="panel">
-  <h2>{{ icon('briefcase', 18) }} Your jobs
-    {% if jobs %}<span class="count-pill">{{ jobs|length }}</span>{% endif %}
-  </h2>
-  {% if jobs %}
-    <div class="tbl-wrap">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Role</th><th>Details</th><th>Experience</th><th>Salary</th>
-            <th>Status</th><th>Applicants</th><th></th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for j in jobs %}
-          <tr>
-            <td>
-              <strong>{{ j.title }}</strong>
-              <div class="mono">{{ j.location or '—' }}{% if j.vacancies > 1 %} · {{ j.vacancies }} openings{% endif %}</div>
-            </td>
-            <td class="mono">{{ j.employment_type }} · {{ j.work_mode }}{% if j.department %}<br>{{ j.department }}{% endif %}</td>
-            <td class="mono">{{ fmt_exp(j) }}</td>
-            <td class="mono">{{ fmt_salary(j) }}</td>
-            <td><span class="tag status-{{ j.status }}">{{ j.status | capitalize }}</span></td>
-            <td><span class="count-pill">{{ j.n_apps }}</span></td>
-            <td>
-              <div class="row-actions">
-                <a class="btn ghost small" href="/employer/jobs/{{ j.id }}/matches">Matches</a>
-                {% if j.status == 'draft' %}
-                  <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
-                    {{ csrf_field(request) }}
-                    <input type="hidden" name="status" value="active">
-                    <button class="btn small" type="submit">Publish</button>
-                  </form>
-                {% elif j.status == 'active' %}
-                  <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
-                    {{ csrf_field(request) }}
-                    <input type="hidden" name="status" value="closed">
-                    <button class="btn ghost small" type="submit">Close</button>
-                  </form>
-                {% else %}
-                  <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
-                    {{ csrf_field(request) }}
-                    <input type="hidden" name="status" value="active">
-                    <button class="btn ghost small" type="submit">Reopen</button>
-                  </form>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <div class="empty">
-      <span class="eico">{{ icon('briefcase', 24) }}</span>
-      <p>You haven't posted any jobs yet.</p>
-      <p style="margin-top:12px;"><a class="btn" href="/employer/jobs/new">{{ icon('plus', 16) }} Post your first job</a></p>
-    </div>
-  {% endif %}
-</section>
-
-<section class="panel">
-  <h2>{{ icon('sparkle', 18) }} How matching works</h2>
-  <div class="autoapply" style="align-items:center;">
-    <span class="brand-mark">{{ icon('target', 20) }}</span>
-    <div>
-      <div class="state on" style="color:var(--brand);">match % = shared skills ÷ required skills</div>
-      <div class="muted" style="font-size:13px;">
-        Open a job's <strong>Matches</strong> to see candidates ranked highest-first —
-        including those who applied automatically. Only <strong>Active</strong> jobs are
-        visible to candidates and eligible for Auto-Apply.
-      </div>
-    </div>
-  </div>
-</section>
+</details>
 {% endblock %}

@@ -24,7 +24,11 @@ JOBS = [
     # employer, title, location, skills, description, dept, emp_type, work_mode,
     # exp_min, exp_max, sal_min, sal_max, hide, vacancies, education, status
     ("hr@acme.io", "Backend Engineer", "Remote", "python, fastapi, sql, docker, aws",
-     "Build low-latency APIs on our cloud platform.",
+     "<p>Build low-latency APIs on our cloud platform.</p>"
+     "<p><strong>What you'll do:</strong></p>"
+     "<ul><li>Design and ship high-throughput services</li>"
+     "<li>Own reliability and performance budgets</li>"
+     "<li>Mentor engineers across the platform team</li></ul>",
      "Engineering", "Full-time", "Remote", 3, 6, 18, 32, 0, 2, "Graduate", "active"),
     ("hr@acme.io", "Data Engineer", "Bengaluru", "python, sql, airflow, spark, aws",
      "Own our batch and streaming data pipelines.",
@@ -36,8 +40,9 @@ JOBS = [
      "Keep our infra fast, cheap, and reliable.",
      "Engineering", "Full-time", "On-site", 4, 8, 22, 40, 1, 1, "Graduate", "active"),
     ("talent@nimbus.dev", "ML Intern", "Bengaluru", "python, machine learning, pytorch",
-     "Support our applied ML team over a 6-month internship.",
-     "Data Science", "Internship", "On-site", 0, 0, 0, 0, 0, 2, "Any", "draft"),
+     "<p>Support our applied ML team over a <em>6-month</em> internship.</p>"
+     "<ul><li>Prototype models with PyTorch</li><li>Ship evaluation tooling</li></ul>",
+     "Data Science", "Internship", "On-site", 0, 0, 3, 5, 0, 2, "Any", "draft"),
 ]
 
 CANDIDATES = [

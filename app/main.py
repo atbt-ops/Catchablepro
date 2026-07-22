@@ -11,6 +11,7 @@ import os
 import secrets
 import sqlite3
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -21,7 +22,10 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from starlette.middleware.sessions import SessionMiddleware
 
+from html import escape
+
 from . import auth, db as dbmod, resume as resume_module
+from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
     EMPLOYER_MATCH_THRESHOLD,
@@ -80,6 +84,11 @@ templates.env.globals["csrf_field"] = csrf_field
 # Display helpers (exposed to templates)
 # --------------------------------------------------------------------------- #
 ONBOARDING_DONE = 3  # step 1 = company details, 2 = first job, 3 = complete
+
+# Salary is captured in lakhs per annum (LPA). These bounds reject values typed
+# in rupees (e.g. 800000) instead of lakhs (8).
+SALARY_MIN_LPA = 0.5
+SALARY_MAX_LPA = 100.0
 COMPANY_SIZES = [
     "1-10 employees", "11-50 employees", "51-200 employees",
     "201-500 employees", "501-1000 employees", "1000+ employees",
@@ -116,8 +125,22 @@ def fmt_exp(job) -> str:
     return f"{lo}–{hi} yrs"
 
 
+def description_html(value: str) -> Markup:
+    """Render a job description safely.
+
+    Newer descriptions are sanitized HTML from the editor; older ones are plain
+    text. Either way the output is re-sanitized (or escaped) before display.
+    """
+    if not value:
+        return Markup("")
+    if "<" in value and ">" in value:
+        return Markup(sanitize_html(value))
+    return Markup(escape(value).replace("\n", "<br>"))
+
+
 templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
+templates.env.globals["description_html"] = description_html
 
 
 @asynccontextmanager
@@ -723,22 +746,29 @@ def employer_update_company(
     return RedirectResponse("/employer", status_code=303)
 
 
+def _job_form_context(request: Request, user, form: dict, errors: list) -> dict:
+    return {
+        "request": request,
+        "user": user,
+        "employment_types": EMPLOYMENT_TYPES,
+        "work_modes": WORK_MODES,
+        "education_levels": EDUCATION_LEVELS,
+        "departments": DEPARTMENTS,
+        "salary_min_lpa": SALARY_MIN_LPA,
+        "salary_max_lpa": SALARY_MAX_LPA,
+        "today": date.today().isoformat(),
+        "form": form,
+        "errors": errors,
+    }
+
+
 @app.get("/employer/jobs/new", response_class=HTMLResponse)
 def employer_new_job_form(request: Request, db: sqlite3.Connection = Depends(get_db)):
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
     return templates.TemplateResponse(
-        request,
-        "job_new.html",
-        {
-            "request": request,
-            "user": user,
-            "employment_types": EMPLOYMENT_TYPES,
-            "work_modes": WORK_MODES,
-            "education_levels": EDUCATION_LEVELS,
-            "departments": DEPARTMENTS,
-        },
+        request, "job_new.html", _job_form_context(request, user, {}, [])
     )
 
 
@@ -769,12 +799,48 @@ def employer_create_job(
         return redirect
 
     status = "draft" if action == "draft" else "active"
-    # Keep ranges sane rather than rejecting the whole form.
+    # Keep experience ranges sane rather than rejecting the whole form.
     exp_min, exp_max = max(0, exp_min), max(0, exp_max)
     if exp_max and exp_max < exp_min:
         exp_min, exp_max = exp_max, exp_min
-    if salary_max and salary_max < salary_min:
-        salary_min, salary_max = salary_max, salary_min
+
+    # Descriptions arrive as HTML from the editor — allowlist it before storing.
+    description = sanitize_html(description)
+
+    # --- Salary is mandatory and must be expressed in lakhs per annum -------- #
+    errors: list[str] = []
+    if salary_min <= 0 or salary_max <= 0:
+        errors.append(
+            "Minimum and maximum salary are required. Enter the amount in "
+            "lakhs per annum (LPA) — for example 12 means ₹12,00,000 a year."
+        )
+    else:
+        for label, value in (("Minimum", salary_min), ("Maximum", salary_max)):
+            if not (SALARY_MIN_LPA <= value <= SALARY_MAX_LPA):
+                errors.append(
+                    f"{label} salary must be given in lakhs per annum, between "
+                    f"{SALARY_MIN_LPA:g} and {SALARY_MAX_LPA:g} LPA. "
+                    f"You entered {value:g} — if that was rupees, enter "
+                    f"{value / 100000:g} instead."
+                )
+        if not errors and salary_max < salary_min:
+            errors.append("Maximum salary cannot be less than the minimum salary.")
+
+    if errors:
+        form = {
+            "title": title, "location": location, "required_skills": required_skills,
+            "description": description, "employment_type": employment_type,
+            "work_mode": work_mode, "exp_min": exp_min, "exp_max": exp_max,
+            "salary_min": salary_min, "salary_max": salary_max,
+            "hide_salary": bool(hide_salary), "vacancies": vacancies,
+            "education": education, "department": department, "deadline": deadline,
+        }
+        return templates.TemplateResponse(
+            request,
+            "job_new.html",
+            _job_form_context(request, user, form, errors),
+            status_code=400,
+        )
 
     cur = db.execute(
         "INSERT INTO jobs (employer_id, title, description, required_skills, location, "

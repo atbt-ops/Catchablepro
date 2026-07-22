@@ -44,6 +44,17 @@ def post(client):
 
 
 @pytest.fixture()
+def post_job(post):
+    """Post a job, filling in the now-mandatory salary unless overridden."""
+    def _do(**fields):
+        data = {"title": "A Role", "required_skills": "python",
+                "salary_min": 8, "salary_max": 14}
+        data.update(fields)
+        return post("/employer/jobs", data=data)
+    return _do
+
+
+@pytest.fixture()
 def register(post):
     """Register (and log in) a user through the right portal for their role.
 

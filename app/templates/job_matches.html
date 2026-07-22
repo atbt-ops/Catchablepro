@@ -34,6 +34,9 @@
             {% endif %}
           </h3>
           {% if r.cand.headline %}<p class="row-sub">{{ r.cand.headline }}</p>{% endif %}
+          <p class="row-sub">
+            <a class="candmail" href="mailto:{{ r.cand.email }}">{{ icon('mail', 12) }} {{ r.cand.email }}</a>
+          </p>
           <div class="chips">
             {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
             {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}
@@ -45,7 +48,12 @@
           {% else %}
             <span class="muted" style="font-size:13px;">No resume</span>
           {% endif %}
-          <a class="btn ghost small" href="mailto:{{ r.cand.email }}">{{ icon('mail', 14) }} Contact</a>
+          {% set subject = 'Regarding your application for ' ~ job.title ~ ' at ' ~ (user.company_name or 'our company') %}
+          {% set body = 'Hi ' ~ (r.cand.name or 'there') ~ ',\n\nWe reviewed your profile for the ' ~ job.title ~ ' role and would like to connect.\n\nBest regards,\n' ~ (user.name or '') ~ '\n' ~ (user.company_name or '') %}
+          <a class="btn small" title="Email {{ r.cand.email }}"
+             href="mailto:{{ r.cand.email }}?subject={{ subject | urlencode }}&body={{ body | urlencode }}">
+            {{ icon('mail', 14) }} Contact
+          </a>
         </div>
       </div>
       {% endfor %}
