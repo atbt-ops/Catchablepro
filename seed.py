@@ -12,16 +12,32 @@ EMPLOYERS = [
     ("talent@nimbus.dev", "Nimbus Labs", "Raj Malhotra"),
 ]
 
+COMPANIES = {
+    # employer_email: (industry, size, website, about)
+    "hr@acme.io": ("Cloud Infrastructure", "201-500 employees", "https://acme.io",
+                   "Acme Cloud builds developer infrastructure for high-scale APIs."),
+    "talent@nimbus.dev": ("Product Design Tools", "51-200 employees", "https://nimbus.dev",
+                          "Nimbus Labs makes collaborative design tooling for product teams."),
+}
+
 JOBS = [
-    # (employer_email, title, location, required_skills, description)
+    # employer, title, location, skills, description, dept, emp_type, work_mode,
+    # exp_min, exp_max, sal_min, sal_max, hide, vacancies, education, status
     ("hr@acme.io", "Backend Engineer", "Remote", "python, fastapi, sql, docker, aws",
-     "Build low-latency APIs on our cloud platform."),
+     "Build low-latency APIs on our cloud platform.",
+     "Engineering", "Full-time", "Remote", 3, 6, 18, 32, 0, 2, "Graduate", "active"),
     ("hr@acme.io", "Data Engineer", "Bengaluru", "python, sql, airflow, spark, aws",
-     "Own our batch and streaming data pipelines."),
+     "Own our batch and streaming data pipelines.",
+     "Data Science", "Full-time", "Hybrid", 2, 5, 14, 26, 0, 1, "Graduate", "active"),
     ("talent@nimbus.dev", "Frontend Engineer", "Remote", "javascript, react, css, typescript",
-     "Craft delightful UIs for our design tools."),
+     "Craft delightful UIs for our design tools.",
+     "Engineering", "Full-time", "Remote", 1, 4, 10, 20, 0, 3, "Any", "active"),
     ("talent@nimbus.dev", "DevOps Engineer", "Hyderabad", "docker, kubernetes, aws, terraform, python",
-     "Keep our infra fast, cheap, and reliable."),
+     "Keep our infra fast, cheap, and reliable.",
+     "Engineering", "Full-time", "On-site", 4, 8, 22, 40, 1, 1, "Graduate", "active"),
+    ("talent@nimbus.dev", "ML Intern", "Bengaluru", "python, machine learning, pytorch",
+     "Support our applied ML team over a 6-month internship.",
+     "Data Science", "Internship", "On-site", 0, 0, 0, 0, 0, 2, "Any", "draft"),
 ]
 
 CANDIDATES = [
@@ -44,6 +60,11 @@ def main() -> None:
             "VALUES (?, ?, 'employer', ?, ?)", (email, pw, name, company))
         email_to_id[email] = cur.lastrowid or conn.execute(
             "SELECT id FROM users WHERE email = ?", (email,)).fetchone()[0]
+        industry, size, website, about = COMPANIES[email]
+        conn.execute(
+            "INSERT OR REPLACE INTO company_profiles "
+            "(user_id, industry, size, website, about) VALUES (?, ?, ?, ?, ?)",
+            (email_to_id[email], industry, size, website, about))
 
     for email, name, headline, skills, auto in CANDIDATES:
         cur = conn.execute(
@@ -58,12 +79,19 @@ def main() -> None:
 
     conn.commit()
 
-    for emp_email, title, loc, req, desc in JOBS:
+    for (emp_email, title, loc, req, desc, dept, emp_type, mode,
+         e_min, e_max, s_min, s_max, hide, vac, edu, status) in JOBS:
         cur = conn.execute(
-            "INSERT INTO jobs (employer_id, title, location, required_skills, description) "
-            "VALUES (?, ?, ?, ?, ?)", (email_to_id[emp_email], title, loc, req, desc))
+            "INSERT INTO jobs (employer_id, title, location, required_skills, description, "
+            "department, employment_type, work_mode, exp_min, exp_max, salary_min, "
+            "salary_max, hide_salary, vacancies, education, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (email_to_id[emp_email], title, loc, req, desc, dept, emp_type, mode,
+             e_min, e_max, s_min, s_max, hide, vac, edu, status))
         job_id = cur.lastrowid
-        # Auto-apply matching candidates to this fresh job.
+        # Auto-apply matching candidates — drafts are not live, so skip them.
+        if status != "active":
+            continue
         for email, name, headline, skills, auto in CANDIDATES:
             if not auto:
                 continue

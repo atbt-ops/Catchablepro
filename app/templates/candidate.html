@@ -67,6 +67,28 @@
   {% if not profile.skills %}
     <p class="hint">Add your skills above (or upload a resume) to see match percentages.</p>
   {% endif %}
+
+  <form method="get" action="/candidate" class="filterbar">
+    <label>Work mode
+      <select name="work_mode" onchange="this.form.submit()">
+        <option value="">Any</option>
+        {% for w in work_modes %}
+          <option value="{{ w }}" {{ 'selected' if sel_work_mode == w }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Employment type
+      <select name="employment_type" onchange="this.form.submit()">
+        <option value="">Any</option>
+        {% for t in employment_types %}
+          <option value="{{ t }}" {{ 'selected' if sel_employment_type == t }}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if sel_work_mode or sel_employment_type %}
+      <a class="btn ghost small" href="/candidate">Clear filters</a>
+    {% endif %}
+  </form>
   {% if job_rows %}
     <div class="rows">
       {% for r in job_rows %}
@@ -77,6 +99,14 @@
           <p class="row-sub">
             {{ icon('building', 13) }} {{ r.job.company_name }}
             {% if r.job.location %}<span class="dot"></span>{{ r.job.location }}{% endif %}
+            <span class="dot"></span>{{ r.job.work_mode }}
+            <span class="dot"></span>{{ r.job.employment_type }}
+          </p>
+          <p class="row-sub">
+            <span class="meta">{{ icon('user', 12) }} {{ fmt_exp(r.job) }}</span>
+            <span class="meta">{{ fmt_salary(r.job) }}</span>
+            {% if r.job.department %}<span class="meta">{{ r.job.department }}</span>{% endif %}
+            {% if r.job.vacancies > 1 %}<span class="meta">{{ r.job.vacancies }} openings</span>{% endif %}
           </p>
           {% if r.job.description %}<p class="row-desc">{{ r.job.description }}</p>{% endif %}
           <div class="chips">

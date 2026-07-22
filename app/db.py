@@ -43,6 +43,15 @@ CREATE TABLE IF NOT EXISTS candidate_profiles (
     updated_at       TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS company_profiles (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    industry    TEXT NOT NULL DEFAULT '',
+    size        TEXT NOT NULL DEFAULT '',
+    website     TEXT NOT NULL DEFAULT '',
+    about       TEXT NOT NULL DEFAULT '',
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     employer_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -50,6 +59,19 @@ CREATE TABLE IF NOT EXISTS jobs (
     description     TEXT    NOT NULL DEFAULT '',
     required_skills TEXT    NOT NULL DEFAULT '',
     location        TEXT    NOT NULL DEFAULT '',
+    -- Naukri-style posting details
+    employment_type TEXT    NOT NULL DEFAULT 'Full-time',
+    work_mode       TEXT    NOT NULL DEFAULT 'On-site',
+    exp_min         INTEGER NOT NULL DEFAULT 0,
+    exp_max         INTEGER NOT NULL DEFAULT 0,
+    salary_min      REAL    NOT NULL DEFAULT 0,   -- LPA (lakhs per annum)
+    salary_max      REAL    NOT NULL DEFAULT 0,   -- LPA
+    hide_salary     INTEGER NOT NULL DEFAULT 0,
+    vacancies       INTEGER NOT NULL DEFAULT 1,
+    education       TEXT    NOT NULL DEFAULT '',
+    department      TEXT    NOT NULL DEFAULT '',
+    deadline        TEXT    NOT NULL DEFAULT '',
+    status          TEXT    NOT NULL DEFAULT 'active',
     created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -76,12 +98,39 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+# Columns added after the first release. SQLite cannot change an existing
+# table via CREATE TABLE IF NOT EXISTS, so they are added on startup instead.
+_JOB_COLUMNS = {
+    "employment_type": "TEXT NOT NULL DEFAULT 'Full-time'",
+    "work_mode": "TEXT NOT NULL DEFAULT 'On-site'",
+    "exp_min": "INTEGER NOT NULL DEFAULT 0",
+    "exp_max": "INTEGER NOT NULL DEFAULT 0",
+    "salary_min": "REAL NOT NULL DEFAULT 0",
+    "salary_max": "REAL NOT NULL DEFAULT 0",
+    "hide_salary": "INTEGER NOT NULL DEFAULT 0",
+    "vacancies": "INTEGER NOT NULL DEFAULT 1",
+    "education": "TEXT NOT NULL DEFAULT ''",
+    "department": "TEXT NOT NULL DEFAULT ''",
+    "deadline": "TEXT NOT NULL DEFAULT ''",
+    "status": "TEXT NOT NULL DEFAULT 'active'",
+}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add any columns introduced after a database was first created."""
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)")}
+    for name, ddl in _JOB_COLUMNS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {ddl}")
+
+
 def init_db() -> None:
-    """Create data dirs and tables if they do not yet exist."""
+    """Create data dirs and tables if they do not yet exist, then migrate."""
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     conn = _connect()
     try:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.commit()
     finally:
         conn.close()

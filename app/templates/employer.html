@@ -7,48 +7,34 @@
     <h1>{{ user.company_name or user.name or 'Employer' }}</h1>
     <p class="sub">Post roles and see candidates ranked by how well their skills match.</p>
   </div>
+  <a class="btn" href="/employer/jobs/new">{{ icon('plus', 16) }} Post a job</a>
 </div>
 
-<div class="grid2">
-  <section class="panel">
-    <h2>{{ icon('plus', 18) }} Post a job</h2>
-    <p class="hint">List the required skills — candidates are scored against them automatically.</p>
-    <form action="/employer/jobs" method="post">
-      {{ csrf_field(request) }}
-      <label>Title
-        <input type="text" name="title" required placeholder="e.g. Backend Engineer">
+<section class="panel">
+  <h2>{{ icon('building', 18) }} Company profile</h2>
+  <p class="hint">Candidates see this on your job postings.</p>
+  <form action="/employer/company" method="post">
+    {{ csrf_field(request) }}
+    <div class="grid2">
+      <label>Company name
+        <input type="text" name="company_name" value="{{ user.company_name }}" placeholder="Acme Inc.">
       </label>
-      <label>Location
-        <input type="text" name="location" placeholder="Remote / Bengaluru">
+      <label>Industry
+        <input type="text" name="industry" value="{{ company.industry }}" placeholder="IT Services / Fintech">
       </label>
-      <label>Required skills <span class="muted">(comma separated)</span>
-        <textarea name="required_skills" rows="2"
-                  placeholder="python, fastapi, sql, docker"></textarea>
+      <label>Company size
+        <input type="text" name="size" value="{{ company.size }}" placeholder="e.g. 51-200 employees">
       </label>
-      <label>Description
-        <textarea name="description" rows="3" placeholder="What the role involves…"></textarea>
+      <label>Website
+        <input type="url" name="website" value="{{ company.website }}" placeholder="https://acme.com">
       </label>
-      <button class="btn" type="submit">{{ icon('plus', 16) }} Post job</button>
-    </form>
-  </section>
-
-  <section class="panel">
-    <h2>{{ icon('sparkle', 18) }} How matching works</h2>
-    <p class="hint">
-      Every candidate profile is scored against each job's required skills:
-    </p>
-    <div class="autoapply" style="align-items:center;">
-      <span class="brand-mark">{{ icon('target', 20) }}</span>
-      <div>
-        <div class="state on" style="color:var(--brand);">match % = shared skills ÷ required skills</div>
-        <div class="muted" style="font-size:13px;">
-          Open a job's <strong>Matches</strong> to see candidates ranked highest-first —
-          including those who applied automatically.
-        </div>
-      </div>
     </div>
-  </section>
-</div>
+    <label>About the company
+      <textarea name="about" rows="3" placeholder="What your company does…">{{ company.about }}</textarea>
+    </label>
+    <button class="btn" type="submit">{{ icon('check', 16) }} Save company profile</button>
+  </form>
+</section>
 
 <section class="panel">
   <h2>{{ icon('briefcase', 18) }} Your jobs
@@ -57,15 +43,48 @@
   {% if jobs %}
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead><tr><th>Title</th><th>Location</th><th>Required skills</th><th>Applications</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Role</th><th>Details</th><th>Experience</th><th>Salary</th>
+            <th>Status</th><th>Applicants</th><th></th>
+          </tr>
+        </thead>
         <tbody>
         {% for j in jobs %}
           <tr>
-            <td><strong>{{ j.title }}</strong></td>
-            <td class="muted">{{ j.location or '—' }}</td>
-            <td class="muted">{{ j.required_skills or '—' }}</td>
+            <td>
+              <strong>{{ j.title }}</strong>
+              <div class="mono">{{ j.location or '—' }}{% if j.vacancies > 1 %} · {{ j.vacancies }} openings{% endif %}</div>
+            </td>
+            <td class="mono">{{ j.employment_type }} · {{ j.work_mode }}{% if j.department %}<br>{{ j.department }}{% endif %}</td>
+            <td class="mono">{{ fmt_exp(j) }}</td>
+            <td class="mono">{{ fmt_salary(j) }}</td>
+            <td><span class="tag status-{{ j.status }}">{{ j.status | capitalize }}</span></td>
             <td><span class="count-pill">{{ j.n_apps }}</span></td>
-            <td><a class="btn ghost small" href="/employer/jobs/{{ j.id }}/matches">View matches {{ icon('arrow-right', 14) }}</a></td>
+            <td>
+              <div class="row-actions">
+                <a class="btn ghost small" href="/employer/jobs/{{ j.id }}/matches">Matches</a>
+                {% if j.status == 'draft' %}
+                  <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <input type="hidden" name="status" value="active">
+                    <button class="btn small" type="submit">Publish</button>
+                  </form>
+                {% elif j.status == 'active' %}
+                  <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <input type="hidden" name="status" value="closed">
+                    <button class="btn ghost small" type="submit">Close</button>
+                  </form>
+                {% else %}
+                  <form action="/employer/jobs/{{ j.id }}/status" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <input type="hidden" name="status" value="active">
+                    <button class="btn ghost small" type="submit">Reopen</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
           </tr>
         {% endfor %}
         </tbody>
@@ -74,8 +93,24 @@
   {% else %}
     <div class="empty">
       <span class="eico">{{ icon('briefcase', 24) }}</span>
-      <p>You haven't posted any jobs yet. Post your first role above.</p>
+      <p>You haven't posted any jobs yet.</p>
+      <p style="margin-top:12px;"><a class="btn" href="/employer/jobs/new">{{ icon('plus', 16) }} Post your first job</a></p>
     </div>
   {% endif %}
+</section>
+
+<section class="panel">
+  <h2>{{ icon('sparkle', 18) }} How matching works</h2>
+  <div class="autoapply" style="align-items:center;">
+    <span class="brand-mark">{{ icon('target', 20) }}</span>
+    <div>
+      <div class="state on" style="color:var(--brand);">match % = shared skills ÷ required skills</div>
+      <div class="muted" style="font-size:13px;">
+        Open a job's <strong>Matches</strong> to see candidates ranked highest-first —
+        including those who applied automatically. Only <strong>Active</strong> jobs are
+        visible to candidates and eligible for Auto-Apply.
+      </div>
+    </div>
+  </div>
 </section>
 {% endblock %}

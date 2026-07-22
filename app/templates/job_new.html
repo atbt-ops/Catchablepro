@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Post a job · SkillMatch{% endblock %}
+{% block content %}
+<a class="backlink" href="/employer">{{ icon('arrow-right', 14) }} Back to dashboard</a>
+<div class="page-head">
+  <div>
+    <h1>Post a job</h1>
+    <p class="sub">The more detail you give, the better we can match candidates to this role.</p>
+  </div>
+</div>
+
+<form action="/employer/jobs" method="post">
+  {{ csrf_field(request) }}
+
+  <section class="panel">
+    <h2>{{ icon('briefcase', 18) }} Role basics</h2>
+    <div class="grid2">
+      <label>Job title *
+        <input type="text" name="title" required placeholder="e.g. Senior Backend Engineer">
+      </label>
+      <label>Department
+        <select name="department">
+          <option value="">Select…</option>
+          {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Employment type
+        <select name="employment_type">
+          {% for t in employment_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Work mode
+        <select name="work_mode">
+          {% for w in work_modes %}<option value="{{ w }}">{{ w }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Location
+        <input type="text" name="location" placeholder="e.g. Bengaluru / Remote">
+      </label>
+      <label>Number of vacancies
+        <input type="number" name="vacancies" value="1" min="1">
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('target', 18) }} Skills &amp; experience</h2>
+    <p class="hint">Required skills drive the match score — list them comma separated.</p>
+    <label>Required skills *
+      <textarea name="required_skills" rows="2" required
+                placeholder="python, fastapi, sql, docker, aws"></textarea>
+    </label>
+    <div class="grid2">
+      <label>Minimum experience (years)
+        <input type="number" name="exp_min" value="0" min="0" max="50">
+      </label>
+      <label>Maximum experience (years)
+        <input type="number" name="exp_max" value="0" min="0" max="50">
+      </label>
+      <label>Minimum education
+        <select name="education">
+          {% for e in education_levels %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Application deadline
+        <input type="date" name="deadline">
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('sparkle', 18) }} Compensation</h2>
+    <div class="grid2">
+      <label>Minimum salary (₹ LPA)
+        <input type="number" name="salary_min" value="0" min="0" step="0.5">
+      </label>
+      <label>Maximum salary (₹ LPA)
+        <input type="number" name="salary_max" value="0" min="0" step="0.5">
+      </label>
+    </div>
+    <label class="checkline">
+      <input type="checkbox" name="hide_salary" value="1">
+      <span>Hide salary from candidates (shows “Not disclosed”)</span>
+    </label>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('doc', 18) }} Job description</h2>
+    <label>Describe the role
+      <textarea name="description" rows="6"
+                placeholder="Responsibilities, team, tech stack, what success looks like…"></textarea>
+    </label>
+  </section>
+
+  <div class="form-actions">
+    <button class="btn" type="submit" name="action" value="publish">
+      {{ icon('check', 16) }} Publish job
+    </button>
+    <button class="btn ghost" type="submit" name="action" value="draft">Save as draft</button>
+    <a class="btn ghost" href="/employer">Cancel</a>
+  </div>
+</form>
+{% endblock %}

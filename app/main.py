@@ -76,6 +76,44 @@ async def verify_csrf(request: Request) -> None:
 templates.env.globals["csrf_field"] = csrf_field
 
 
+# --------------------------------------------------------------------------- #
+# Display helpers (exposed to templates)
+# --------------------------------------------------------------------------- #
+EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship", "Freelance"]
+WORK_MODES = ["On-site", "Hybrid", "Remote"]
+EDUCATION_LEVELS = ["Any", "Diploma", "Graduate", "Post Graduate", "Doctorate"]
+DEPARTMENTS = [
+    "Engineering", "Data Science", "Product", "Design", "Sales", "Marketing",
+    "Human Resources", "Finance", "Operations", "Customer Support", "Other",
+]
+
+
+def fmt_salary(job) -> str:
+    """'₹8–12 LPA', '₹8 LPA', or 'Not disclosed'."""
+    if job["hide_salary"]:
+        return "Not disclosed"
+    lo, hi = job["salary_min"] or 0, job["salary_max"] or 0
+    if not lo and not hi:
+        return "Not disclosed"
+    if lo and hi:
+        return f"₹{lo:g}–{hi:g} LPA"
+    return f"₹{(lo or hi):g} LPA"
+
+
+def fmt_exp(job) -> str:
+    """'Fresher', '3 yrs', or '3–6 yrs'."""
+    lo, hi = job["exp_min"] or 0, job["exp_max"] or 0
+    if not lo and not hi:
+        return "Fresher"
+    if lo == hi:
+        return f"{lo} yr" if lo == 1 else f"{lo} yrs"
+    return f"{lo}–{hi} yrs"
+
+
+templates.env.globals["fmt_salary"] = fmt_salary
+templates.env.globals["fmt_exp"] = fmt_exp
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -122,12 +160,29 @@ def _profile(db: sqlite3.Connection, user_id: int) -> sqlite3.Row:
     return row
 
 
+def _company(db: sqlite3.Connection, user_id: int) -> sqlite3.Row:
+    """Return the employer's company profile row, creating it on first access."""
+    row = db.execute(
+        "SELECT * FROM company_profiles WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if row is None:
+        db.execute("INSERT INTO company_profiles (user_id) VALUES (?)", (user_id,))
+        db.commit()
+        row = db.execute(
+            "SELECT * FROM company_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    return row
+
+
 def _auto_apply_candidate_to_all_jobs(db: sqlite3.Connection, candidate_id: int) -> int:
     """Apply this candidate to every sufficiently-matching job. Returns count added."""
     prof = _profile(db, candidate_id)
     if not prof["auto_apply"]:
         return 0
-    jobs = db.execute("SELECT id, required_skills FROM jobs").fetchall()
+    # Only live postings — drafts and closed roles are not applied to.
+    jobs = db.execute(
+        "SELECT id, required_skills FROM jobs WHERE status = 'active'"
+    ).fetchall()
     added = 0
     for job in jobs:
         pct = match_pct(prof["skills"], job["required_skills"])
@@ -145,9 +200,11 @@ def _auto_apply_candidate_to_all_jobs(db: sqlite3.Connection, candidate_id: int)
 
 
 def _auto_apply_all_candidates_to_job(db: sqlite3.Connection, job_id: int) -> None:
-    """When a new job is posted, apply every auto-apply candidate that matches."""
-    job = db.execute("SELECT required_skills FROM jobs WHERE id = ?", (job_id,)).fetchone()
-    if job is None:
+    """When a job goes live, apply every auto-apply candidate that matches."""
+    job = db.execute(
+        "SELECT required_skills, status FROM jobs WHERE id = ?", (job_id,)
+    ).fetchone()
+    if job is None or job["status"] != "active":
         return
     candidates = db.execute(
         "SELECT p.user_id, p.skills FROM candidate_profiles p WHERE p.auto_apply = 1"
@@ -259,16 +316,32 @@ def logout(request: Request, _csrf: None = Depends(verify_csrf)):
 # Candidate
 # --------------------------------------------------------------------------- #
 @app.get("/candidate", response_class=HTMLResponse)
-def candidate_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db)):
+def candidate_dashboard(
+    request: Request,
+    work_mode: str = "",
+    employment_type: str = "",
+    db: sqlite3.Connection = Depends(get_db),
+):
     user, redirect = _require(request, db, "candidate")
     if redirect:
         return redirect
     prof = _profile(db, user["id"])
 
-    jobs = db.execute(
+    # Only live postings are visible to candidates.
+    sql = (
         "SELECT j.*, u.company_name FROM jobs j "
-        "JOIN users u ON u.id = j.employer_id ORDER BY j.created_at DESC"
-    ).fetchall()
+        "JOIN users u ON u.id = j.employer_id WHERE j.status = 'active'"
+    )
+    params: list = []
+    if work_mode:
+        sql += " AND j.work_mode = ?"
+        params.append(work_mode)
+    if employment_type:
+        sql += " AND j.employment_type = ?"
+        params.append(employment_type)
+    sql += " ORDER BY j.created_at DESC"
+    jobs = db.execute(sql, params).fetchall()
+
     applied_ids = {
         r["job_id"]
         for r in db.execute(
@@ -307,6 +380,10 @@ def candidate_dashboard(request: Request, db: sqlite3.Connection = Depends(get_d
             "job_rows": job_rows,
             "my_apps": my_apps,
             "auto_min": AUTO_APPLY_MIN_MATCH,
+            "work_modes": WORK_MODES,
+            "employment_types": EMPLOYMENT_TYPES,
+            "sel_work_mode": work_mode,
+            "sel_employment_type": employment_type,
         },
     )
 
@@ -433,6 +510,7 @@ def employer_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
+    company = _company(db, user["id"])
     jobs = db.execute(
         "SELECT j.*, "
         "(SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) AS n_apps "
@@ -440,7 +518,56 @@ def employer_dashboard(request: Request, db: sqlite3.Connection = Depends(get_db
         (user["id"],),
     ).fetchall()
     return templates.TemplateResponse(
-        request, "employer.html", {"request": request, "user": user, "jobs": jobs}
+        request,
+        "employer.html",
+        {"request": request, "user": user, "jobs": jobs, "company": company},
+    )
+
+
+@app.post("/employer/company")
+def employer_update_company(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    company_name: str = Form(""),
+    industry: str = Form(""),
+    size: str = Form(""),
+    website: str = Form(""),
+    about: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    _company(db, user["id"])  # ensure the row exists
+    db.execute(
+        "UPDATE users SET company_name = ? WHERE id = ?",
+        (company_name.strip(), user["id"]),
+    )
+    db.execute(
+        "UPDATE company_profiles SET industry = ?, size = ?, website = ?, about = ?, "
+        "updated_at = datetime('now') WHERE user_id = ?",
+        (industry.strip(), size.strip(), website.strip(), about.strip(), user["id"]),
+    )
+    db.commit()
+    return RedirectResponse("/employer", status_code=303)
+
+
+@app.get("/employer/jobs/new", response_class=HTMLResponse)
+def employer_new_job_form(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "job_new.html",
+        {
+            "request": request,
+            "user": user,
+            "employment_types": EMPLOYMENT_TYPES,
+            "work_modes": WORK_MODES,
+            "education_levels": EDUCATION_LEVELS,
+            "departments": DEPARTMENTS,
+        },
     )
 
 
@@ -452,19 +579,74 @@ def employer_create_job(
     location: str = Form(""),
     required_skills: str = Form(""),
     description: str = Form(""),
+    employment_type: str = Form("Full-time"),
+    work_mode: str = Form("On-site"),
+    exp_min: int = Form(0),
+    exp_max: int = Form(0),
+    salary_min: float = Form(0),
+    salary_max: float = Form(0),
+    hide_salary: Optional[str] = Form(None),
+    vacancies: int = Form(1),
+    education: str = Form(""),
+    department: str = Form(""),
+    deadline: str = Form(""),
+    action: str = Form("publish"),
     db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
+
+    status = "draft" if action == "draft" else "active"
+    # Keep ranges sane rather than rejecting the whole form.
+    exp_min, exp_max = max(0, exp_min), max(0, exp_max)
+    if exp_max and exp_max < exp_min:
+        exp_min, exp_max = exp_max, exp_min
+    if salary_max and salary_max < salary_min:
+        salary_min, salary_max = salary_max, salary_min
+
     cur = db.execute(
-        "INSERT INTO jobs (employer_id, title, description, required_skills, location) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (user["id"], title.strip(), description.strip(), required_skills.strip(), location.strip()),
+        "INSERT INTO jobs (employer_id, title, description, required_skills, location, "
+        "employment_type, work_mode, exp_min, exp_max, salary_min, salary_max, "
+        "hide_salary, vacancies, education, department, deadline, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            user["id"], title.strip(), description.strip(), required_skills.strip(),
+            location.strip(), employment_type, work_mode, exp_min, exp_max,
+            salary_min, salary_max, 1 if hide_salary else 0, max(1, vacancies),
+            education.strip(), department.strip(), deadline.strip(), status,
+        ),
     )
     db.commit()
-    # Auto-apply candidates never miss a new posting.
+    # Auto-apply candidates never miss a new posting (drafts are skipped).
     _auto_apply_all_candidates_to_job(db, cur.lastrowid)
+    return RedirectResponse("/employer", status_code=303)
+
+
+@app.post("/employer/jobs/{job_id}/status")
+def employer_set_job_status(
+    request: Request,
+    job_id: int,
+    _csrf: None = Depends(verify_csrf),
+    status: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Publish a draft, or close / reopen a posting."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    if status not in ("draft", "active", "closed"):
+        return RedirectResponse("/employer", status_code=303)
+    owned = db.execute(
+        "SELECT id FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
+    ).fetchone()
+    if owned is None:
+        return RedirectResponse("/employer", status_code=303)
+    db.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
+    db.commit()
+    if status == "active":
+        # Going live pulls in auto-apply candidates that match.
+        _auto_apply_all_candidates_to_job(db, job_id)
     return RedirectResponse("/employer", status_code=303)
 
 

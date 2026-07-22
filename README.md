@@ -8,8 +8,25 @@ FastAPI + Uvicorn, an **in-process SQLite** database (no network hop), and
 
 | Role | Capabilities |
 |------|--------------|
-| **Employer** | Register, post jobs with required skills, and see **candidates ranked by skill-match %** for each job — including who applied automatically. Download applicant resumes. |
+| **Employer** | Register, maintain a **company profile** (industry, size, website, about), post detailed jobs, and see **candidates ranked by skill-match %** for each job — including who applied automatically. Download applicant resumes. |
 | **Candidate** | Register, build a profile (headline + skills), **upload a resume**, browse jobs with a live **match %**, apply manually, or flip **Auto-Apply** to be applied to every matching job — now and in the future. |
+
+### Job posting (Naukri-style)
+
+Employers post from a dedicated page (`/employer/jobs/new`) with:
+
+- **Role basics** — title, department, employment type (Full-time/Part-time/Contract/
+  Internship/Freelance), work mode (On-site/Hybrid/Remote), location, vacancies
+- **Skills & experience** — required skills (drives matching), min/max years,
+  minimum education, application deadline
+- **Compensation** — min/max salary in ₹ LPA, with a *hide salary* option that
+  shows candidates "Not disclosed"
+- **Description** — free-text role details
+
+**Job lifecycle:** `Draft → Active → Closed` (reopenable). Only **Active** jobs are
+visible to candidates or eligible for Auto-Apply, so drafts stay private.
+
+Candidates can filter the job list by **work mode** and **employment type**.
 
 ### How matching works (keyword overlap)
 
@@ -63,7 +80,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-15 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+21 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
