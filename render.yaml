@@ -15,6 +15,24 @@ services:
       - key: SECRET_KEY
         generateValue: true # Render generates a strong random value for you
 
+      # Email. Defaults to "console" (logs only, sends nothing). To deliver for
+      # real, set EMAIL_BACKEND to "smtp" or "sendgrid" in the Render dashboard
+      # and fill in the secrets below (sync: false keeps them out of git).
+      - key: EMAIL_BACKEND
+        value: console
+      - key: EMAIL_FROM
+        value: no-reply@example.com
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+
     # ---------------------------------------------------------------------
     # PERSISTENCE: the free plan has no disk, so the SQLite database and any
     # uploaded resumes are LOST on every restart/redeploy. To keep data,

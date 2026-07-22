@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Contact {{ cand.name or cand.email }} · SkillMatch{% endblock %}
+{% block content %}
+<a class="backlink" href="/employer/jobs/{{ job.id }}/matches">
+  {{ icon('arrow-right', 14) }} Back to matches
+</a>
+<div class="page-head">
+  <div>
+    <h1>Contact candidate</h1>
+    <p class="sub">Sent from SkillMatch — replies go straight to your inbox ({{ user.email }}).</p>
+  </div>
+</div>
+
+{% if error %}
+  <div class="errorlist"><strong>Email not sent.</strong> {{ error }}</div>
+{% endif %}
+
+{% if not mail_configured %}
+  <div class="notice">
+    {{ icon('bolt', 15) }}
+    <div>
+      <strong>No email provider configured</strong> — running the
+      <code>{{ backend }}</code> backend, so this message will be logged instead of
+      delivered. Set <code>EMAIL_BACKEND</code> plus your SMTP or SendGrid
+      credentials to send for real.
+    </div>
+  </div>
+{% endif %}
+
+<section class="panel">
+  <div class="contact-to">
+    <span class="avatar">{{ (cand.name or cand.email)[0] | upper }}</span>
+    <div>
+      <div class="contact-name">{{ cand.name or cand.email }}</div>
+      <a class="candmail" href="mailto:{{ cand.email }}">{{ icon('mail', 12) }} {{ cand.email }}</a>
+      {% if cand.headline %}<div class="muted" style="font-size:13px;">{{ cand.headline }}</div>{% endif %}
+    </div>
+  </div>
+
+  <form action="/employer/jobs/{{ job.id }}/contact/{{ cand.id }}" method="post">
+    {{ csrf_field(request) }}
+    <label>Subject <span class="req">*</span>
+      <input type="text" name="subject" required value="{{ subject }}">
+    </label>
+    <label>Message <span class="req">*</span>
+      <textarea name="body" rows="10" required>{{ body }}</textarea>
+    </label>
+    <div class="form-actions">
+      <button class="btn" type="submit">{{ icon('mail', 16) }} Send email</button>
+      <a class="btn ghost" href="/employer/jobs/{{ job.id }}/matches">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

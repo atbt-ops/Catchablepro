@@ -24,7 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from html import escape
 
-from . import auth, db as dbmod, resume as resume_module
+from . import auth, db as dbmod, mailer, resume as resume_module
 from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
@@ -940,5 +940,98 @@ def employer_job_matches(
     return templates.TemplateResponse(
         request,
         "job_matches.html",
-        {"request": request, "user": user, "job": job, "rows": rows},
+        {
+            "request": request, "user": user, "job": job, "rows": rows,
+            "sent_to": request.query_params.get("sent", ""),
+        },
+    )
+
+
+def _contact_target(db, employer, job_id: int, candidate_id: int):
+    """Return (job, candidate) only if this employer may contact them."""
+    job = db.execute(
+        "SELECT * FROM jobs WHERE id = ? AND employer_id = ?", (job_id, employer["id"])
+    ).fetchone()
+    if job is None:
+        return None, None
+    cand = db.execute(
+        "SELECT u.id, u.name, u.email, p.headline, p.skills "
+        "FROM users u JOIN candidate_profiles p ON p.user_id = u.id "
+        "WHERE u.id = ? AND u.role = 'candidate'",
+        (candidate_id,),
+    ).fetchone()
+    return job, cand
+
+
+@app.get("/employer/jobs/{job_id}/contact/{candidate_id}", response_class=HTMLResponse)
+def employer_contact_form(
+    request: Request, job_id: int, candidate_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job, cand = _contact_target(db, user, job_id, candidate_id)
+    if job is None or cand is None:
+        return RedirectResponse("/employer", status_code=303)
+
+    company = user["company_name"] or "our company"
+    subject = f"Regarding your application for {job['title']} at {company}"
+    body = (
+        f"Hi {cand['name'] or 'there'},\n\n"
+        f"We reviewed your profile for the {job['title']} role and would like "
+        f"to connect.\n\n"
+        f"Best regards,\n{user['name'] or ''}\n{company}"
+    )
+    return templates.TemplateResponse(
+        request,
+        "contact.html",
+        {
+            "request": request, "user": user, "job": job, "cand": cand,
+            "subject": subject, "body": body,
+            "mail_configured": mailer.is_configured(),
+            "backend": mailer.backend(),
+            "error": None,
+        },
+    )
+
+
+@app.post("/employer/jobs/{job_id}/contact/{candidate_id}")
+def employer_contact_send(
+    request: Request,
+    job_id: int,
+    candidate_id: int,
+    _csrf: None = Depends(verify_csrf),
+    subject: str = Form(...),
+    body: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job, cand = _contact_target(db, user, job_id, candidate_id)
+    if job is None or cand is None:
+        return RedirectResponse("/employer", status_code=303)
+
+    ok, error = mailer.send_email(
+        to=cand["email"],
+        subject=subject.strip(),
+        body=body,
+        reply_to=user["email"],  # candidate replies straight to the recruiter
+    )
+    if not ok:
+        return templates.TemplateResponse(
+            request,
+            "contact.html",
+            {
+                "request": request, "user": user, "job": job, "cand": cand,
+                "subject": subject, "body": body,
+                "mail_configured": mailer.is_configured(),
+                "backend": mailer.backend(),
+                "error": error,
+            },
+            status_code=502,
+        )
+    return RedirectResponse(
+        f"/employer/jobs/{job_id}/matches?sent={cand['email']}", status_code=303
     )

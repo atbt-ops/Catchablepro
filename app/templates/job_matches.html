@@ -13,6 +13,10 @@
   </div>
 </div>
 
+{% if sent_to %}
+  <div class="flash-ok">{{ icon('check', 15) }} Email sent to <strong>{{ sent_to }}</strong>.</div>
+{% endif %}
+
 <section class="panel">
   <h2>{{ icon('user', 18) }} Candidate matches
     {% if rows %}<span class="count-pill">{{ rows|length }}</span>{% endif %}
@@ -48,10 +52,8 @@
           {% else %}
             <span class="muted" style="font-size:13px;">No resume</span>
           {% endif %}
-          {% set subject = 'Regarding your application for ' ~ job.title ~ ' at ' ~ (user.company_name or 'our company') %}
-          {% set body = 'Hi ' ~ (r.cand.name or 'there') ~ ',\n\nWe reviewed your profile for the ' ~ job.title ~ ' role and would like to connect.\n\nBest regards,\n' ~ (user.name or '') ~ '\n' ~ (user.company_name or '') %}
           <a class="btn small" title="Email {{ r.cand.email }}"
-             href="mailto:{{ r.cand.email }}?subject={{ subject | urlencode }}&body={{ body | urlencode }}">
+             href="/employer/jobs/{{ job.id }}/contact/{{ r.cand.id }}">
             {{ icon('mail', 14) }} Contact
           </a>
         </div>

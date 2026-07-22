@@ -103,7 +103,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-32 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+44 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
@@ -143,6 +143,38 @@ Any Docker host works too — the image needs only `ENV=production` and a
 |----------|---------|
 | `ENV` | Set to `production` to enable `Secure` cookies. |
 | `SECRET_KEY` | Session-cookie signing key. **Required** in production — the app refuses to start with the dev default. Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+
+## Email
+
+Employers contact candidates from **Matches → Contact**, which opens a compose
+page prefilled with the candidate's address, the role, and a draft message. The
+email is sent **server-side** (no dependency on the user having a mail client),
+with `Reply-To` set to the recruiter so replies land in their inbox.
+
+Pick a backend with `EMAIL_BACKEND`:
+
+| Backend | When to use | Required variables |
+|---------|-------------|--------------------|
+| `console` *(default)* | Local dev and tests — **nothing is sent**, messages are logged | – |
+| `smtp` | Gmail, Amazon SES, Mailgun, or SendGrid's SMTP relay | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_USE_TLS` |
+| `sendgrid` | SendGrid over HTTPS — use when the host blocks SMTP ports | `SENDGRID_API_KEY` |
+
+Set `EMAIL_FROM` to a verified sender address on your provider.
+
+**SendGrid via SMTP** (simplest — one API key, no code change):
+
+```bash
+EMAIL_BACKEND=smtp
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey          # the literal word "apikey"
+SMTP_PASSWORD=SG.xxxxx    # your SendGrid API key
+EMAIL_FROM=no-reply@yourdomain.com
+```
+
+`console` is the deliberate default so a misconfigured deploy can never mail real
+candidates by accident — the compose page shows a warning banner when no provider
+is configured. Sending failures are surfaced in the UI rather than swallowed.
 
 ## Security
 

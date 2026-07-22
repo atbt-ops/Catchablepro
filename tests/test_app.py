@@ -302,3 +302,72 @@ def test_stored_description_is_sanitized_in_db(client, register, post_job, tmp_p
     conn.close()
     assert "<b>there</b>" in desc      # formatting preserved
     assert "<script>" not in desc      # script tag removed
+
+
+def test_contact_form_prefills_candidate_and_sends(client, register, post, post_job):
+    from app import mailer
+    mailer.outbox.clear()
+
+    register("hire@acme.io", "employer", company_name="Acme", name="Priya")
+    post_job(title="Backend Engineer", required_skills="python, sql")
+    post("/logout")
+    register("asha@example.com", "candidate", name="Asha Verma")
+    post("/candidate/profile", data={"headline": "", "skills": "python, sql"})
+    post("/logout")
+    post("/employer/login", data={"email": "hire@acme.io", "password": "password123"})
+
+    # The matches page links to the compose page, not a mailto.
+    matches = client.get("/employer/jobs/1/matches").text
+    assert "asha@example.com" in matches
+    assert "/employer/jobs/1/contact/" in matches
+
+    # Compose page is prefilled for that candidate and role.
+    form = client.get("/employer/jobs/1/contact/2").text
+    assert "asha@example.com" in form
+    assert "Backend Engineer" in form
+    assert "Hi Asha Verma" in form
+
+    # Sending delivers to the candidate, with replies routed to the employer.
+    r = post("/employer/jobs/1/contact/2", data={
+        "subject": "About the Backend Engineer role", "body": "Hi Asha, let's talk.",
+    })
+    assert r.status_code == 303
+    assert len(mailer.outbox) == 1
+    sent = mailer.outbox[0]
+    assert sent.to == "asha@example.com"
+    assert sent.subject == "About the Backend Engineer role"
+    assert sent.reply_to == "hire@acme.io"
+    mailer.outbox.clear()
+
+
+def test_employer_cannot_contact_through_another_employers_job(client, register, post, post_job):
+    from app import mailer
+    mailer.outbox.clear()
+
+    # Employer A owns job 1.
+    register("a@x.io", "employer", company_name="A")
+    post_job(title="A Role", required_skills="python")
+    post("/logout")
+    register("cand9@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+    post("/logout")
+
+    # Employer B tries to use A's job to reach the candidate.
+    register("b@x.io", "employer", company_name="B")
+    r = post("/employer/jobs/1/contact/2", data={"subject": "Hi", "body": "Hello"})
+    assert r.status_code == 303
+    assert r.headers["location"] == "/employer"
+    assert mailer.outbox == []   # nothing was sent
+
+
+def test_contact_page_warns_when_no_provider_configured(client, register, post, post_job):
+    register("warn@x.io", "employer", company_name="W")
+    post_job(title="W Role", required_skills="python")
+    post("/logout")
+    register("wc@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+    post("/logout")
+    post("/employer/login", data={"email": "warn@x.io", "password": "password123"})
+
+    page = client.get("/employer/jobs/1/contact/2").text
+    assert "No email provider configured" in page
