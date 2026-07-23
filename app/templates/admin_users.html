@@ -1,0 +1,109 @@
+{% extends "admin_base.html" %}
+{% from "macros.html" import icon, pager %}
+{% set active_page = 'users' %}
+{% block title %}Users · Admin{% endblock %}
+
+{% block rightrail %}
+  <div class="railcard">
+    <h4>{{ icon('bolt', 13) }} Suspending an account</h4>
+    <p class="tip">
+      Blocks sign-in immediately, ends any live session, hides that employer's
+      jobs from candidates, and drops the candidate out of matches and
+      Auto-Apply. Nothing is deleted — it is fully reversible.
+    </p>
+  </div>
+  <div class="railcard">
+    <h4>{{ icon('check', 13) }} Protected</h4>
+    <p class="tip">
+      You cannot suspend yourself or another admin, so the platform can never be
+      locked out of its own console.
+    </p>
+  </div>
+{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Users</h1>
+    <p class="sub">{{ pg.total }} account{{ 's' if pg.total != 1 }} matching your filter</p>
+  </div>
+</div>
+
+{% if request.query_params.get('error') == 'protected' %}
+  <div class="notice">{{ icon('bolt', 16) }}
+    <div>That account is protected — you cannot suspend yourself or another admin.</div>
+  </div>
+{% endif %}
+
+<form method="get" action="/admin/users" class="filterbar">
+  <label>Role
+    <select name="role" onchange="this.form.submit()">
+      <option value="">All</option>
+      <option value="candidate" {{ 'selected' if sel_role == 'candidate' }}>Candidates</option>
+      <option value="employer" {{ 'selected' if sel_role == 'employer' }}>Employers</option>
+    </select>
+  </label>
+  <label>Search
+    <input type="search" name="q" value="{{ q }}" placeholder="email, name or company">
+  </label>
+  <button class="btn small" type="submit">Search</button>
+  {% if sel_role or q %}<a class="btn ghost small" href="/admin/users">Clear</a>{% endif %}
+</form>
+
+<section class="panel">
+  {% if rows %}
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr><th>Account</th><th>Role</th><th>State</th><th>Joined</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for u in rows %}
+          <tr>
+            <td>
+              <strong>{{ u.name or '—' }}</strong>
+              {% if u.is_admin %}<span class="tag auto">Admin</span>{% endif %}
+              <div class="mono">{{ u.email }}</div>
+              {% if u.company_name %}<div class="mono">{{ u.company_name }}</div>{% endif %}
+              {% if u.is_suspended and u.suspended_reason %}
+                <div class="mono" style="color:var(--red)">Reason: {{ u.suspended_reason }}</div>
+              {% endif %}
+            </td>
+            <td><span class="tag">{{ u.role | capitalize }}</span></td>
+            <td>
+              {% if u.is_suspended %}<span class="tag stage-rejected">Suspended</span>
+              {% elif not u.email_verified %}<span class="tag status-draft">Unverified</span>
+              {% else %}<span class="tag applied">Active</span>{% endif %}
+            </td>
+            <td class="mono">{{ u.created_at }}</td>
+            <td>
+              {% if u.is_admin or u.id == user.id %}
+                <span class="muted" style="font-size:12px;">Protected</span>
+              {% elif u.is_suspended %}
+                <form action="/admin/users/{{ u.id }}/suspend" method="post" class="inline">
+                  {{ csrf_field(request) }}
+                  <button class="btn ghost small" type="submit">Reinstate</button>
+                </form>
+              {% else %}
+                <form action="/admin/users/{{ u.id }}/suspend" method="post" class="row-actions">
+                  {{ csrf_field(request) }}
+                  <input type="text" name="reason" placeholder="Reason (optional)"
+                         style="width:150px;margin:0;padding:6px 9px;font-size:12px;">
+                  <button class="btn danger small" type="submit">Suspend</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ pager(request, pg, 'page', 'users') }}
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('user', 24) }}</span>
+      <p>No accounts match that filter.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

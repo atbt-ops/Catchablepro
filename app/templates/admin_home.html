@@ -1,0 +1,84 @@
+{% extends "admin_base.html" %}
+{% from "macros.html" import icon %}
+{% set active_page = 'home' %}
+{% block title %}Admin · SkillMatch{% endblock %}
+
+{% block rightrail %}
+  <div class="railcard">
+    <h4>{{ icon('sparkle', 13) }} Needs attention</h4>
+    <div class="statrow"><span class="k">Suspended</span><span class="v amber">{{ stats.suspended }}</span></div>
+    <div class="statrow"><span class="k">Unverified</span><span class="v">{{ stats.unverified }}</span></div>
+    <p class="tip" style="margin-top:10px;">
+      Suspended accounts cannot sign in, and their jobs disappear from candidate
+      search immediately.
+    </p>
+  </div>
+  <div class="railcard">
+    <h4>{{ icon('bolt', 13) }} Admin access</h4>
+    <p class="tip">
+      Admin is never self-service. Grant it from the server with
+      <code>python manage.py make-admin &lt;email&gt;</code>.
+    </p>
+  </div>
+{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Platform overview</h1>
+    <p class="sub">Moderate accounts and postings across SkillMatch.</p>
+  </div>
+</div>
+
+<div class="pipeline">
+  <a class="pipe" href="/admin/users?role=candidate"><b>{{ stats.candidates }}</b><span>Candidates</span></a>
+  <a class="pipe" href="/admin/users?role=employer"><b>{{ stats.employers }}</b><span>Employers</span></a>
+  <a class="pipe stage-rejected" href="/admin/users"><b>{{ stats.suspended }}</b><span>Suspended</span></a>
+  <a class="pipe" href="/admin/jobs"><b>{{ stats.jobs }}</b><span>Jobs</span></a>
+  <a class="pipe stage-hired" href="/admin/jobs?status=active"><b>{{ stats.active_jobs }}</b><span>Active</span></a>
+  <a class="pipe stage-shortlisted" href="/admin/jobs"><b>{{ stats.applications }}</b><span>Applications</span></a>
+</div>
+
+<section class="panel">
+  <h2>{{ icon('user', 18) }} Newest accounts</h2>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>State</th><th>Joined</th></tr></thead>
+      <tbody>
+      {% for u in recent_users %}
+        <tr>
+          <td><strong>{{ u.name or '—' }}</strong>{% if u.company_name %}<div class="mono">{{ u.company_name }}</div>{% endif %}</td>
+          <td class="mono">{{ u.email }}</td>
+          <td><span class="tag">{{ u.role | capitalize }}</span></td>
+          <td>
+            {% if u.is_suspended %}<span class="tag stage-rejected">Suspended</span>
+            {% elif not u.email_verified %}<span class="tag status-draft">Unverified</span>
+            {% else %}<span class="tag applied">Active</span>{% endif %}
+          </td>
+          <td class="mono">{{ u.created_at }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>{{ icon('briefcase', 18) }} Newest postings</h2>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>Title</th><th>Company</th><th>Status</th><th>Posted</th></tr></thead>
+      <tbody>
+      {% for j in recent_jobs %}
+        <tr>
+          <td><strong>{{ j.title }}</strong></td>
+          <td class="muted">{{ j.company_name or '—' }}</td>
+          <td><span class="tag status-{{ j.status }}">{{ j.status | capitalize }}</span></td>
+          <td class="mono">{{ j.created_at }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

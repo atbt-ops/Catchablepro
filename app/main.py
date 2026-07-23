@@ -244,7 +244,21 @@ def _require(request: Request, db: sqlite3.Connection, role: Optional[str] = Non
     user = auth.current_user(request, db)
     if user is None:
         return None, RedirectResponse("/login", status_code=303)
+    if user["is_suspended"]:
+        # A suspension takes effect immediately, mid-session.
+        request.session.clear()
+        return None, RedirectResponse("/login?suspended=1", status_code=303)
     if role and user["role"] != role:
+        return None, RedirectResponse(_dashboard_url(user["role"]), status_code=303)
+    return user, None
+
+
+def _require_admin(request: Request, db: sqlite3.Connection):
+    """Admin-only guard. Non-admins are bounced to their own dashboard."""
+    user, redirect = _require(request, db)
+    if redirect:
+        return None, redirect
+    if not user["is_admin"]:
         return None, RedirectResponse(_dashboard_url(user["role"]), status_code=303)
     return user, None
 
@@ -316,7 +330,8 @@ def _auto_apply_all_candidates_to_job(db: sqlite3.Connection, job_id: int) -> No
     candidates = db.execute(
         "SELECT p.user_id, p.skills FROM candidate_profiles p "
         "JOIN users u ON u.id = p.user_id "
-        "WHERE p.auto_apply = 1 AND u.email_verified = 1"
+        "WHERE p.auto_apply = 1 AND u.email_verified = 1 "
+        "AND u.is_suspended = 0"
     ).fetchall()
     for cand in candidates:
         pct = match_pct(cand["skills"], job["required_skills"])
@@ -423,6 +438,15 @@ def login(
             {"request": request, "error": "Invalid email or password."},
             status_code=401,
         )
+    if user["is_suspended"]:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"request": request,
+             "error": "This account has been suspended. Contact support if you "
+                      "believe this is a mistake."},
+            status_code=403,
+        )
     ratelimit.reset(f"login:{email}")
     request.session["user_id"] = user["id"]
     return RedirectResponse(_post_login_url(db, user), status_code=303)
@@ -515,6 +539,15 @@ def employer_login(
             {"request": request, "error": "Invalid email or password."},
             status_code=401,
         )
+    if user["is_suspended"]:
+        return templates.TemplateResponse(
+            request,
+            "employer_login.html",
+            {"request": request,
+             "error": "This account has been suspended. Contact support if you "
+                      "believe this is a mistake."},
+            status_code=403,
+        )
     if user["role"] != "employer":
         return templates.TemplateResponse(
             request,
@@ -531,6 +564,152 @@ def employer_login(
 # --------------------------------------------------------------------------- #
 # Account & password management (shared by both roles)
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Admin / moderation. Admin is granted only via manage.py, never self-service.
+# --------------------------------------------------------------------------- #
+ADMIN_ROWS_PER_PAGE = 20
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_home(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    stats = db.execute(
+        "SELECT "
+        "(SELECT COUNT(*) FROM users WHERE role = 'candidate') AS candidates, "
+        "(SELECT COUNT(*) FROM users WHERE role = 'employer') AS employers, "
+        "(SELECT COUNT(*) FROM users WHERE is_suspended = 1) AS suspended, "
+        "(SELECT COUNT(*) FROM users WHERE email_verified = 0) AS unverified, "
+        "(SELECT COUNT(*) FROM jobs) AS jobs, "
+        "(SELECT COUNT(*) FROM jobs WHERE status = 'active') AS active_jobs, "
+        "(SELECT COUNT(*) FROM applications) AS applications"
+    ).fetchone()
+    recent_users = db.execute(
+        "SELECT * FROM users ORDER BY created_at DESC, id DESC LIMIT 8"
+    ).fetchall()
+    recent_jobs = db.execute(
+        "SELECT j.*, u.company_name FROM jobs j JOIN users u ON u.id = j.employer_id "
+        "ORDER BY j.created_at DESC, j.id DESC LIMIT 8"
+    ).fetchall()
+    return templates.TemplateResponse(
+        request,
+        "admin_home.html",
+        {"request": request, "user": user, "stats": stats,
+         "recent_users": recent_users, "recent_jobs": recent_jobs},
+    )
+
+
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users(
+    request: Request, role: str = "", q: str = "", page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+
+    where, params = "1=1", []
+    if role in ("employer", "candidate"):
+        where += " AND role = ?"
+        params.append(role)
+    if q.strip():
+        where += " AND (email LIKE ? OR name LIKE ? OR company_name LIKE ?)"
+        like = f"%{q.strip()}%"
+        params += [like, like, like]
+
+    total = db.execute(
+        f"SELECT COUNT(*) AS n FROM users WHERE {where}", params
+    ).fetchone()["n"]
+    pg = paginate(total, page, ADMIN_ROWS_PER_PAGE)
+    rows = db.execute(
+        f"SELECT * FROM users WHERE {where} ORDER BY created_at DESC, id DESC "
+        "LIMIT ? OFFSET ?",
+        (*params, pg.per_page, pg.offset),
+    ).fetchall()
+    return templates.TemplateResponse(
+        request,
+        "admin_users.html",
+        {"request": request, "user": user, "rows": rows, "pg": pg,
+         "sel_role": role, "q": q},
+    )
+
+
+@app.post("/admin/users/{user_id}/suspend")
+def admin_toggle_suspend(
+    request: Request,
+    user_id: int,
+    _csrf: None = Depends(verify_csrf),
+    reason: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    target = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    if target is None:
+        return RedirectResponse("/admin/users", status_code=303)
+    # Guard rails: never lock yourself out, never suspend another admin.
+    if target["id"] == user["id"] or target["is_admin"]:
+        return RedirectResponse("/admin/users?error=protected", status_code=303)
+
+    new_state = 0 if target["is_suspended"] else 1
+    db.execute(
+        "UPDATE users SET is_suspended = ?, suspended_reason = ? WHERE id = ?",
+        (new_state, reason.strip()[:500] if new_state else "", user_id),
+    )
+    db.commit()
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.get("/admin/jobs", response_class=HTMLResponse)
+def admin_jobs(
+    request: Request, status: str = "", page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    where, params = "1=1", []
+    if status in ("draft", "active", "closed"):
+        where += " AND j.status = ?"
+        params.append(status)
+    total = db.execute(
+        f"SELECT COUNT(*) AS n FROM jobs j WHERE {where}", params
+    ).fetchone()["n"]
+    pg = paginate(total, page, ADMIN_ROWS_PER_PAGE)
+    rows = db.execute(
+        "SELECT j.*, u.company_name, u.email AS employer_email, "
+        "u.is_suspended AS employer_suspended, "
+        "(SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) AS n_apps "
+        f"FROM jobs j JOIN users u ON u.id = j.employer_id WHERE {where} "
+        "ORDER BY j.created_at DESC, j.id DESC LIMIT ? OFFSET ?",
+        (*params, pg.per_page, pg.offset),
+    ).fetchall()
+    return templates.TemplateResponse(
+        request,
+        "admin_jobs.html",
+        {"request": request, "user": user, "rows": rows, "pg": pg,
+         "sel_status": status},
+    )
+
+
+@app.post("/admin/jobs/{job_id}/takedown")
+def admin_takedown_job(
+    request: Request,
+    job_id: int,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Pull a posting out of circulation without deleting its history."""
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    db.execute("UPDATE jobs SET status = 'closed' WHERE id = ?", (job_id,))
+    db.commit()
+    return RedirectResponse("/admin/jobs", status_code=303)
+
+
 @app.get("/verify-email", response_class=HTMLResponse)
 def verify_email(
     request: Request, token: str = "", db: sqlite3.Connection = Depends(get_db)
@@ -736,7 +915,8 @@ def candidate_dashboard(
     # Only live postings are visible to candidates.
     sql = (
         "SELECT j.*, u.company_name FROM jobs j "
-        "JOIN users u ON u.id = j.employer_id WHERE j.status = 'active'"
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE j.status = 'active' AND u.is_suspended = 0"
     )
     params: list = []
     if work_mode:
@@ -1269,7 +1449,8 @@ def employer_job_matches(
     # employer based on the percentage of skills" requirement.
     candidates = db.execute(
         "SELECT u.id, u.name, u.email, p.headline, p.skills, p.resume_filename "
-        "FROM candidate_profiles p JOIN users u ON u.id = p.user_id ORDER BY u.id"
+        "FROM candidate_profiles p JOIN users u ON u.id = p.user_id "
+        "WHERE u.is_suspended = 0 ORDER BY u.id"
     ).fetchall()
     applied_ids = {
         r["candidate_id"]: r

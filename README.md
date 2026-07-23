@@ -71,6 +71,34 @@ Applied → Shortlisted → Interview → Offered → Hired      (+ On hold, Rej
 Every action is ownership-checked: an employer can only view or modify
 applications belonging to their own jobs.
 
+### Admin console
+
+A moderation surface at `/admin`, gated to accounts with the admin flag:
+
+- **Overview** — platform counts (candidates, employers, jobs, applications) and
+  the newest accounts and postings.
+- **Users** — search and filter by role; **suspend / reinstate** any non-admin
+  account with an optional reason.
+- **Jobs** — filter by status; **take a posting down** (sets it to Closed).
+
+Suspending an account takes effect immediately and everywhere: sign-in is
+refused, any **live session is ended on the next request**, the employer's jobs
+disappear from candidate search, and a suspended candidate drops out of matches
+and Auto-Apply. Nothing is deleted — it is fully reversible.
+
+**Admin is never self-service.** There is no signup path, no in-app promotion,
+and the signup form ignores an `is_admin` field. Rights are granted only from
+the server:
+
+```bash
+python manage.py make-admin you@example.com
+python manage.py list-admins
+python manage.py revoke-admin you@example.com
+```
+
+Guard rails: an admin cannot suspend themselves or another admin, so the
+platform can never be locked out of its own console.
+
 ### Pagination
 
 Every list view is paged, with the page number in the query string so links are
@@ -183,7 +211,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-123 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+140 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).

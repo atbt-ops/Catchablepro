@@ -34,6 +34,7 @@
             <span class="who-role">{{ user.role }}</span>
           </span>
         </span>
+        {% if user.is_admin %}<a class="navlink" href="/admin">Admin</a>{% endif %}
         <a class="navlink" href="/account">Account</a>
         <form action="/logout" method="post" class="inline">
           {{ csrf_field(request) }}

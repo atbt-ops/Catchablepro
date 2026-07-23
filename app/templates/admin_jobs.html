@@ -1,0 +1,82 @@
+{% extends "admin_base.html" %}
+{% from "macros.html" import icon, pager %}
+{% set active_page = 'jobs' %}
+{% block title %}Jobs · Admin{% endblock %}
+
+{% block rightrail %}
+  <div class="railcard">
+    <h4>{{ icon('bolt', 13) }} Taking a job down</h4>
+    <p class="tip">
+      Sets the posting to <strong>Closed</strong>, so it leaves candidate search
+      and Auto-Apply straight away. Applications already received are kept, and
+      the employer can see the change on their dashboard.
+    </p>
+  </div>
+{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Jobs</h1>
+    <p class="sub">{{ pg.total }} posting{{ 's' if pg.total != 1 }} across the platform</p>
+  </div>
+</div>
+
+<form method="get" action="/admin/jobs" class="filterbar">
+  <label>Status
+    <select name="status" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for s in ['active', 'draft', 'closed'] %}
+        <option value="{{ s }}" {{ 'selected' if sel_status == s }}>{{ s | capitalize }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if sel_status %}<a class="btn ghost small" href="/admin/jobs">Clear</a>{% endif %}
+</form>
+
+<section class="panel">
+  {% if rows %}
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr><th>Posting</th><th>Employer</th><th>Status</th><th>Applicants</th><th>Posted</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for j in rows %}
+          <tr>
+            <td>
+              <strong>{{ j.title }}</strong>
+              <div class="mono">{{ j.employment_type }} · {{ j.work_mode }}{% if j.location %} · {{ j.location }}{% endif %}</div>
+            </td>
+            <td>
+              {{ j.company_name or '—' }}
+              <div class="mono">{{ j.employer_email }}</div>
+              {% if j.employer_suspended %}<span class="tag stage-rejected">Employer suspended</span>{% endif %}
+            </td>
+            <td><span class="tag status-{{ j.status }}">{{ j.status | capitalize }}</span></td>
+            <td><span class="count-pill">{{ j.n_apps }}</span></td>
+            <td class="mono">{{ j.created_at }}</td>
+            <td>
+              {% if j.status != 'closed' %}
+                <form action="/admin/jobs/{{ j.id }}/takedown" method="post" class="inline">
+                  {{ csrf_field(request) }}
+                  <button class="btn danger small" type="submit">Take down</button>
+                </form>
+              {% else %}
+                <span class="muted" style="font-size:12px;">Closed</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ pager(request, pg, 'page', 'jobs') }}
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('briefcase', 24) }}</span>
+      <p>No postings match that filter.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

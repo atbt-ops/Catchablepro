@@ -33,7 +33,7 @@
             {% endif %}
           </td>
         </tr>
-        <tr><th>Account type</th><td class="mono">{{ user.role | capitalize }}</td></tr>
+        <tr><th>Account type</th><td class="mono">{{ user.role | capitalize }}{% if user.is_admin %} <span class="tag auto">Admin</span>{% endif %}</td></tr>
         {% if user.role == 'employer' %}
           <tr><th>Company</th><td>{{ user.company_name or '—' }}</td></tr>
           <tr><th>Designation</th><td>{{ user.designation or '—' }}</td></tr>

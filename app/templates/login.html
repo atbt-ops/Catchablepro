@@ -6,6 +6,9 @@
   <div class="formcard">
     <h2>Welcome back</h2>
     <p class="sub">Log in to your SkillMatch account.</p>
+    {% if request.query_params.get('suspended') %}
+      <p class="error">{{ icon('bolt', 15) }} This account has been suspended.</p>
+    {% endif %}
     {% if request.query_params.get('reset') %}
       <p class="flash-ok">{{ icon('check', 15) }} Password updated — please log in.</p>
     {% endif %}

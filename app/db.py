@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS users (
     phone         TEXT    NOT NULL DEFAULT '',
     designation   TEXT    NOT NULL DEFAULT '',
     email_verified INTEGER NOT NULL DEFAULT 0,
+    is_admin      INTEGER NOT NULL DEFAULT 0,
+    is_suspended  INTEGER NOT NULL DEFAULT 0,
+    suspended_reason TEXT NOT NULL DEFAULT '',
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -146,6 +149,10 @@ _ADDED_COLUMNS = {
         "phone": "TEXT NOT NULL DEFAULT ''",
         "designation": "TEXT NOT NULL DEFAULT ''",
         "email_verified": "INTEGER NOT NULL DEFAULT 0",
+        # Platform moderation. Admin is never self-service — see manage.py.
+        "is_admin": "INTEGER NOT NULL DEFAULT 0",
+        "is_suspended": "INTEGER NOT NULL DEFAULT 0",
+        "suspended_reason": "TEXT NOT NULL DEFAULT ''",
     },
     "company_profiles": {
         "hq_location": "TEXT NOT NULL DEFAULT ''",
