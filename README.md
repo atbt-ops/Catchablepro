@@ -99,6 +99,14 @@ python manage.py revoke-admin you@example.com
 Guard rails: an admin cannot suspend themselves or another admin, so the
 platform can never be locked out of its own console.
 
+**Audit log** (`/admin/audit`) — an append-only record of every moderation
+action: suspensions, reinstatements, job takedowns, and admin grants (including
+those made from `manage.py`). The app only inserts and reads these rows — there
+is no edit or delete path. Each entry snapshots who acted, the target's
+email/title *at the time*, the reason, and the actor's IP, so history stays
+accurate even after the referenced account or job changes. Filterable by action
+and paginated.
+
 ### Pagination
 
 Every list view is paged, with the page number in the query string so links are
@@ -211,7 +219,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-140 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+146 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).

@@ -102,6 +102,22 @@ CREATE TABLE IF NOT EXISTS email_verifications (
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS audit_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- actor_id may be NULL for server/CLI actions. actor_email is a snapshot so
+    -- the record still names who acted even if that account is later removed.
+    actor_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    actor_email  TEXT    NOT NULL DEFAULT '',
+    action       TEXT    NOT NULL,
+    target_type  TEXT    NOT NULL DEFAULT '',
+    target_id    INTEGER,
+    target_label TEXT    NOT NULL DEFAULT '',
+    detail       TEXT    NOT NULL DEFAULT '',
+    ip           TEXT    NOT NULL DEFAULT '',
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS applications (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id       INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,

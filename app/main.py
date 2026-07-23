@@ -25,7 +25,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from html import escape
 
-from . import auth, db as dbmod, mailer, ratelimit, resume as resume_module
+from . import audit, auth, db as dbmod, mailer, ratelimit, resume as resume_module
 from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
@@ -194,6 +194,7 @@ templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
+templates.env.globals["audit_label"] = audit.action_label
 
 
 def page_url(request: Request, page: int, param: str = "page") -> str:
@@ -654,11 +655,22 @@ def admin_toggle_suspend(
         return RedirectResponse("/admin/users?error=protected", status_code=303)
 
     new_state = 0 if target["is_suspended"] else 1
+    clean_reason = reason.strip()[:500] if new_state else ""
     db.execute(
         "UPDATE users SET is_suspended = ?, suspended_reason = ? WHERE id = ?",
-        (new_state, reason.strip()[:500] if new_state else "", user_id),
+        (new_state, clean_reason, user_id),
     )
     db.commit()
+    audit.record(
+        db,
+        "user.suspend" if new_state else "user.reinstate",
+        actor=user,
+        target_type="user",
+        target_id=target["id"],
+        target_label=target["email"],
+        detail=clean_reason,
+        ip=_client_ip(request),
+    )
     return RedirectResponse("/admin/users", status_code=303)
 
 
@@ -694,6 +706,35 @@ def admin_jobs(
     )
 
 
+@app.get("/admin/audit", response_class=HTMLResponse)
+def admin_audit(
+    request: Request, action: str = "", page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    where, params = "1=1", []
+    if action in audit.ACTIONS:
+        where += " AND action = ?"
+        params.append(action)
+    total = db.execute(
+        f"SELECT COUNT(*) AS n FROM audit_log WHERE {where}", params
+    ).fetchone()["n"]
+    pg = paginate(total, page, ADMIN_ROWS_PER_PAGE)
+    rows = db.execute(
+        f"SELECT * FROM audit_log WHERE {where} "
+        "ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+        (*params, pg.per_page, pg.offset),
+    ).fetchall()
+    return templates.TemplateResponse(
+        request,
+        "admin_audit.html",
+        {"request": request, "user": user, "rows": rows, "pg": pg,
+         "actions": audit.ACTIONS, "sel_action": action},
+    )
+
+
 @app.post("/admin/jobs/{job_id}/takedown")
 def admin_takedown_job(
     request: Request,
@@ -705,8 +746,15 @@ def admin_takedown_job(
     user, redirect = _require_admin(request, db)
     if redirect:
         return redirect
+    job = db.execute("SELECT id, title FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if job is None:
+        return RedirectResponse("/admin/jobs", status_code=303)
     db.execute("UPDATE jobs SET status = 'closed' WHERE id = ?", (job_id,))
     db.commit()
+    audit.record(
+        db, "job.takedown", actor=user, target_type="job",
+        target_id=job["id"], target_label=job["title"], ip=_client_ip(request),
+    )
     return RedirectResponse("/admin/jobs", status_code=303)
 
 

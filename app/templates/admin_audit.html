@@ -1,0 +1,82 @@
+{% extends "admin_base.html" %}
+{% from "macros.html" import icon, pager %}
+{% set active_page = 'audit' %}
+{% block title %}Audit log · Admin{% endblock %}
+
+{% block rightrail %}
+  <div class="railcard">
+    <h4>{{ icon('doc', 13) }} About this log</h4>
+    <p class="tip">
+      An append-only record of moderation actions — suspensions, reinstatements,
+      job takedowns and admin grants. Entries are never edited or deleted.
+    </p>
+  </div>
+  <div class="railcard">
+    <h4>{{ icon('bolt', 13) }} Snapshots</h4>
+    <p class="tip">
+      Each row stores who acted and the target's email or title <em>at the
+      time</em>, so history stays readable even after later changes.
+    </p>
+  </div>
+{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Audit log</h1>
+    <p class="sub">{{ pg.total }} recorded action{{ 's' if pg.total != 1 }}</p>
+  </div>
+</div>
+
+<form method="get" action="/admin/audit" class="filterbar">
+  <label>Action
+    <select name="action" onchange="this.form.submit()">
+      <option value="">All actions</option>
+      {% for key, label in actions.items() %}
+        <option value="{{ key }}" {{ 'selected' if sel_action == key }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if sel_action %}<a class="btn ghost small" href="/admin/audit">Clear</a>{% endif %}
+</form>
+
+<section class="panel">
+  {% if rows %}
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="mono">{{ r.created_at }}</td>
+            <td class="mono">{{ r.actor_email }}</td>
+            <td>
+              {% set cls = 'stage-rejected' if r.action == 'user.suspend'
+                          else 'applied' if r.action in ['user.reinstate']
+                          else 'auto' if r.action in ['admin.grant', 'admin.revoke']
+                          else 'status-draft' %}
+              <span class="tag {{ cls }}">{{ audit_label(r.action) }}</span>
+            </td>
+            <td>
+              {% if r.target_label %}
+                <strong>{{ r.target_label }}</strong>
+                <div class="mono">{{ r.target_type }}#{{ r.target_id }}</div>
+              {% else %}—{% endif %}
+            </td>
+            <td class="muted">{{ r.detail or '—' }}{% if r.ip %}<div class="mono">{{ r.ip }}</div>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ pager(request, pg, 'page', 'entries') }}
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('doc', 24) }}</span>
+      <p>No actions recorded yet.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

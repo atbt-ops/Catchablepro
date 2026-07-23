@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 
+from app import audit
 from app.db import _connect, init_db
 
 
@@ -30,6 +31,14 @@ def _set_admin(email: str, value: int) -> int:
             return 0
         conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (value, user["id"]))
         conn.commit()
+        audit.record(
+            conn,
+            "admin.grant" if value else "admin.revoke",
+            actor_email="manage.py (server)",
+            target_type="user",
+            target_id=user["id"],
+            target_label=email,
+        )
         verb = "granted to" if value else "revoked from"
         print(f"Admin {verb} {email} ({user['name'] or 'unnamed'}, {user['role']}).")
         return 0
