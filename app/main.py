@@ -25,7 +25,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from html import escape
 
-from . import audit, auth, db as dbmod, mailer, ratelimit, resume as resume_module
+from . import audit, auth, db as dbmod, mailer, ratelimit, resume as resume_module, totp
 from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
@@ -106,6 +106,17 @@ CONTACT_EMAIL_LIMIT = (30, 60 * 60)  # per employer — stops mass mailing
 
 
 VERIFY_RESEND_LIMIT = (5, 60 * 60)  # per user — stops verification-mail spam
+TWOFA_LIMIT = (10, 15 * 60)         # per user — slows 2FA code guessing
+
+
+def _login_success(request: Request, db: sqlite3.Connection, user):
+    """Finish login, or divert to the 2FA challenge when it's enabled."""
+    if user["totp_enabled"]:
+        # No user_id yet — a pending marker cannot access anything behind _require.
+        request.session["pending_2fa"] = user["id"]
+        return RedirectResponse("/2fa", status_code=303)
+    request.session["user_id"] = user["id"]
+    return RedirectResponse(_post_login_url(db, user), status_code=303)
 
 
 def _client_ip(request: Request) -> str:
@@ -195,6 +206,7 @@ templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
+templates.env.globals["pipeline_stages"] = PIPELINE_STAGES
 
 
 def page_url(request: Request, page: int, param: str = "page") -> str:
@@ -449,8 +461,7 @@ def login(
             status_code=403,
         )
     ratelimit.reset(f"login:{email}")
-    request.session["user_id"] = user["id"]
-    return RedirectResponse(_post_login_url(db, user), status_code=303)
+    return _login_success(request, db, user)
 
 
 # --------------------------------------------------------------------------- #
@@ -558,8 +569,74 @@ def employer_login(
             status_code=403,
         )
     ratelimit.reset(f"login:{email}")
+    return _login_success(request, db, user)
+
+
+# --------------------------------------------------------------------------- #
+# Two-factor authentication challenge (shown after password when 2FA is on)
+# --------------------------------------------------------------------------- #
+@app.get("/2fa", response_class=HTMLResponse)
+def twofa_challenge_form(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    if not request.session.get("pending_2fa"):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(
+        request, "twofa_challenge.html", {"request": request, "error": None}
+    )
+
+
+@app.post("/2fa")
+def twofa_challenge(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    code: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    uid = request.session.get("pending_2fa")
+    if not uid:
+        return RedirectResponse("/login", status_code=303)
+
+    allowed, retry = ratelimit.check(f"2fa:{uid}", *TWOFA_LIMIT)
+    if not allowed:
+        return templates.TemplateResponse(
+            request, "twofa_challenge.html",
+            {"request": request,
+             "error": f"Too many attempts. Try again in {retry // 60 + 1} minute(s)."},
+            status_code=429,
+        )
+
+    user = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if user is None:
+        request.session.pop("pending_2fa", None)
+        return RedirectResponse("/login", status_code=303)
+
+    entry = code.strip()
+    ok = totp.verify(user["totp_secret"], entry) or _consume_recovery_code(db, uid, entry)
+    if not ok:
+        return templates.TemplateResponse(
+            request, "twofa_challenge.html",
+            {"request": request, "error": "Invalid code. Try again."},
+            status_code=401,
+        )
+
+    ratelimit.reset(f"2fa:{uid}")
+    request.session.pop("pending_2fa", None)
     request.session["user_id"] = user["id"]
     return RedirectResponse(_post_login_url(db, user), status_code=303)
+
+
+def _consume_recovery_code(db: sqlite3.Connection, user_id: int, code: str) -> bool:
+    """Spend a single-use recovery code; returns True if one matched."""
+    if not code:
+        return False
+    row = db.execute(
+        "SELECT id FROM recovery_codes WHERE user_id = ? AND code_hash = ? AND used = 0",
+        (user_id, totp.hash_recovery_code(code)),
+    ).fetchone()
+    if row is None:
+        return False
+    db.execute("UPDATE recovery_codes SET used = 1 WHERE id = ?", (row["id"],))
+    db.commit()
+    return True
 
 
 # --------------------------------------------------------------------------- #
@@ -892,11 +969,17 @@ def account_page(request: Request, db: sqlite3.Connection = Depends(get_db)):
     user, redirect = _require(request, db)
     if redirect:
         return redirect
+    recovery_left = db.execute(
+        "SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used = 0",
+        (user["id"],),
+    ).fetchone()["n"]
     return templates.TemplateResponse(
         request,
         "account.html",
         {"request": request, "user": user, "error": None,
-         "changed": request.query_params.get("changed") == "1"},
+         "changed": request.query_params.get("changed") == "1",
+         "twofa_off": request.query_params.get("twofa") == "off",
+         "recovery_left": recovery_left},
     )
 
 
@@ -935,6 +1018,115 @@ def account_change_password(
     )
     db.commit()
     return RedirectResponse("/account?changed=1", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Two-factor enrolment / removal
+# --------------------------------------------------------------------------- #
+@app.get("/account/2fa/setup", response_class=HTMLResponse)
+def twofa_setup(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    if user["totp_enabled"]:
+        return RedirectResponse("/account", status_code=303)
+
+    # A pending secret is stored (enabled=0) so it survives the round trip to the
+    # authenticator app without being placed in a client-readable cookie. Reuse
+    # an existing pending secret so refreshing the page keeps the same QR.
+    secret = user["totp_secret"]
+    if not secret:
+        secret = totp.generate_secret()
+        db.execute("UPDATE users SET totp_secret = ? WHERE id = ?", (secret, user["id"]))
+        db.commit()
+
+    return templates.TemplateResponse(
+        request,
+        "twofa_setup.html",
+        {
+            "request": request, "user": user,
+            "qr": totp.qr_data_uri(secret, user["email"]),
+            "secret_display": totp.format_secret(secret),
+            "error": None,
+        },
+    )
+
+
+@app.post("/account/2fa/enable", response_class=HTMLResponse)
+def twofa_enable(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    code: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    if user["totp_enabled"] or not user["totp_secret"]:
+        return RedirectResponse("/account", status_code=303)
+
+    if not totp.verify(user["totp_secret"], code):
+        return templates.TemplateResponse(
+            request,
+            "twofa_setup.html",
+            {
+                "request": request, "user": user,
+                "qr": totp.qr_data_uri(user["totp_secret"], user["email"]),
+                "secret_display": totp.format_secret(user["totp_secret"]),
+                "error": "That code didn't match. Check your authenticator and try again.",
+            },
+            status_code=400,
+        )
+
+    # Confirmed: enable, then mint one-time recovery codes shown once.
+    db.execute("UPDATE users SET totp_enabled = 1 WHERE id = ?", (user["id"],))
+    db.execute("DELETE FROM recovery_codes WHERE user_id = ?", (user["id"],))
+    codes = totp.generate_recovery_codes()
+    for c in codes:
+        db.execute(
+            "INSERT INTO recovery_codes (user_id, code_hash) VALUES (?, ?)",
+            (user["id"], totp.hash_recovery_code(c)),
+        )
+    db.commit()
+    audit.record(db, "security.2fa_enable", actor=user, target_type="user",
+                 target_id=user["id"], target_label=user["email"],
+                 ip=_client_ip(request))
+    return templates.TemplateResponse(
+        request,
+        "twofa_recovery.html",
+        {"request": request, "user": user, "codes": codes},
+    )
+
+
+@app.post("/account/2fa/disable")
+def twofa_disable(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    current_password: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    # Turning off a security control requires re-proving the password.
+    if not auth.verify_password(current_password, user["password_hash"]):
+        return templates.TemplateResponse(
+            request,
+            "account.html",
+            {"request": request, "user": user, "changed": False,
+             "error": "Your current password is incorrect."},
+            status_code=400,
+        )
+    db.execute(
+        "UPDATE users SET totp_enabled = 0, totp_secret = '' WHERE id = ?",
+        (user["id"],),
+    )
+    db.execute("DELETE FROM recovery_codes WHERE user_id = ?", (user["id"],))
+    db.commit()
+    audit.record(db, "security.2fa_disable", actor=user, target_type="user",
+                 target_id=user["id"], target_label=user["email"],
+                 ip=_client_ip(request))
+    return RedirectResponse("/account?twofa=off", status_code=303)
 
 
 @app.post("/logout")

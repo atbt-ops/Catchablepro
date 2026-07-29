@@ -63,4 +63,39 @@
     </form>
   </section>
 </div>
+
+<section class="panel">
+  <h2>{{ icon('bolt', 18) }} Two-factor authentication</h2>
+  {% if twofa_off | default(false) %}
+    <div class="flash-ok">{{ icon('check', 15) }} Two-factor authentication has been turned off.</div>
+  {% endif %}
+
+  {% if user.totp_enabled %}
+    <div class="autoapply active">
+      <span class="state on">{{ icon('check', 15) }} 2FA is ON</span>
+      <div class="muted" style="font-size:13px;">
+        You'll be asked for a code from your authenticator app each time you log in.
+        {% if (recovery_left | default(0)) %}
+          <br>{{ recovery_left }} recovery code{{ 's' if recovery_left != 1 }} remaining.
+        {% else %}
+          <br><strong>No recovery codes left</strong> — turn 2FA off and on again to generate a new set.
+        {% endif %}
+      </div>
+    </div>
+    <form action="/account/2fa/disable" method="post" style="margin-top:14px;">
+      {{ csrf_field(request) }}
+      <label>Confirm your password to turn 2FA off
+        <input type="password" name="current_password" required>
+      </label>
+      <button class="btn danger" type="submit">Turn off 2FA</button>
+    </form>
+  {% else %}
+    <p class="hint">
+      Add a second step to every login using an authenticator app
+      (Google Authenticator, Authy, 1Password…). Strongly recommended for
+      employer and admin accounts.
+    </p>
+    <a class="btn" href="/account/2fa/setup">{{ icon('bolt', 16) }} Set up 2FA</a>
+  {% endif %}
+</section>
 {% endblock %}

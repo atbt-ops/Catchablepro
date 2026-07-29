@@ -37,7 +37,17 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin      INTEGER NOT NULL DEFAULT 0,
     is_suspended  INTEGER NOT NULL DEFAULT 0,
     suspended_reason TEXT NOT NULL DEFAULT '',
+    totp_secret   TEXT    NOT NULL DEFAULT '',
+    totp_enabled  INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS recovery_codes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code_hash  TEXT    NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS candidate_profiles (
@@ -169,6 +179,9 @@ _ADDED_COLUMNS = {
         "is_admin": "INTEGER NOT NULL DEFAULT 0",
         "is_suspended": "INTEGER NOT NULL DEFAULT 0",
         "suspended_reason": "TEXT NOT NULL DEFAULT ''",
+        # Two-factor auth (TOTP). secret is base32; empty until enrolled.
+        "totp_secret": "TEXT NOT NULL DEFAULT ''",
+        "totp_enabled": "INTEGER NOT NULL DEFAULT 0",
     },
     "company_profiles": {
         "hq_location": "TEXT NOT NULL DEFAULT ''",

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Two-factor · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard">
+    <h2>Two-factor authentication</h2>
+    <p class="sub">Enter the 6-digit code from your authenticator app to finish signing in.</p>
+    {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
+    <form action="/2fa" method="post">
+      {{ csrf_field(request) }}
+      <label>Authentication code
+        <input type="text" name="code" inputmode="numeric" autofocus required
+               autocomplete="one-time-code" placeholder="123456 or recovery code">
+      </label>
+      <button class="btn block" type="submit">Verify</button>
+    </form>
+    <p class="center-note">
+      Lost your device? Enter one of your <strong>recovery codes</strong> above.
+    </p>
+  </div>
+</div>
+{% endblock %}

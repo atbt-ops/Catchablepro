@@ -421,6 +421,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .rail { position: static; }
 }
 
+/* ---------- 2FA setup ---------- */
+.setup-steps { list-style: none; padding: 0; margin: 8px 0 0; }
+.setup-steps > li { padding: 16px 0; border-top: 1px solid var(--border-soft); }
+.setup-steps > li:first-child { border-top: 0; }
+.qr-box {
+  display: inline-grid; place-items: center; margin: 12px 0; padding: 12px;
+  background: #fff; border-radius: 12px; border: 1px solid var(--border);
+}
+.secretkey {
+  display: inline-block; margin-top: 4px; padding: 6px 10px; border-radius: 7px;
+  background: var(--surface-3); font-size: 15px; letter-spacing: 2px;
+}
+.recovery-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px;
+}
+.recovery-code {
+  padding: 10px 12px; border-radius: 8px; text-align: center; font-size: 16px;
+  letter-spacing: 1px; background: var(--surface-2); border: 1px solid var(--border);
+}
+@media (max-width: 460px) { .recovery-grid { grid-template-columns: 1fr; } }
+
 /* ---------- flash / notice banners ---------- */
 .flash-ok {
   display: flex; align-items: center; gap: 9px; margin-bottom: 16px;
@@ -519,6 +540,70 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .step.done { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); color: var(--text-soft); }
 .step.done .step-dot { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green); }
 .step-label { font-weight: 500; }
+
+/* ---------- application cards + pipeline progress ---------- */
+.applist { display: flex; flex-direction: column; gap: 12px; }
+.approw {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.approw-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.approw-title strong { font-size: 15.5px; }
+.approw-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.matchpill {
+  font-size: 12px; font-weight: 700; color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  padding: 3px 10px; border-radius: 999px;
+}
+.approw-foot { font-size: 12px; margin-top: 8px; }
+
+.appprog { margin: 12px 0 2px; }
+.appprog-steps { display: flex; align-items: flex-start; }
+.appprog-step {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  position: relative; text-align: center; min-width: 0;
+}
+/* connector line between dots */
+.appprog-step:not(:first-child)::before {
+  content: ""; position: absolute; top: 12px; left: -50%; width: 100%; height: 3px;
+  background: var(--surface-3); z-index: 0; border-radius: 2px;
+}
+.appprog-step.done::before, .appprog-step.current::before {
+  background: linear-gradient(90deg, var(--green), var(--green));
+}
+.dotstep {
+  position: relative; z-index: 1; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 11px; font-weight: 800;
+  background: var(--surface-3); color: var(--muted);
+  border: 2px solid var(--surface-2); transition: all .25s var(--ease);
+}
+.appprog-step.done .dotstep { background: var(--green); color: #fff; }
+.appprog-step.current .dotstep {
+  background: linear-gradient(135deg, var(--brand), var(--violet)); color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+.steplbl { margin-top: 5px; font-size: 10.5px; line-height: 1.25; color: var(--muted); }
+.appprog-step.done .steplbl { color: var(--text-soft); }
+.appprog-step.current .steplbl { color: var(--text); font-weight: 700; }
+.appprog-cap { margin-top: 9px; font-size: 12.5px; color: var(--muted); }
+.appprog-cap strong { color: var(--text); }
+.appprog.no-labels .steplbl { display: none; }
+
+/* off-track outcomes */
+.appprog.terminal { margin: 12px 0 2px; }
+.appprog-simplebar { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.appprog-simplebar > i { display: block; height: 100%; border-radius: 999px; }
+.appprog.rejected .appprog-simplebar > i { background: var(--red); }
+.appprog.hold .appprog-simplebar > i { background: var(--amber); }
+.appprog.rejected .appprog-cap { color: var(--red); }
+.appprog.hold .appprog-cap { color: var(--amber); }
+
+@media (max-width: 560px) {
+  .steplbl { display: none; }   /* dots only on narrow screens */
+}
 
 /* ---------- pagination ---------- */
 .pager {

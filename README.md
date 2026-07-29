@@ -63,7 +63,10 @@ Applied → Shortlisted → Interview → Offered → Hired      (+ On hold, Rej
 
 - Pipeline tiles show a count per stage and double as filters.
 - **Private notes** per applicant, visible only to the employer.
-- Candidates see their current stage on their own dashboard.
+- Candidates see their current stage on their own dashboard as a **graphical
+  progress bar** — a five-step stepper (Applied → Shortlisted → Interview →
+  Offered → Hired) with completed steps filled and the current one highlighted.
+  *On hold* and *Rejected* render as their own coloured end states.
 - **Notifying the candidate is opt-in per change** — tick *Email the candidate*
   when moving a stage. Nothing is ever sent automatically, so a rejection can't
   go out by accident.
@@ -219,7 +222,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-146 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+157 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
@@ -339,8 +342,28 @@ migration, so upgrading never locks existing users out.
 Counters are in-process, so with multiple workers each keeps its own; a shared
 store (Redis) would be needed to scale out.
 
-**Not yet implemented:** 2FA, SSO/OAuth, an admin role, and session revocation
-across devices. See `app/auth.py` and `app/ratelimit.py`.
+### Two-factor authentication (TOTP)
+
+Any user can enable app-based 2FA from **Account settings**:
+
+1. **Setup** shows a QR code (and a typeable secret) to add to Google
+   Authenticator, Authy, 1Password, etc.
+2. Enabling requires a valid code, which proves the authenticator is working
+   before 2FA is switched on, and issues **10 single-use recovery codes** shown
+   once.
+3. After that, password login is only step one — it redirects to a **code
+   challenge** at `/2fa`; the session isn't established until a valid TOTP or
+   recovery code is entered. Code attempts are rate-limited.
+4. **Disabling requires the password**, and enabling/disabling is written to the
+   audit log.
+
+The TOTP algorithm (RFC 6238) is implemented on the stdlib in `app/totp.py` —
+no crypto dependency — and is checked against the RFC test vectors. Only the QR
+image uses a third-party library (`segno`, pure-Python). Recovery codes are
+stored hashed, like password-reset tokens.
+
+**Not yet implemented:** SSO/OAuth and session revocation across devices.
+See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
 
 ## Security
 

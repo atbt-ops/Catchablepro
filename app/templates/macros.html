@@ -69,6 +69,40 @@
   {% endif %}
 {% endmacro %}
 
+{# Graphical hiring-pipeline progress for one application. #}
+{% macro application_progress(status, labels=true) %}
+{% set stages = pipeline_stages %}
+{% if status == 'rejected' %}
+  <div class="appprog terminal rejected">
+    <div class="appprog-simplebar"><i style="width:100%"></i></div>
+    <div class="appprog-cap">{{ icon('bolt', 12) }} Not selected for this role</div>
+  </div>
+{% elif status == 'on_hold' %}
+  <div class="appprog terminal hold">
+    <div class="appprog-simplebar"><i style="width:100%"></i></div>
+    <div class="appprog-cap">On hold — the employer has paused this application</div>
+  </div>
+{% else %}
+  {% set idx = stages.index(status) if status in stages else 0 %}
+  <div class="appprog {{ 'no-labels' if not labels }}">
+    <div class="appprog-steps" role="img"
+         aria-label="Stage {{ idx + 1 }} of {{ stages|length }}: {{ stage_label(status) }}">
+      {% for s in stages %}
+        {% set state = 'done' if loop.index0 < idx else ('current' if loop.index0 == idx else 'todo') %}
+        <div class="appprog-step {{ state }}">
+          <span class="dotstep">{% if state == 'done' %}{{ icon('check', 11) }}{% else %}{{ loop.index }}{% endif %}</span>
+          {% if labels %}<span class="steplbl">{{ stage_label(s) }}</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="appprog-cap">
+      Stage {{ idx + 1 }} of {{ stages|length }} · <strong>{{ stage_label(status) }}</strong>
+      {% if status == 'hired' %} — congratulations!{% endif %}
+    </div>
+  </div>
+{% endif %}
+{% endmacro %}
+
 {% macro tier(pct) %}{{ 'high' if pct >= 70 else 'mid' if pct >= 40 else 'low' }}{% endmacro %}
 
 {% macro match_ring(pct, size=64) %}

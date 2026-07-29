@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Set up 2FA · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard wide">
+    <h2>Set up two-factor authentication</h2>
+    <p class="sub">Scan the code with your authenticator app, then enter the 6-digit code it shows.</p>
+    {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
+
+    <ol class="setup-steps">
+      <li>
+        <strong>1. Scan this QR code</strong>
+        <div class="qr-box">
+          {% if qr %}<img src="{{ qr }}" alt="2FA QR code" width="180" height="180">
+          {% else %}<p class="muted">QR unavailable — use the manual key below.</p>{% endif %}
+        </div>
+        <p class="muted" style="font-size:13px;">
+          Can't scan? Enter this key manually:<br>
+          <code class="secretkey">{{ secret_display }}</code>
+        </p>
+      </li>
+      <li>
+        <strong>2. Enter the 6-digit code</strong>
+        <form action="/account/2fa/enable" method="post">
+          {{ csrf_field(request) }}
+          <label>Code from your app
+            <input type="text" name="code" inputmode="numeric" pattern="[0-9 ]*"
+                   autocomplete="one-time-code" autofocus required
+                   placeholder="123456" maxlength="7">
+          </label>
+          <div class="form-actions">
+            <button class="btn" type="submit">{{ icon('check', 16) }} Verify &amp; enable</button>
+            <a class="btn ghost" href="/account">Cancel</a>
+          </div>
+        </form>
+      </li>
+    </ol>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Recovery codes · SkillMatch{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="formcard wide">
+    <h2>{{ icon('check', 20) }} Two-factor authentication is on</h2>
+    <p class="sub">
+      Save these recovery codes somewhere safe. Each one works <strong>once</strong>
+      if you ever lose access to your authenticator app. <strong>They won't be
+      shown again.</strong>
+    </p>
+
+    <div class="recovery-grid">
+      {% for c in codes %}<code class="recovery-code">{{ c }}</code>{% endfor %}
+    </div>
+
+    <div class="notice" style="margin-top:18px;">
+      {{ icon('bolt', 16) }}
+      <div>Treat these like passwords. Anyone with a code and your email can sign in.</div>
+    </div>
+
+    <div class="form-actions" style="margin-top:18px;">
+      <a class="btn" href="/account">I've saved my codes</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

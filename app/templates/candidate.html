@@ -1,5 +1,5 @@
 {% extends "shell.html" %}
-{% from "macros.html" import icon, match_ring, navitem, pager %}
+{% from "macros.html" import icon, match_ring, navitem, pager, application_progress %}
 {% block title %}Candidate dashboard · SkillMatch{% endblock %}
 
 {% block sidebar %}
@@ -198,22 +198,24 @@
     {% if apps_page.total %}<span class="count-pill">{{ apps_page.total }}</span>{% endif %}
   </h2>
   {% if my_apps %}
-    <div class="tbl-wrap">
-      <table class="tbl">
-        <thead><tr><th>Job</th><th>Company</th><th>Match</th><th>Status</th><th>How</th><th>When</th></tr></thead>
-        <tbody>
-        {% for a in my_apps %}
-          <tr>
-            <td><strong>{{ a.title }}</strong></td>
-            <td class="muted">{{ a.company_name }}</td>
-            <td>{{ a.match_pct }}%</td>
-            <td><span class="tag stage-{{ a.status }}">{{ stage_label(a.status) }}</span></td>
-            <td>{% if a.source == 'auto' %}<span class="tag auto">Auto</span>{% else %}<span class="tag">Manual</span>{% endif %}</td>
-            <td class="mono">{{ a.created_at }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+    <div class="applist">
+      {% for a in my_apps %}
+      <div class="approw">
+        <div class="approw-top">
+          <div class="approw-title">
+            <strong>{{ a.title }}</strong>
+            <span class="muted">· {{ a.company_name }}</span>
+          </div>
+          <div class="approw-tags">
+            <span class="matchpill">{{ a.match_pct }}% match</span>
+            {% if a.source == 'auto' %}<span class="tag auto">Auto</span>{% else %}<span class="tag">Manual</span>{% endif %}
+            <span class="tag stage-{{ a.status }}">{{ stage_label(a.status) }}</span>
+          </div>
+        </div>
+        {{ application_progress(a.status) }}
+        <div class="approw-foot muted">Applied {{ a.created_at }}</div>
+      </div>
+      {% endfor %}
     </div>
     {{ pager(request, apps_page, 'apps_page', 'applications') }}
   {% else %}
