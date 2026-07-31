@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
-{% block title %}Contact {{ cand.name or cand.email }} · SkillMatch{% endblock %}
+{% block title %}Contact {{ cand.name or cand.email }} · Catchablepro{% endblock %}
 {% block content %}
 <a class="backlink" href="/employer/jobs/{{ job.id }}/matches">
   {{ icon('arrow-right', 14) }} Back to matches
@@ -8,7 +8,7 @@
 <div class="page-head">
   <div>
     <h1>Contact candidate</h1>
-    <p class="sub">Sent from SkillMatch — replies go straight to your inbox ({{ user.email }}).</p>
+    <p class="sub">Sent from Catchablepro — replies go straight to your inbox ({{ user.email }}).</p>
   </div>
 </div>
 

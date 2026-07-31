@@ -1,4 +1,4 @@
-# SkillMatch — minimal production image
+# Catchablepro — minimal production image
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

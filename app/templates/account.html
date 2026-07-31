@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
-{% block title %}Account settings · SkillMatch{% endblock %}
+{% block title %}Account settings · Catchablepro{% endblock %}
 {% block content %}
 <a class="backlink" href="{{ '/employer' if user.role == 'employer' else '/candidate' }}">
   {{ icon('arrow-right', 14) }} Back to dashboard

@@ -18,7 +18,7 @@ from urllib.parse import quote
 DIGITS = 6
 PERIOD = 30          # seconds per code
 SKEW_STEPS = 1       # accept the adjacent windows to tolerate clock drift
-ISSUER = "SkillMatch"
+ISSUER = "Catchablepro"
 
 
 def generate_secret(n_bytes: int = 20) -> str:

@@ -1,4 +1,4 @@
-# SkillMatch — a skill-driven job portal
+# Catchablepro — a skill-driven job portal
 
 A working MVP job portal for **employers** and **candidates**, built for low latency:
 FastAPI + Uvicorn, an **in-process SQLite** database (no network hop), and
@@ -230,8 +230,8 @@ every push via [GitHub Actions](.github/workflows/ci.yml).
 ## Docker
 
 ```bash
-docker build -t skillmatch .
-docker run -p 8000:8000 -e SECRET_KEY=change-me -v skillmatch-data:/app/data skillmatch
+docker build -t catchablepro .
+docker run -p 8000:8000 -e SECRET_KEY=change-me -v catchablepro-data:/app/data catchablepro
 ```
 
 The SQLite DB and uploaded resumes live on the `/app/data` volume so they survive

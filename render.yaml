@@ -1,8 +1,8 @@
-# Render Blueprint — deploy SkillMatch from this repo.
+# Render Blueprint — deploy Catchablepro from this repo.
 # In Render: New + > Blueprint > connect this repo. Render reads this file.
 services:
   - type: web
-    name: skillmatch
+    name: catchablepro
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free              # free tier: no persistent disk, spins down when idle
@@ -39,6 +39,6 @@ services:
     # upgrade `plan` above to `starter` and uncomment the disk below.
     # ---------------------------------------------------------------------
     # disk:
-    #   name: skillmatch-data
+    #   name: catchablepro-data
     #   mountPath: /app/data
     #   sizeGB: 1

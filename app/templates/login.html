@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
-{% block title %}Log in · SkillMatch{% endblock %}
+{% block title %}Log in · Catchablepro{% endblock %}
 {% block content %}
 <div class="auth-wrap">
   <div class="formcard">
     <h2>Welcome back</h2>
-    <p class="sub">Log in to your SkillMatch account.</p>
+    <p class="sub">Log in to your Catchablepro account.</p>
     {% if request.query_params.get('suspended') %}
       <p class="error">{{ icon('bolt', 15) }} This account has been suspended.</p>
     {% endif %}

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from email.message import EmailMessage
 from typing import List, Optional, Tuple
 
-log = logging.getLogger("skillmatch.mailer")
+log = logging.getLogger("catchablepro.mailer")
 if not log.handlers:
     # Attach our own handler so console-backend output is visible regardless of
     # how the host (uvicorn, gunicorn, pytest) has configured logging.
@@ -55,7 +55,7 @@ def backend() -> str:
 
 
 def default_from() -> str:
-    return _cfg("EMAIL_FROM", "no-reply@skillmatch.local")
+    return _cfg("EMAIL_FROM", "no-reply@catchablepro.local")
 
 
 def is_configured() -> bool:

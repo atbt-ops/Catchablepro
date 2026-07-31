@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
-{% block title %}Employer sign up · SkillMatch{% endblock %}
+{% block title %}Employer sign up · Catchablepro{% endblock %}
 {% block content %}
 <div class="auth-wrap">
   <div class="formcard wide">
     <span class="portal-chip">{{ icon('building', 13) }} For Employers</span>
-    <h2>Start hiring on SkillMatch</h2>
+    <h2>Start hiring on Catchablepro</h2>
     <p class="sub">Create your recruiter account — it takes about a minute.</p>
     {% if error %}<p class="error">{{ icon('bolt', 15) }} {{ error }}</p>{% endif %}
     <form action="/employer/register" method="post">

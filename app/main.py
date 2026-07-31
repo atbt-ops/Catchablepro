@@ -1,4 +1,4 @@
-"""SkillMatch job portal — FastAPI application.
+"""Catchablepro job portal — FastAPI application.
 
 Server-rendered (Jinja) with an in-process SQLite database. Two roles:
   * employer  — post jobs, view skill-ranked candidate matches & applications
@@ -128,10 +128,10 @@ def _send_verification_email(request: Request, db: sqlite3.Connection, user) -> 
     link = str(request.base_url).rstrip("/") + f"/verify-email?token={token}"
     mailer.send_email(
         to=user["email"],
-        subject="Confirm your SkillMatch email address",
+        subject="Confirm your Catchablepro email address",
         body=(
             f"Hi {user['name'] or 'there'},\n\n"
-            f"Please confirm your email address to activate your SkillMatch "
+            f"Please confirm your email address to activate your Catchablepro "
             f"account. This link is valid for {auth.VERIFY_TOKEN_TTL_HOURS} hours:\n\n"
             f"{link}\n\n"
             f"If you didn't create this account, you can ignore this email.\n"
@@ -225,7 +225,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SkillMatch Job Portal", lifespan=lifespan)
+app = FastAPI(title="Catchablepro Job Portal", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
@@ -900,10 +900,10 @@ def forgot_password(
     link = str(request.base_url).rstrip("/") + f"/reset-password?token={token}"
     mailer.send_email(
         to=user["email"],
-        subject="Reset your SkillMatch password",
+        subject="Reset your Catchablepro password",
         body=(
             f"Hi {user['name'] or 'there'},\n\n"
-            f"We received a request to reset your SkillMatch password.\n"
+            f"We received a request to reset your Catchablepro password.\n"
             f"Use the link below within {auth.RESET_TOKEN_TTL_MINUTES} minutes:\n\n"
             f"{link}\n\n"
             f"If you didn't ask for this, you can safely ignore this email — "
