@@ -51,6 +51,39 @@ visible to candidates or eligible for Auto-Apply, so drafts stay private.
 
 Candidates can filter the job list by **work mode** and **employment type**.
 
+### On-demand posting cost
+
+To stop finished jobs from lingering as junk, each posting carries a **holding
+cost that ramps up the longer it stays live** — modelled on cloud on-demand
+billing (pay-as-you-go, rate rises with sustained use):
+
+```
+Week 1 (days 0-6):   FREE          Week 4 (days 21-27): ₹200/day
+Week 2 (days 7-13):  ₹50/day       Week 5 (days 28-29): ₹400/day
+Week 3 (days 14-20): ₹100/day      Day 30:              auto-closed
+```
+
+- The meter runs **only while the job is `active`** — closing or filling it stops
+  the charge immediately. Each activation starts a **fresh free week**, so
+  reopening an old or auto-closed job is genuinely useful.
+- The employer dashboard shows each job's **running cost, current daily rate, and
+  a countdown to auto-close**, plus a total running bill in the sidebar. As a job
+  nears the cap the meter turns red.
+- At the 30-day cap a job is **auto-closed** and the employer emailed;
+  the closure is written to the admin audit log. Expiry happens lazily on the
+  busy list views (no scheduler), so stale jobs drop out of candidate search on
+  their own.
+
+This is a **simulated meter** — no real money changes hands. It exists to shape
+behaviour and to be the seam a real payment gateway (Stripe/Razorpay) would plug
+into later. All rates live in one place (`app/pricing.py`), and the cost engine
+is pure and fully unit-tested.
+
+*Caveat:* because reopening restarts the free week, an employer could in theory
+close-and-reopen weekly to stay free — but that repeatedly hides the job from
+candidates, so it is self-penalising. A real-money version would bill per
+activation to remove the incentive.
+
 ### Applicant tracking
 
 Each job has an **Applicants** page (`/employer/jobs/{id}/applicants`) — the
@@ -222,7 +255,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-157 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+170 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).

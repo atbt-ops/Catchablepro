@@ -15,6 +15,7 @@ ACTIONS = {
     "user.suspend": "Account suspended",
     "user.reinstate": "Account reinstated",
     "job.takedown": "Job taken down",
+    "job.autoexpire": "Job auto-closed (expired)",
     "admin.grant": "Admin granted",
     "admin.revoke": "Admin revoked",
     "security.2fa_enable": "2FA enabled",

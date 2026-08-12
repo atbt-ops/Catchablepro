@@ -86,13 +86,23 @@ def main() -> None:
 
     conn.commit()
 
+    # Stagger active_since across active jobs so the pricing meter demos each
+    # tier: free week, a mid paid tier, and one near the auto-close cap.
+    _active_ages = [1, 10, 26]  # days since going live, cycled across active jobs
+    _age_i = 0
     for (emp_email, title, loc, req, desc, dept, emp_type, mode,
          e_min, e_max, s_min, s_max, hide, vac, edu, status) in JOBS:
+        if status == "active":
+            age = _active_ages[_age_i % len(_active_ages)]
+            _age_i += 1
+            active_since = f"datetime('now', '-{age} days')"
+        else:
+            active_since = "''"
         cur = conn.execute(
             "INSERT INTO jobs (employer_id, title, location, required_skills, description, "
             "department, employment_type, work_mode, exp_min, exp_max, salary_min, "
-            "salary_max, hide_salary, vacancies, education, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "salary_max, hide_salary, vacancies, education, status, active_since) "
+            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {active_since})",
             (email_to_id[emp_email], title, loc, req, desc, dept, emp_type, mode,
              e_min, e_max, s_min, s_max, hide, vac, edu, status))
         job_id = cur.lastrowid

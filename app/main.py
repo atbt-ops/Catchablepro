@@ -25,7 +25,10 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from html import escape
 
-from . import audit, auth, db as dbmod, mailer, ratelimit, resume as resume_module, totp
+from . import (
+    audit, auth, db as dbmod, mailer, pricing, ratelimit,
+    resume as resume_module, totp,
+)
 from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
@@ -301,6 +304,79 @@ def _company(db: sqlite3.Connection, user_id: int) -> sqlite3.Row:
             "SELECT * FROM company_profiles WHERE user_id = ?", (user_id,)
         ).fetchone()
     return row
+
+
+# --------------------------------------------------------------------------- #
+# On-demand pricing: billing transitions and the auto-expiry sweep
+# --------------------------------------------------------------------------- #
+def _set_job_status(db: sqlite3.Connection, job: sqlite3.Row, new_status: str) -> None:
+    """Change a job's status, moving the pricing meter accordingly.
+
+    Going active starts a fresh billing spell; leaving active banks the elapsed
+    time into billable_seconds so cumulative cost survives close/reopen.
+    """
+    old = job["status"]
+    if new_status == "active" and old != "active":
+        # Fresh billing spell — a reopened job gets a new free week.
+        db.execute(
+            "UPDATE jobs SET status = 'active', active_since = datetime('now'), "
+            "billable_seconds = 0 WHERE id = ?",
+            (job["id"],),
+        )
+    elif old == "active" and new_status != "active":
+        db.execute(
+            "UPDATE jobs SET status = ?, active_since = '' WHERE id = ?",
+            (new_status, job["id"]),
+        )
+    else:
+        db.execute("UPDATE jobs SET status = ? WHERE id = ?", (new_status, job["id"]))
+    db.commit()
+
+
+def sweep_expired_jobs(db: sqlite3.Connection) -> int:
+    """Auto-close any active job that has passed the pricing cap.
+
+    Called lazily on the busy list views so expiry happens without a scheduler.
+    Returns the number closed. Each closure is audited and the employer emailed.
+    """
+    active = db.execute(
+        "SELECT id, employer_id, title, billable_seconds, active_since "
+        "FROM jobs WHERE status = 'active' AND active_since != ''"
+    ).fetchall()
+    closed = 0
+    for job in active:
+        state = pricing.cost_state(job["billable_seconds"], job["active_since"])
+        if not state.expired:
+            continue
+        db.execute(
+            "UPDATE jobs SET status = 'closed', active_since = '' WHERE id = ?",
+            (job["id"],),
+        )
+        db.commit()
+        audit.record(
+            db, "job.autoexpire", actor_email="system (pricing)",
+            target_type="job", target_id=job["id"], target_label=job["title"],
+            detail=f"Reached the {pricing.CAP_DAYS}-day cap; accrued {state.accrued_display}.",
+        )
+        emp = db.execute(
+            "SELECT email, name, company_name FROM users WHERE id = ?",
+            (job["employer_id"],),
+        ).fetchone()
+        if emp:
+            mailer.send_email(
+                to=emp["email"],
+                subject=f"Your job '{job['title']}' was auto-closed",
+                body=(
+                    f"Hi {emp['name'] or 'there'},\n\n"
+                    f"Your posting '{job['title']}' reached the "
+                    f"{pricing.CAP_DAYS}-day limit and was automatically closed to "
+                    f"keep listings fresh. Total holding cost: {state.accrued_display}.\n\n"
+                    f"If you're still hiring for this role, you can reopen it from "
+                    f"your dashboard — it starts a new free week.\n"
+                ),
+            )
+        closed += 1
+    return closed
 
 
 def _auto_apply_candidate_to_all_jobs(db: sqlite3.Connection, candidate_id: int) -> int:
@@ -823,11 +899,10 @@ def admin_takedown_job(
     user, redirect = _require_admin(request, db)
     if redirect:
         return redirect
-    job = db.execute("SELECT id, title FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    job = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if job is None:
         return RedirectResponse("/admin/jobs", status_code=303)
-    db.execute("UPDATE jobs SET status = 'closed' WHERE id = ?", (job_id,))
-    db.commit()
+    _set_job_status(db, job, "closed")  # also stops the pricing meter
     audit.record(
         db, "job.takedown", actor=user, target_type="job",
         target_id=job["id"], target_label=job["title"], ip=_client_ip(request),
@@ -1150,6 +1225,7 @@ def candidate_dashboard(
     user, redirect = _require(request, db, "candidate")
     if redirect:
         return redirect
+    sweep_expired_jobs(db)  # drop postings that hit the pricing cap from search
     prof = _profile(db, user["id"])
 
     # Only live postings are visible to candidates.
@@ -1434,19 +1510,27 @@ def employer_dashboard(
     if company["onboarding_step"] < ONBOARDING_DONE:
         return RedirectResponse("/employer/onboarding", status_code=303)
 
+    sweep_expired_jobs(db)  # auto-close anything past the pricing cap first
+
     total = db.execute(
         "SELECT COUNT(*) AS n FROM jobs WHERE employer_id = ?", (user["id"],)
     ).fetchone()["n"]
     jobs_page = paginate(total, page, EMPLOYER_JOBS_PER_PAGE)
-    jobs = db.execute(
+    rows = db.execute(
         "SELECT j.*, "
         "(SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) AS n_apps "
         "FROM jobs j WHERE j.employer_id = ? ORDER BY j.created_at DESC, j.id DESC "
         "LIMIT ? OFFSET ?",
         (user["id"], jobs_page.per_page, jobs_page.offset),
     ).fetchall()
+    # Attach the live pricing state to each job on this page.
+    jobs = []
+    for j in rows:
+        cost = pricing.cost_state(j["billable_seconds"], j["active_since"]) \
+            if j["status"] == "active" else None
+        jobs.append({"job": j, "cost": cost})
 
-    # Rail stats must reflect every job, not just this page.
+    # Rail stats over every job, plus the total running bill across active jobs.
     stats = db.execute(
         "SELECT "
         "SUM(status = 'active') AS active, "
@@ -1456,6 +1540,15 @@ def employer_dashboard(
         "FROM jobs WHERE employer_id = ?",
         (user["id"], user["id"]),
     ).fetchone()
+    active_jobs = db.execute(
+        "SELECT billable_seconds, active_since FROM jobs "
+        "WHERE employer_id = ? AND status = 'active'",
+        (user["id"],),
+    ).fetchall()
+    running_bill = sum(
+        pricing.cost_state(a["billable_seconds"], a["active_since"]).accrued
+        for a in active_jobs
+    )
 
     return templates.TemplateResponse(
         request,
@@ -1466,6 +1559,9 @@ def employer_dashboard(
             "stat_active": stats["active"] or 0,
             "stat_drafts": stats["drafts"] or 0,
             "stat_applicants": stats["applicants"] or 0,
+            "running_bill": running_bill,
+            "currency": pricing.CURRENCY,
+            "cap_days": pricing.CAP_DAYS,
         },
     )
 
@@ -1511,6 +1607,10 @@ def _job_form_context(request: Request, user, form: dict, errors: list) -> dict:
         "salary_min_lpa": SALARY_MIN_LPA,
         "salary_max_lpa": SALARY_MAX_LPA,
         "today": date.today().isoformat(),
+        "pricing_rates": pricing.WEEKLY_RATES,
+        "pricing_free_days": pricing.FREE_DAYS,
+        "pricing_cap_days": pricing.CAP_DAYS,
+        "currency": pricing.CURRENCY,
         "form": form,
         "errors": errors,
     }
@@ -1617,11 +1717,13 @@ def employer_create_job(
             status_code=400,
         )
 
+    # A job published straight away starts its pricing meter now; a draft does not.
+    active_since = "datetime('now')" if status == "active" else "''"
     cur = db.execute(
         "INSERT INTO jobs (employer_id, title, description, required_skills, location, "
         "employment_type, work_mode, exp_min, exp_max, salary_min, salary_max, "
-        "hide_salary, vacancies, education, department, deadline, status) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "hide_salary, vacancies, education, department, deadline, status, active_since) "
+        f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {active_since})",
         (
             user["id"], title.strip(), description.strip(), required_skills.strip(),
             location.strip(), employment_type, work_mode, exp_min, exp_max,
@@ -1659,12 +1761,11 @@ def employer_set_job_status(
     if status == "active" and not user["email_verified"]:
         return RedirectResponse("/employer?verify_required=1", status_code=303)
     owned = db.execute(
-        "SELECT id FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
+        "SELECT * FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
     ).fetchone()
     if owned is None:
         return RedirectResponse("/employer", status_code=303)
-    db.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
-    db.commit()
+    _set_job_status(db, owned, status)  # moves the pricing meter too
     if status == "active":
         # Going live pulls in auto-apply candidates that match.
         _auto_apply_all_candidates_to_job(db, job_id)
