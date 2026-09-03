@@ -7,7 +7,9 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free              # free tier: no persistent disk, spins down when idle
     region: oregon
-    healthCheckPath: /healthz
+    # Readiness, not liveness: /readyz fails with 503 when the database or
+    # uploads volume is broken, so Render stops routing to a dead instance.
+    healthCheckPath: /readyz
     autoDeploy: true
     envVars:
       - key: ENV
