@@ -91,6 +91,11 @@ CREATE TABLE IF NOT EXISTS jobs (
     department      TEXT    NOT NULL DEFAULT '',
     deadline        TEXT    NOT NULL DEFAULT '',
     status          TEXT    NOT NULL DEFAULT 'active',
+    -- On-demand pricing meter (see app/pricing.py). active_since is the start of
+    -- the current active spell (empty when not active); billable_seconds is the
+    -- accumulated active time from earlier spells.
+    active_since     TEXT   NOT NULL DEFAULT '',
+    billable_seconds REAL   NOT NULL DEFAULT 0,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -170,6 +175,8 @@ _ADDED_COLUMNS = {
         "department": "TEXT NOT NULL DEFAULT ''",
         "deadline": "TEXT NOT NULL DEFAULT ''",
         "status": "TEXT NOT NULL DEFAULT 'active'",
+        "active_since": "TEXT NOT NULL DEFAULT ''",
+        "billable_seconds": "REAL NOT NULL DEFAULT 0",
     },
     "users": {
         "phone": "TEXT NOT NULL DEFAULT ''",
@@ -210,6 +217,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 # Accounts that predate verification are grandfathered in, so an
                 # upgrade never locks existing users out of applying or posting.
                 conn.execute("UPDATE users SET email_verified = 1")
+            elif name == "active_since":
+                # Jobs that were already live before pricing existed start their
+                # meter now, giving them a fresh free week rather than being
+                # retroactively billed (or instantly auto-expired).
+                conn.execute(
+                    "UPDATE jobs SET active_since = datetime('now') "
+                    "WHERE status = 'active'"
+                )
 
 
 def init_db() -> None:

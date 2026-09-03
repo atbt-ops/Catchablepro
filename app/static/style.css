@@ -605,6 +605,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .steplbl { display: none; }   /* dots only on narrow screens */
 }
 
+/* ---------- on-demand pricing meter ---------- */
+.costmeter {
+  display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 11px; padding: 6px 11px; border-radius: 999px;
+  font-size: 12.5px; border: 1px solid var(--border);
+}
+.costmeter .dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .5; }
+.costmeter.free { color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); border-color: color-mix(in srgb, var(--green) 26%, transparent); }
+.costmeter.paid { color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, transparent); border-color: color-mix(in srgb, var(--brand) 26%, transparent); }
+.costmeter.warn { color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); border-color: color-mix(in srgb, var(--red) 30%, transparent); }
+.costmeter b { font-weight: 700; }
+.costwarn { font-weight: 700; }
+
+.pricing-box {
+  margin-top: 7px; padding: 14px 16px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.pricing-box h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 7px; }
+.pricing-tiers { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.pricing-tier {
+  flex: 1 1 84px; text-align: center; padding: 8px 6px; border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+}
+.pricing-tier .wk { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.pricing-tier .rt { font-size: 14px; font-weight: 800; margin-top: 2px; }
+.pricing-tier.t0 .rt { color: var(--green); }
+
 /* ---------- pagination ---------- */
 .pager {
   display: flex; align-items: center; justify-content: space-between;

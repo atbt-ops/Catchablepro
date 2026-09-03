@@ -20,6 +20,19 @@
   </div>
 
   <div class="railcard">
+    <h4>{{ icon('sparkle', 13) }} Running bill</h4>
+    <div class="statrow">
+      <span class="k">Active postings</span>
+      <span class="v {{ 'brand' if running_bill else 'green' }}">{{ currency }}{{ '{:,}'.format(running_bill) }}</span>
+    </div>
+    <p class="tip" style="margin-top:8px;">
+      On-demand pricing: the first week of each posting is free, then the daily
+      rate rises the longer it stays live. Close a job to stop its meter.
+      Jobs auto-close after {{ cap_days }} days.
+    </p>
+  </div>
+
+  <div class="railcard">
     <h4>{{ icon('plus', 13) }} Quick actions</h4>
     <a class="btn small block" href="/employer/jobs/new">Post a job</a>
     {% if stat_drafts %}
@@ -28,14 +41,6 @@
         not visible to candidates yet.
       </p>
     {% endif %}
-  </div>
-
-  <div class="railcard">
-    <h4>{{ icon('target', 13) }} How matching works</h4>
-    <p class="tip">
-      match % = shared skills ÷ required skills. Listing precise required skills
-      gives you sharper candidate rankings.
-    </p>
   </div>
 {% endblock %}
 
@@ -62,7 +67,9 @@
   </h2>
   {% if jobs %}
     <div class="rows">
-      {% for j in jobs %}
+      {% for item in jobs %}
+      {% set j = item.job %}
+      {% set cost = item.cost %}
       <div class="jobcard is-{{ j.status }}">
         <div>
           <h3>
@@ -89,6 +96,27 @@
               {% for s in j.required_skills.split(',') %}
                 {% if s.strip() %}<span class="chip">{{ s.strip() }}</span>{% endif %}
               {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if cost %}
+            {% set warn = cost.days_to_cap <= 5 %}
+            <div class="costmeter {{ 'warn' if warn else ('paid' if not cost.is_free else 'free') }}">
+              {{ icon('sparkle', 12) }}
+              {% if cost.is_free %}
+                <b>Free</b> this week
+                {% if cost.days_to_next is not none %}
+                  · then {{ currency }}{{ cost.next_rate }}/day in {{ cost.days_to_next | round(0, 'ceil') | int }} day(s)
+                {% endif %}
+              {% else %}
+                <b>{{ cost.accrued_display }}</b> so far · {{ currency }}{{ cost.daily_rate }}/day now
+              {% endif %}
+              <span class="dot"></span>
+              {% if warn %}
+                <span class="costwarn">auto-closes in {{ cost.days_to_cap | round(0, 'ceil') | int }} day(s)</span>
+              {% else %}
+                closes in {{ cost.days_to_cap | round(0, 'ceil') | int }} days
+              {% endif %}
             </div>
           {% endif %}
         </div>
