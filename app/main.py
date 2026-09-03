@@ -17,7 +17,12 @@ from urllib.parse import urlencode
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
@@ -25,7 +30,16 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from html import escape
 
-from . import audit, auth, db as dbmod, mailer, ratelimit, resume as resume_module, totp
+from . import (
+    audit,
+    auth,
+    db as dbmod,
+    health,
+    mailer,
+    ratelimit,
+    resume as resume_module,
+    totp,
+)
 from .richtext import is_effectively_empty, sanitize_html
 from .db import (
     AUTO_APPLY_MIN_MATCH,
@@ -364,8 +378,26 @@ def _auto_apply_all_candidates_to_job(db: sqlite3.Connection, job_id: int) -> No
 # --------------------------------------------------------------------------- #
 @app.get("/healthz")
 def healthz():
-    """Liveness probe for the hosting platform."""
+    """Liveness: this process is up and serving requests.
+
+    Deliberately checks nothing else. Restarting the process cannot fix a
+    broken dependency, so a dependency failure belongs in /readyz, which takes
+    the instance out of rotation instead of into a restart loop.
+    """
     return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz():
+    """Readiness: every dependency a request needs is actually working.
+
+    503 when it is not, so the platform stops routing traffic here. This is
+    the endpoint a load balancer or `healthCheckPath` should point at.
+    """
+    report = health.readiness()
+    return JSONResponse(
+        report, status_code=200 if report["status"] == "ok" else 503
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
