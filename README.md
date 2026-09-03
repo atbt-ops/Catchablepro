@@ -245,7 +245,7 @@ The repo ships a [Render Blueprint](render.yaml). To go live:
 2. In [Render](https://dashboard.render.com): **New + → Blueprint** → connect this repo.
 3. Render reads `render.yaml`, builds the Dockerfile, and generates a strong
    `SECRET_KEY` for you. Click **Apply**.
-4. You get a public URL. Health checks hit `/healthz`.
+4. You get a public URL. Render gates traffic on `/readyz` (see **Health checks**).
 
 **Persistence caveat:** the blueprint defaults to Render's **free** plan, which has
 **no persistent disk** — the SQLite DB and uploaded resumes reset on every restart
@@ -262,6 +262,45 @@ Any Docker host works too — the image needs only `ENV=production` and a
 |----------|---------|
 | `ENV` | Set to `production` to enable `Secure` cookies. |
 | `SECRET_KEY` | Session-cookie signing key. **Required** in production — the app refuses to start with the dev default. Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+
+### Health checks
+
+Two endpoints, because a platform asks two different questions:
+
+| Endpoint | Question | Behaviour |
+|----------|----------|-----------|
+| `/healthz` | *Liveness* — "is this process wedged? should I restart it?" | Always `200 {"status": "ok"}`. Checks nothing else on purpose. |
+| `/readyz` | *Readiness* — "are its dependencies working? should I send it traffic?" | Probes the database and the uploads directory. `200` when both pass, **`503`** when either fails, with per-check detail. |
+
+Point load balancers, `healthCheckPath` and Kubernetes readiness probes at
+**`/readyz`** — that is the one that stops traffic reaching a broken instance.
+Liveness stays dependency-free deliberately: restarting a process cannot fix a
+missing database, and a liveness probe that fails on a dependency outage
+restarts every replica at once instead of just draining them.
+
+`/readyz` exercises its dependencies rather than asserting they are fine:
+
+- **database** — opens SQLite in read-only URI mode and reads from a real
+  table. It checks the schema, not just the file, and read-only mode means the
+  probe cannot paper over a missing database by creating an empty one.
+- **uploads** — writes a probe file to the resume directory and deletes it,
+  which catches an unmounted volume, a read-only remount and a full disk. Only
+  a real write catches the last one: `os.access` answers a question about
+  permissions, and a full disk is perfectly writable by that measure.
+
+```json
+{
+  "status": "degraded",
+  "checks": {
+    "database": {"ok": false, "latency_ms": 0.21,
+                 "error": "OperationalError: unable to open database file"},
+    "uploads":  {"ok": true,  "latency_ms": 0.12}
+  }
+}
+```
+
+Errors name the failure without echoing filesystem paths, since the endpoint is
+public.
 
 ## Email
 
@@ -385,6 +424,7 @@ See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
 │  ├─ auth.py        # PBKDF2 password hashing + session helper (stdlib only)
 │  ├─ matching.py    # keyword-overlap skill match + resume skill extraction
 │  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
+│  ├─ health.py     # liveness + readiness dependency probes
 │  ├─ static/        # style.css (design system: light/dark themes)
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
