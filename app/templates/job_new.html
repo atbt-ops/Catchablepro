@@ -116,6 +116,24 @@
   </section>
 
   <section class="panel">
+    <h2>{{ icon('sparkle', 18) }} On-demand posting cost</h2>
+    <p class="hint">
+      The first week is <strong>free</strong>. After that the daily rate rises the
+      longer the job stays live — so close it as soon as you've hired. The meter
+      stops the moment you close the job, and postings auto-close after
+      {{ pricing_cap_days }} days.
+    </p>
+    <div class="pricing-tiers">
+      {% for rate in pricing_rates %}
+        <div class="pricing-tier t{{ loop.index0 }}">
+          <div class="wk">Week {{ loop.index }}</div>
+          <div class="rt">{% if rate == 0 %}Free{% else %}{{ currency }}{{ rate }}/day{% endif %}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>{{ icon('doc', 18) }} Job description</h2>
     <p class="hint">Use the toolbar to add headings, <strong>bold</strong> text and bullet points.</p>
     <div class="rt-wrap">
