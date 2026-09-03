@@ -237,6 +237,33 @@ docker run -p 8000:8000 -e SECRET_KEY=change-me -v catchablepro-data:/app/data c
 The SQLite DB and uploaded resumes live on the `/app/data` volume so they survive
 container restarts.
 
+**The image is multi-stage.** Dependencies are installed into a virtualenv in a
+builder stage and only the finished virtualenv is copied into the runtime image,
+so pip's caches and build-time artefacts never ship to production.
+
+**It runs as an unprivileged user** (`app`, UID `10001`) rather than root — a
+container escape from root inside the container is root on the node. The fixed
+high UID also satisfies a Kubernetes `runAsNonRoot` / `runAsUser` policy without
+the cluster needing to resolve a name.
+
+> **Bind mounts need a chown.** `/app/data` is the one path the app writes to.
+> Docker seeds a fresh *named* volume from the image directory and preserves its
+> ownership, so the `docker run` above works as-is. A **bind mount** does not:
+> `chown -R 10001:10001` the host directory first, or the container starts and
+> then fails readiness with `PermissionError` on the uploads check.
+
+**`HEALTHCHECK` hits `/readyz`,** so `docker ps` distinguishes *working* from
+merely *running* and a compose `depends_on: service_healthy` waits for something
+real. It shells out to Python rather than `curl`, which the slim base image does
+not carry:
+
+```bash
+docker inspect --format '{{json .State.Health}}' <container> | jq
+```
+
+An unhealthy container reports the reason there — `HTTPError: 503` when a
+dependency is down, a connection error when the server is not listening.
+
 ## Deploy
 
 The repo ships a [Render Blueprint](render.yaml). To go live:
