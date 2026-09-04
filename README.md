@@ -464,6 +464,27 @@ stored hashed, like password-reset tokens.
 **Not yet implemented:** SSO/OAuth and session revocation across devices.
 See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
 
+## Dependencies
+
+Every direct dependency is pinned to an exact version in `requirements.txt`.
+An open range means two builds of the same commit can install different code —
+so "redeploy to fix it" becomes a coin flip, and a break arrives on a day
+nobody changed anything.
+
+To upgrade one, edit the version, run the tests, and commit the result:
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest
+```
+
+**What this does not yet cover:** transitive dependencies — `starlette`,
+`pydantic`, `anyio`, `h11` and friends — still resolve freely, so a build can
+still shift underneath the pins above. Closing that needs a real lock file
+(`pip-tools`, `uv`), generated on the **same Python the image runs** (3.13):
+a freeze taken on another interpreter can pin versions that image cannot
+install, which trades a silent break for a loud one at exactly the wrong time.
+
 ## Logging
 
 Every log record is one JSON object on one line, written to stdout, so a log
