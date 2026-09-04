@@ -316,6 +316,14 @@ or redeploy. That's fine for a demo. To keep data, change `plan: free` to
 Any Docker host works too — the image needs only `ENV=production` and a
 `SECRET_KEY`, with a volume on `/app/data` for persistence.
 
+### When it breaks
+
+[`docs/runbook.md`](docs/runbook.md) is the operational runbook: how to tell a
+dead process from a broken dependency, roll back a deploy, read the logs back
+to one user's request, and what never to do mid-incident. It is honest about
+the procedures that do not work yet — restoring from a backup, chiefly, since
+there are no backups.
+
 ### Production configuration
 
 | Variable | Purpose |
@@ -595,6 +603,7 @@ access log is switched off to avoid logging every request twice.
 │  ├─ static/        # style.css (design system: light/dark themes)
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
+├─ docs/runbook.md   # what to do when it breaks
 ├─ .github/workflows/ci.yml   # CI: tests + docker build
 ├─ data/             # portal.db + uploads/ (git-ignored)
 ├─ Dockerfile
