@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
+from functools import lru_cache
 from typing import Dict, Optional, Set, Tuple
 
 # --------------------------------------------------------------------------- #
@@ -112,8 +113,14 @@ FUZZY_MIN_LENGTH = 5    # short tokens fuzz into each other too easily
 _PUNCT = re.compile(r"[\s_\-]+")
 
 
+@lru_cache(maxsize=2048)
 def canonical(skill: str) -> str:
-    """Normalize a skill and resolve it through the alias table."""
+    """Normalize a skill and resolve it through the alias table.
+
+    Memoized too: score_skill canonicalizes every candidate skill for every
+    required skill, so the same handful of strings are normalized over and over
+    within a single page render. Pure — the alias table is built at import.
+    """
     s = skill.strip().lower()
     if not s:
         return ""

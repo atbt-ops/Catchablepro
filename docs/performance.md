@@ -20,69 +20,97 @@ Each virtual user signs in as its own generated account. Logins are rate-limited
 per email, so several users sharing one account measures the rate limiter rather
 than the app — a mistake this tool made once and now prevents.
 
-## The numbers
+## Where the time goes
 
-Default mix (three parts `/candidate`, one `/account`, one `/healthz`), against
-104 active jobs and 203 candidate profiles.
+Timing the pieces of one dashboard render, against 104 active jobs:
 
-| Concurrent users | Throughput | p50 | p95 | Errors |
-|---:|---:|---:|---:|---:|
-| 1 | 46.5 req/s | 30 ms | 35 ms | 0 |
-| 5 | 23.4 req/s | 288 ms | 394 ms | 0 |
-| 10 | 16.2 req/s | 840 ms | 1101 ms | 0 |
-| 20 | 14.1 req/s | 1641 ms | 2360 ms | 0 |
-| 40 | 10.2 req/s | 3533 ms | 4663 ms | 0 |
-
-**p95 crosses one second at about 10 concurrent users**, and throughput *falls*
-as concurrency rises. Nothing errors — it degrades into slowness rather than
-failure, which is the better failure mode and also the harder one to notice.
-
-## Where the cost is
-
-Isolating one endpoint at a time makes the cause plain:
-
-| Target | 1 user | 10 users |
+| Component | Cost | Share of a ~22 ms request |
 |---|---:|---:|
-| `/healthz` | — | **505 req/s**, p50 17 ms |
-| `/candidate` | 30.6 req/s, p50 31 ms | **9.0 req/s**, p50 1044 ms |
+| Scoring every job against the candidate | 15.4 ms | **~70%** |
+| `sweep_expired_jobs()` | 0.58 ms | <3% |
+| `SELECT` active jobs | 0.34 ms | <2% |
 
-The framework, the server and the event loop are not the problem: a trivial
-endpoint serves 500 req/s on the same process. The candidate dashboard is,
-and specifically it **does not run concurrently**. Ten simultaneous requests
-each take 34× as long as one, and together deliver *less* total throughput than
-a single user — so the concurrency is not just failing to help, it is costing
-extra.
+Scoring dominated, so scoring is what got fixed. `_score_all()` and
+`canonical()` are pure functions — the alias and related-skill tables are built
+at import and never mutate, and an edited profile arrives as a different string
+— so both are memoized. Measured on the same data: **15.67 ms → 0.19 ms**.
 
-That shape points at serialization plus contention rather than raw slowness:
+> An earlier version of this document listed "get the sweeps off the request
+> path" as the first thing to fix. That was reasoning from what looked wasteful
+> rather than from measurement, and it was wrong: the sweep is under 3% of the
+> request. Measuring first changed the answer.
 
-- The dashboard scores **every active job** against the signed-in candidate on
-  every render. That is pure Python, so the GIL lets exactly one request do it
-  at a time no matter how many threads are waiting.
-- `sweep_expired_jobs()` and the auto-apply sweep run **inline in the request**,
-  adding database work to a page a user is waiting on.
-- Every request opens its own SQLite connection against one file.
+## Throughput and latency, before and after
 
-## What to do about it, in order
+Default mix (three parts `/candidate`, one `/account`, one `/healthz`), 104
+active jobs, 203 candidate profiles. "Before" is the same benchmark run against
+the unmemoized code.
 
-Nothing here is worth doing before there is traffic — but when p95 starts
-drifting, this is the order that pays:
+| Users | Before | After | |
+|---:|---|---|---|
+| 1 | 46.5 req/s · p50 30 ms | **161.5 req/s · p50 6.9 ms** | 3.5× |
+| 10 | 16.2 req/s · p50 840 ms | 20.5 req/s · p50 670 ms | 1.3× |
+| 40 | 10.2 req/s · p50 3533 ms | 12.8 req/s · p50 1451 ms | 1.3× |
 
-1. **Get the sweeps off the request path.** They are the clearest waste: work
-   that has nothing to do with rendering this page, done while a user waits.
-2. **Stop recomputing every match on every render.** Cache per candidate and
-   invalidate when their skills or the job list changes, or precompute scores
-   into a table. This is the big one — it is what makes the page O(1) in the
-   number of jobs instead of O(n).
-3. **Only then consider more workers.** They will not help while SQLite is the
-   shared bottleneck, and they would break the in-process rate limiter and the
-   in-process metrics counters. Postgres first, then workers.
+Zero errors at every level, before and after. It degrades into slowness rather
+than failure — the better failure mode, and the harder one to notice.
+
+**The single-user win is large and the concurrent win is not.** Removing 70% of
+the per-request CPU did not fix the way this app behaves under concurrency,
+which means the concurrency problem was never the scoring.
+
+## The open question: `/candidate` does not scale, and we do not yet know why
+
+Isolating endpoints at 10 concurrent users, after the fix:
+
+| Target | Throughput | p50 |
+|---|---:|---:|
+| `/healthz` (no database) | 517 req/s | 17 ms |
+| `/account` (authenticated, reads) | **284 req/s** | 30 ms |
+| `/candidate` | **12.3 req/s** | 834 ms |
+
+And `/candidate` alone, as concurrency rises:
+
+| Users | Throughput | p50 |
+|---:|---:|---:|
+| 1 | 123 req/s | 7.5 ms |
+| 2 | 105 req/s | 17.9 ms |
+| 4 | **23 req/s** | **169 ms** |
+| 10 | 12.3 req/s | 834 ms |
+
+The cliff is between **two and four** concurrent users, and it is specific to
+this one page. It is not the framework (`/healthz` serves 517 req/s), not
+authentication or SQLite reads in general (`/account` serves 284 req/s), and no
+longer the scoring (7.5 ms per request at one user).
+
+That is as far as measurement has taken it. Root-causing the cliff is the next
+piece of work, and it wants evidence rather than another plausible story —
+candidates worth instrumenting include what the page does that `/account` does
+not: it loads *every* active job, sorts them in Python, and runs
+`sweep_expired_jobs()` over all of them, any of which may serialize under
+contention in a way it does not in isolation.
+
+## What to do, in the order the measurements support
+
+1. **Root-cause the concurrency cliff** above. Until that is understood,
+   everything else is guessing — as the sweeps-first ordering in the previous
+   version of this document was.
+2. **Then reconsider the sweeps.** Cheap in isolation, but they still do work in
+   a request a user is waiting on, and they are one of the few things
+   `/candidate` does that `/account` does not.
+3. **Postgres before more workers.** Extra uvicorn workers cannot help while
+   SQLite is the shared bottleneck, and they would break the in-process rate
+   limiter, the in-process metrics counters *and* the memoization added here —
+   each worker would keep its own cache.
 
 ## Caveats
 
 - Measured on a 4-core container running the app, the load generator and the
-  database together, on Python 3.11. Render's instance is smaller and the load
-  will come from outside, so treat these as **relative** figures for spotting
+  database together, on Python 3.11. Render's instance is smaller and load will
+  arrive from outside, so treat these as **relative** figures for spotting
   regressions, not as a capacity promise.
-- Single uvicorn worker, SQLite, no cache — the deployment as it stands today.
-- The load generator competes with the app for the same CPUs, which flatters
-  nothing: real clients would be elsewhere.
+- Single uvicorn worker, SQLite, as deployed today.
+- The memoization flatters a benchmark that requests the same pages repeatedly.
+  That is also what a real session does — one person reloading, paging and
+  filtering re-asks identical questions — but a stream of first-time visitors
+  each pay the full 15 ms once, and the cache holds 4096 pairs.
