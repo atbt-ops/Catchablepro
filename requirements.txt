@@ -1,10 +1,17 @@
-fastapi>=0.111
-uvicorn[standard]>=0.30
-jinja2>=3.1
-python-multipart>=0.0.9
-itsdangerous>=2.2
-pypdf>=4.2
-python-docx>=1.1
-bleach>=6.1
-httpx>=0.27
-segno>=1.6
+# Pinned exactly, on purpose: two builds of the same commit must install the
+# same code. To upgrade, change a version here, run the tests, and commit the
+# result — never leave it to whatever the index resolves on build day.
+#
+# Known gap: transitive dependencies (starlette, pydantic, anyio, h11, ...)
+# still float. Closing it needs a lock file generated on the deployment
+# interpreter — see "Dependencies" in the README.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+jinja2==3.1.6
+python-multipart==0.0.32
+itsdangerous==2.2.0
+pypdf==6.16.2
+python-docx==1.2.0
+bleach==6.4.0
+httpx==0.28.1
+segno==1.6.6
