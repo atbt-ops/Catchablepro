@@ -59,46 +59,63 @@ than failure — the better failure mode, and the harder one to notice.
 the per-request CPU did not fix the way this app behaves under concurrency,
 which means the concurrency problem was never the scoring.
 
-## The open question: `/candidate` does not scale, and we do not yet know why
+## Why `/candidate` did not scale
 
-Isolating endpoints at 10 concurrent users, after the fix:
+Timing the handler's phases under load answered it. Same request, one user
+versus four:
 
-| Target | Throughput | p50 |
-|---|---:|---:|
-| `/healthz` (no database) | 517 req/s | 17 ms |
-| `/account` (authenticated, reads) | **284 req/s** | 30 ms |
-| `/candidate` | **12.3 req/s** | 834 ms |
+| Phase | 1 user | 4 users | Growth |
+|---|---:|---:|---:|
+| `sweep_expired_jobs()` | 0.72 ms | **37.6 ms** | 52× |
+| Scoring + ranking every job | 1.33 ms | **109.5 ms** | 82× |
+| The other queries | 0.19 ms | 1.77 ms | 9× |
+| Template render | 1.90 ms | 2.52 ms | 1.3× |
 
-And `/candidate` alone, as concurrency rises:
+The two phases that explode are precisely the two that loop over **every active
+job in pure Python**. Rendering — also Python, but over the ten rows one page
+shows — barely moves. Four times the concurrency makes that work 50–80× slower,
+not 4× slower, because CPU-bound Python threads contend for the GIL instead of
+running side by side.
 
-| Users | Throughput | p50 |
-|---:|---:|---:|
-| 1 | 123 req/s | 7.5 ms |
-| 2 | 105 req/s | 17.9 ms |
-| 4 | **23 req/s** | **169 ms** |
-| 10 | 12.3 req/s | 834 ms |
+So the cliff was never one slow thing. It is *per-request work proportional to
+the number of active jobs*, in a runtime that cannot do such work in parallel.
+That is why `/account` sustains 284 req/s: it has no such loop.
 
-The cliff is between **two and four** concurrent users, and it is specific to
-this one page. It is not the framework (`/healthz` serves 517 req/s), not
-authentication or SQLite reads in general (`/account` serves 284 req/s), and no
-longer the scoring (7.5 ms per request at one user).
+### Fixed: the sweep no longer runs on every render
 
-That is as far as measurement has taken it. Root-causing the cliff is the next
-piece of work, and it wants evidence rather than another plausible story —
-candidates worth instrumenting include what the page does that `/account` does
-not: it loads *every* active job, sorts them in Python, and runs
-`sweep_expired_jobs()` over all of them, any of which may serialize under
-contention in a way it does not in isolation.
+Expiring a job is bookkeeping against a 30-day cap, not part of drawing a page,
+and it cost `O(active jobs)` inside every list view. It is now throttled to at
+most once a minute (`SWEEP_MIN_INTERVAL_SECONDS`), behind a lock so concurrent
+requests cannot all sweep at once — which also closes an existing hole where two
+parallel requests could each close *and each audit* the same expired job.
+
+`/candidate` alone, before and after that change:
+
+| Users | Sweep every render | Sweep throttled | |
+|---:|---|---|---|
+| 1 | 123 req/s · p50 7.5 ms | 128 req/s · p50 7.0 ms | — |
+| 4 | 23.3 req/s · p50 169 ms | **34.1 req/s · p50 113 ms** | +46% |
+| 10 | 12.3 req/s · p50 834 ms | 15.2 req/s · p50 584 ms | +24% |
+| 40 | — | 8.9 req/s · p50 2767 ms | |
+
+### Still open: ranking is O(active jobs) per render
+
+The remaining 109 ms is the match loop. Memoizing made each score a cache
+lookup, but the page still touches every active job to rank them and then shows
+ten. Removing the cliff means not doing that work per request at all —
+persisting scores so the page can `ORDER BY` and `LIMIT` in SQL, invalidated
+when a candidate's skills or the job list change.
+
+That is a schema change with real invalidation questions, so it is named here
+rather than attempted: it is the next piece of work, and the measurements above
+are the case for it.
 
 ## What to do, in the order the measurements support
 
-1. **Root-cause the concurrency cliff** above. Until that is understood,
-   everything else is guessing — as the sweeps-first ordering in the previous
-   version of this document was.
-2. **Then reconsider the sweeps.** Cheap in isolation, but they still do work in
-   a request a user is waiting on, and they are one of the few things
-   `/candidate` does that `/account` does not.
-3. **Postgres before more workers.** Extra uvicorn workers cannot help while
+1. **Persist match scores** so ranking is a SQL `ORDER BY … LIMIT` rather than
+   a Python loop over every active job. That is the only change left that
+   removes the cliff rather than shaving it.
+2. **Postgres before more workers.** Extra uvicorn workers cannot help while
    SQLite is the shared bottleneck, and they would break the in-process rate
    limiter, the in-process metrics counters *and* the memoization added here —
    each worker would keep its own cache.

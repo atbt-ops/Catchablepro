@@ -326,10 +326,17 @@ Scoring every job against the candidate was ~70% of a dashboard render, so
 arguments, and the tables they consult are built at import. That took a render
 from 30 ms to 7 ms and single-user throughput from 46 to 161 req/s.
 
-It did **not** fix behaviour under concurrency, which is the open question:
-`/candidate` collapses between two and four simultaneous users while `/account`
-sustains 284 req/s and `/healthz` 517 req/s. Nothing errors; it degrades into
-slowness. The doc records what has been ruled out.
+Timing the handler's phases under load explained what remained: the two phases
+that loop over **every active job in pure Python** — the expiry sweep and
+ranking — grow 50–80× at four concurrent users, while template rendering barely
+moves. CPU-bound Python threads contend for the GIL rather than running side by
+side, so per-request work proportional to the job count is what does not scale.
+
+The sweep is bookkeeping, not part of drawing a page, so it is now throttled to
+once a minute behind a lock (`SWEEP_MIN_INTERVAL_SECONDS`) — worth +46%
+throughput at four users, and it also closes a hole where two parallel requests
+could each close and each audit the same expired job. Ranking is still O(active
+jobs) per render; the doc explains why persisting scores is the next step.
 
 ### When it breaks
 
