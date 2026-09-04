@@ -75,6 +75,22 @@
         <div>Confirm your email address first — use the <strong>Resend link</strong> button above.</div>
       </div>
     {% endif %}
+    {% set resume_error = request.query_params.get('resume_error') %}
+    {% if resume_error %}
+      <div class="notice">
+        {{ icon('bolt', 16) }}
+        <div>
+          {% if resume_error == 'size' %}
+            That resume is over 5&nbsp;MB. Attach a smaller file — your previous
+            resume is untouched.
+          {% elif resume_error == 'type' %}
+            Resumes must be a PDF, a Word document (.docx) or a text file.
+          {% else %}
+            That resume could not be saved. Try attaching it again.
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
   <footer class="foot">

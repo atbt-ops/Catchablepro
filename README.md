@@ -464,6 +464,36 @@ stored hashed, like password-reset tokens.
 **Not yet implemented:** SSO/OAuth and session revocation across devices.
 See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
 
+## Logging
+
+Every log record is one JSON object on one line, written to stdout, so a log
+destination can filter and alert on fields instead of grepping prose. Set the
+floor with `LOG_LEVEL` (default `INFO`).
+
+Each request is tagged with a **request id**, returned in the `X-Request-ID`
+response header and attached to every record produced while serving it — which
+is what turns "it broke at 2pm" into a single query:
+
+```json
+{"ts": "2026-09-04T07:03:28+0000", "level": "INFO", "logger": "catchablepro.access",
+ "msg": "request", "request_id": "810ec04cd3c030e0", "method": "POST",
+ "path": "/candidate/profile", "status": 303, "duration_ms": 8.85, "user_id": 1}
+```
+
+An id supplied by a proxy in `X-Request-ID` is reused so one trace spans hops,
+but only when it looks like an id — anything that could smuggle a newline into
+a log line is replaced with a generated one.
+
+Application code just logs; the id rides a `ContextVar`:
+
+```python
+log.info("stage changed", extra={"application_id": app_id, "stage": stage})
+```
+
+The request line is emitted in a `finally`, so a request that raises is still
+recorded — an unlogged 500 is the one you most need to find later. uvicorn's own
+access log is switched off to avoid logging every request twice.
+
 ## Security
 
 - **Passwords**: PBKDF2-HMAC-SHA256 with a per-user salt (stdlib only).
@@ -473,6 +503,12 @@ See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
   (`csrf_field()`); the `verify_csrf` dependency rejects any POST with a
   missing or mismatched token (HTTP 403), verified by a test.
 - **Access control**: resumes are downloadable only by their owner or an employer.
+- **Uploads**: resumes are capped at **5 MB** and restricted to `.pdf`, `.docx`,
+  `.txt` and `.md`. The file is streamed to disk in 64 KB chunks and only moved
+  into place once complete, so peak memory is one chunk and a refused upload
+  never replaces the resume a candidate already had. This bounds what the app
+  reads and stores; bounding what a client may *send* is a request-body limit,
+  which belongs at the proxy in front of it.
 
 ## Project layout
 
@@ -485,6 +521,7 @@ See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
 │  ├─ matching.py    # keyword-overlap skill match + resume skill extraction
 │  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
 │  ├─ health.py     # liveness + readiness dependency probes
+│  ├─ logging_config.py       # JSON log records + request-id context
 │  ├─ static/        # style.css (design system: light/dark themes)
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
@@ -500,6 +537,7 @@ See `app/auth.py`, `app/totp.py`, and `app/ratelimit.py`.
 ## Configuration
 
 - `SECRET_KEY` — session-cookie signing key (defaults to a dev value; set in production).
+- `LOG_LEVEL` — logging floor, default `INFO`.
 - Thresholds live in `app/db.py`: `AUTO_APPLY_MIN_MATCH` (min % to auto-apply) and
   `EMPLOYER_MATCH_THRESHOLD` (min % for a candidate to appear on a job's Matches page).
 

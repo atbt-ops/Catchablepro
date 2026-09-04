@@ -7,9 +7,12 @@ Server-rendered (Jinja) with an in-process SQLite database. Two roles:
 """
 from __future__ import annotations
 
+import logging
 import os
+import re
 import secrets
 import sqlite3
+import time
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -35,6 +38,7 @@ from . import (
     auth,
     db as dbmod,
     health,
+    logging_config,
     mailer,
     pricing,
     ratelimit,
@@ -51,6 +55,13 @@ from .db import (
 )
 from .matching import extract_skills, match_detail, match_pct, parse_skills
 from .pagination import paginate
+
+# --- Resume uploads --------------------------------------------------------- #
+# A resume is a document, not a payload. Without a ceiling one upload can fill
+# the disk or exhaust memory, and with a single instance that is the whole site.
+MAX_RESUME_BYTES = 5 * 1024 * 1024   # 5 MB
+RESUME_CHUNK_BYTES = 64 * 1024       # streamed, so peak memory is one chunk
+ALLOWED_RESUME_SUFFIXES = {".pdf", ".docx", ".txt", ".md", ".text"}
 
 # --- Page sizes ------------------------------------------------------------- #
 JOBS_PER_PAGE = 10        # candidate's ranked job list
@@ -236,6 +247,7 @@ templates.env.globals["page_url"] = page_url
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging_config.configure(os.environ.get("LOG_LEVEL", "INFO").upper())
     init_db()
     yield
 
@@ -248,6 +260,47 @@ app.add_middleware(
     https_only=IS_PROD,  # Secure cookie flag when served over HTTPS in production
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+access_log = logging.getLogger("catchablepro.access")
+
+# A request id is echoed back so a user can quote it, and accepted from a proxy
+# so one trace spans hops. It is still user input: anything that could smuggle
+# a newline into a log line is replaced rather than trusted.
+_SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+@app.middleware("http")
+async def request_context(request: Request, call_next):
+    """Tag every request with an id, then log how it went.
+
+    The log line is emitted in a ``finally`` so a request that raises is still
+    recorded — an unlogged 500 is the one you most need to find later.
+    """
+    incoming = request.headers.get("x-request-id", "")
+    request_id = incoming if _SAFE_REQUEST_ID.match(incoming) else secrets.token_hex(8)
+    token = logging_config.request_id_var.set(request_id)
+    started = time.perf_counter()
+    status = 500  # stands unless a response comes back to say otherwise
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        if not request.url.path.startswith("/static"):
+            access_log.info(
+                "request",
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": status,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                    # Present only once SessionMiddleware has run; absent when a
+                    # request fails before that.
+                    "user_id": request.scope.get("session", {}).get("user_id"),
+                },
+            )
+        logging_config.request_id_var.reset(token)
 
 
 # --------------------------------------------------------------------------- #
@@ -1334,6 +1387,44 @@ def candidate_dashboard(
     )
 
 
+async def _save_resume(upload: UploadFile, user_id: int) -> tuple[str, str]:
+    """Stream an uploaded resume to disk, bounded.
+
+    Returns ``(filename, "")`` on success or ``("", reason)`` on refusal. The
+    file is written in chunks to a ``.part`` sibling and only moved into place
+    once it is complete, so a refused or interrupted upload never replaces the
+    resume a candidate already had.
+
+    This bounds what the app reads and stores. It does not bound what the
+    client may send: a request-body limit belongs at the proxy in front of it.
+    """
+    suffix = Path(upload.filename or "").suffix.lower()
+    if suffix not in ALLOWED_RESUME_SUFFIXES:
+        return "", "type"
+
+    dest = UPLOAD_DIR / f"resume_{user_id}{suffix}"
+    part = dest.with_name(dest.name + ".part")
+    written = 0
+    too_large = False
+    try:
+        with open(part, "wb") as fh:
+            while True:
+                chunk = await upload.read(RESUME_CHUNK_BYTES)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > MAX_RESUME_BYTES:
+                    too_large = True
+                    break
+                fh.write(chunk)
+        if too_large:
+            return "", "size"
+        os.replace(part, dest)
+    finally:
+        part.unlink(missing_ok=True)
+    return dest.name, ""
+
+
 @app.post("/candidate/profile")
 async def candidate_update_profile(
     request: Request,
@@ -1351,11 +1442,12 @@ async def candidate_update_profile(
     final_skills = skills.strip()
 
     if resume is not None and resume.filename:
-        ext = Path(resume.filename).suffix
-        safe_name = f"resume_{user['id']}{ext}"
+        safe_name, refused = await _save_resume(resume, user["id"])
+        if refused:
+            return RedirectResponse(
+                f"/candidate?resume_error={refused}", status_code=303
+            )
         dest = UPLOAD_DIR / safe_name
-        with open(dest, "wb") as fh:
-            fh.write(await resume.read())
         resume_filename = safe_name
 
         # Auto-detect skills from the resume against a vocabulary of common
