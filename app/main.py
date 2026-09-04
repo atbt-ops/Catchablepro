@@ -25,6 +25,7 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -40,6 +41,7 @@ from . import (
     health,
     logging_config,
     mailer,
+    metrics,
     pricing,
     ratelimit,
     resume as resume_module,
@@ -305,14 +307,25 @@ async def request_context(request: Request, call_next):
         response.headers["X-Request-ID"] = request_id
         return response
     finally:
-        if not request.url.path.startswith("/static"):
+        elapsed = time.perf_counter() - started
+        path = request.url.path
+        if metrics.is_observable(path):
+            # The route template, not the path: one series for every job's
+            # applicants page rather than one per job. See app/metrics.py.
+            matched = request.scope.get("route")
+            metrics.observe(
+                request.method,
+                getattr(matched, "path", None) or metrics.UNMATCHED,
+                status,
+                elapsed,
+            )
             access_log.info(
                 "request",
                 extra={
                     "method": request.method,
-                    "path": request.url.path,
+                    "path": path,
                     "status": status,
-                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                    "duration_ms": round(elapsed * 1000, 2),
                     # Present only once SessionMiddleware has run; absent when a
                     # request fails before that.
                     "user_id": request.scope.get("session", {}).get("user_id"),
@@ -543,6 +556,27 @@ def readyz():
     return JSONResponse(
         report, status_code=200 if report["status"] == "ok" else 503
     )
+
+
+@app.get("/metrics")
+def metrics_endpoint(request: Request):
+    """Prometheus scrape endpoint.
+
+    Guarded, because the exposition leaks the shape of the service: route
+    names, traffic volume and error rates. In production it is off unless
+    METRICS_TOKEN is set, and a caller without that bearer token gets a 404
+    rather than a 401 — there is no reason to confirm the endpoint exists to
+    someone who cannot read it. Development leaves it open so a local Prometheus
+    needs no setup.
+    """
+    expected = metrics.token()
+    if IS_PROD and not expected:
+        raise HTTPException(status_code=404)
+    if expected and not secrets.compare_digest(
+        request.headers.get("authorization", ""), f"Bearer {expected}"
+    ):
+        raise HTTPException(status_code=404)
+    return Response(metrics.render(), media_type=metrics.CONTENT_TYPE)
 
 
 @app.get("/", response_class=HTMLResponse)

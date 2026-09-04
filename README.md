@@ -572,6 +572,47 @@ The request line is emitted in a `finally`, so a request that raises is still
 recorded — an unlogged 500 is the one you most need to find later. uvicorn's own
 access log is switched off to avoid logging every request twice.
 
+## Metrics
+
+`/metrics` exposes Prometheus text-format metrics: request rate, errors and
+duration, plus the process and GC collectors `prometheus_client` registers by
+default.
+
+```
+http_requests_total{method="GET",route="/candidate",status="200"} 41
+http_request_duration_seconds_bucket{method="GET",route="/candidate",le="0.1"} 39
+```
+
+**Requests are labelled by route template, never by path.**
+`/employer/jobs/7/applicants` and `/employer/jobs/8/applicants` are one series,
+not one per job, and anything matching no route collapses into `route="unmatched"`
+so a scanner probing random URLs cannot mint time series. A label with unbounded
+values is how a service quietly overwhelms its own metrics backend. `/metrics`
+and `/static` are not measured — they would only measure the observer and the
+disk.
+
+**Access.** The exposition reveals route names, traffic volume and error rates,
+so in production the endpoint is served only when `METRICS_TOKEN` is set and the
+scraper presents it:
+
+```bash
+curl -H "Authorization: Bearer $METRICS_TOKEN" https://<your-app>/metrics
+```
+
+Without the token — or with the wrong one — the response is **404, not 401**:
+there is no reason to confirm the endpoint exists to someone who cannot read it.
+Development leaves it open so a local Prometheus needs no setup.
+
+**Scraping from a managed host.** Prometheus pulls, which is awkward when the
+instance sits behind a platform and may spin down when idle. Pushing suits this
+shape better: a Grafana Agent or OpenTelemetry collector scraping locally and
+using `remote_write` outbound needs no inbound access at all.
+
+**One worker only.** These counters live in the process. Running multiple
+uvicorn workers would give each its own numbers and scrapes would alternate
+between them; that needs `prometheus_client`'s multiprocess mode. The app is
+single-instance by design today (see the SQLite note above), so this matches.
+
 ## Security
 
 - **Passwords**: PBKDF2-HMAC-SHA256 with a per-user salt (stdlib only).
@@ -600,6 +641,7 @@ access log is switched off to avoid logging every request twice.
 │  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
 │  ├─ health.py     # liveness + readiness dependency probes
 │  ├─ logging_config.py       # JSON log records + request-id context
+│  ├─ metrics.py    # Prometheus counters/histograms + scrape helpers
 │  ├─ static/        # style.css (design system: light/dark themes)
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
@@ -617,6 +659,7 @@ access log is switched off to avoid logging every request twice.
 
 - `SECRET_KEY` — session-cookie signing key (defaults to a dev value; set in production).
 - `LOG_LEVEL` — logging floor, default `INFO`.
+- `METRICS_TOKEN` — bearer token a Prometheus scraper must present. **Required in production** or `/metrics` is not served at all.
 - Thresholds live in `app/db.py`: `AUTO_APPLY_MIN_MATCH` (min % to auto-apply) and
   `EMPLOYER_MATCH_THRESHOLD` (min % for a candidate to appear on a job's Matches page).
 

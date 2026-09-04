@@ -42,6 +42,13 @@ services:
       - key: SENDGRID_API_KEY
         sync: false
 
+      # Prometheus scraping. /metrics is OFF in production until this is set,
+      # because the exposition leaks route names, traffic volume and error
+      # rates. Generate one and paste it into the Render dashboard:
+      #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+      - key: METRICS_TOKEN
+        sync: false
+
     # ---------------------------------------------------------------------
     # PERSISTENCE: the free plan has no disk, so the SQLite database and any
     # uploaded resumes are LOST on every restart/redeploy. To keep data,
