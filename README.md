@@ -319,11 +319,17 @@ Any Docker host works too — the image needs only `ENV=production` and a
 ### Performance
 
 [`docs/performance.md`](docs/performance.md) records a measured baseline and how
-to reproduce it with `scripts/loadtest.py`. The short version: a trivial
-endpoint serves ~500 req/s, but the candidate dashboard does not run
-concurrently — p95 crosses one second at about ten simultaneous users, and
-throughput falls as concurrency rises. Nothing errors; it degrades into
-slowness.
+to reproduce it with `scripts/loadtest.py`.
+
+Scoring every job against the candidate was ~70% of a dashboard render, so
+`_score_all()` and `canonical()` are memoized — both are pure functions of their
+arguments, and the tables they consult are built at import. That took a render
+from 30 ms to 7 ms and single-user throughput from 46 to 161 req/s.
+
+It did **not** fix behaviour under concurrency, which is the open question:
+`/candidate` collapses between two and four simultaneous users while `/account`
+sustains 284 req/s and `/healthz` 517 req/s. Nothing errors; it degrades into
+slowness. The doc records what has been ruled out.
 
 ### When it breaks
 

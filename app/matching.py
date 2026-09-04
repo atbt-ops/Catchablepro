@@ -12,6 +12,7 @@ keyword overlap, so existing scores are unchanged.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from typing import Dict, Iterable, List, Set, Tuple
 
 from .semantics import canonical, score_skill
@@ -42,15 +43,33 @@ def parse_skills(raw: str) -> Set[str]:
     return {p.strip().lower() for p in parts if p.strip()}
 
 
-def _score_all(candidate_raw: str, required_raw: str):
-    """Score every required skill against the candidate's skill set."""
+#: How many (candidate skills, required skills) pairs to remember. Both sides
+#: are short strings and the value is a small tuple, so this costs little; the
+#: bound is what stops a stream of distinct skill sets growing it without end.
+_SCORE_CACHE_SIZE = 4096
+
+
+@lru_cache(maxsize=_SCORE_CACHE_SIZE)
+def _score_all(candidate_raw: str, required_raw: str) -> Tuple[Tuple, ...]:
+    """Score every required skill against the candidate's skill set.
+
+    Memoized, because a dashboard scores one candidate against every active job
+    on every render, and those pairs repeat constantly — the same person
+    reloading, paging, or filtering re-asks exactly the same questions. The
+    function is a pure function of its two strings: the alias and related-skill
+    tables it consults are built once at import and never mutate, and an edited
+    profile arrives as a different string, so there is nothing to invalidate.
+
+    Returns a tuple rather than a list so a caller cannot mutate what the cache
+    handed back and poison later hits.
+    """
     required = parse_skills(required_raw)
     candidate = parse_skills(candidate_raw)
     results = []
     for want in sorted(required):
         score, via, kind = score_skill(candidate, want)
         results.append((want, score, via, kind))
-    return results
+    return tuple(results)
 
 
 def match_pct(candidate_raw: str, required_raw: str) -> int:
