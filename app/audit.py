@@ -20,6 +20,7 @@ ACTIONS = {
     "admin.revoke": "Admin revoked",
     "security.2fa_enable": "2FA enabled",
     "security.2fa_disable": "2FA disabled",
+    "account.delete": "Account deleted by its owner",
 }
 
 

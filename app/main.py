@@ -14,7 +14,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 from typing import Optional
@@ -1285,6 +1285,152 @@ def twofa_disable(
                  target_id=user["id"], target_label=user["email"],
                  ip=_client_ip(request))
     return RedirectResponse("/account?twofa=off", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Getting your data out, and getting rid of it
+# --------------------------------------------------------------------------- #
+def _export_payload(db: sqlite3.Connection, user: sqlite3.Row) -> dict:
+    """Everything this account holds about the person asking.
+
+    Deliberately excludes credentials — a password hash and a TOTP secret are
+    not the user's data to take away, they are the means of impersonating them.
+    It also stops at the account boundary: an employer's export carries their
+    company and their postings, never the candidates who applied, because that
+    is somebody else's personal data.
+    """
+    payload: dict = {
+        "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "account": {
+            "email": user["email"],
+            "name": user["name"],
+            "role": user["role"],
+            "phone": user["phone"],
+            "designation": user["designation"],
+            "company_name": user["company_name"],
+            "email_verified": bool(user["email_verified"]),
+            "two_factor_enabled": bool(user["totp_enabled"]),
+            "created_at": user["created_at"],
+        },
+    }
+
+    if user["role"] == "candidate":
+        profile = db.execute(
+            "SELECT headline, skills, resume_filename, auto_apply, updated_at "
+            "FROM candidate_profiles WHERE user_id = ?",
+            (user["id"],),
+        ).fetchone()
+        payload["profile"] = dict(profile) if profile else {}
+        payload["applications"] = [
+            dict(row)
+            for row in db.execute(
+                "SELECT j.title AS job_title, u.company_name AS company, "
+                "       a.status, a.match_pct, a.source, a.created_at "
+                "FROM applications a "
+                "JOIN jobs j ON j.id = a.job_id "
+                "JOIN users u ON u.id = j.employer_id "
+                "WHERE a.candidate_id = ? ORDER BY a.id",
+                (user["id"],),
+            ).fetchall()
+        ]
+    else:
+        company = db.execute(
+            "SELECT industry, size, website, about, hq_location, onboarding_step "
+            "FROM company_profiles WHERE user_id = ?",
+            (user["id"],),
+        ).fetchone()
+        payload["company_profile"] = dict(company) if company else {}
+        payload["jobs_posted"] = [
+            dict(row)
+            for row in db.execute(
+                "SELECT title, department, employment_type, work_mode, location, "
+                "       required_skills, status, created_at "
+                "FROM jobs WHERE employer_id = ? ORDER BY id",
+                (user["id"],),
+            ).fetchall()
+        ]
+
+    return payload
+
+
+@app.get("/account/export")
+def account_export(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    """Hand the account holder their own data as a JSON file."""
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+    stamp = date.today().isoformat()
+    return JSONResponse(
+        _export_payload(db, user),
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="catchablepro-{user["id"]}-{stamp}.json"'
+        },
+    )
+
+
+@app.post("/account/delete")
+def account_delete(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    current_password: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Erase the account and everything hanging off it, on the owner's say-so.
+
+    Every table that references a user cascades, so one DELETE removes the
+    profile, applications, jobs, recovery codes and tokens. The two things the
+    database cannot reach are handled here: the resume file on disk, and the
+    audit entry, which is written first so it survives — its actor_id becomes
+    NULL while the snapshotted email keeps the record readable.
+    """
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+
+    def fail(message: str):
+        return templates.TemplateResponse(
+            request,
+            "account.html",
+            {"request": request, "user": user, "changed": False, "error": message},
+            status_code=400,
+        )
+
+    if not auth.verify_password(current_password, user["password_hash"]):
+        return fail("Your current password is incorrect.")
+    if user["is_admin"]:
+        # Mirrors the moderation guard rails: an admin cannot remove themselves
+        # and leave the platform without one. Revoke the rights first.
+        return fail(
+            "Admin accounts cannot be deleted from here — have another admin "
+            "revoke your admin rights first (manage.py revoke-admin)."
+        )
+
+    resume_name = ""
+    if user["role"] == "candidate":
+        row = db.execute(
+            "SELECT resume_filename FROM candidate_profiles WHERE user_id = ?",
+            (user["id"],),
+        ).fetchone()
+        resume_name = row["resume_filename"] if row else ""
+
+    audit.record(db, "account.delete", actor=user, target_type="user",
+                 target_id=user["id"], target_label=user["email"],
+                 detail=f"role={user['role']}", ip=_client_ip(request))
+
+    db.execute("DELETE FROM users WHERE id = ?", (user["id"],))
+    db.commit()
+
+    if resume_name:
+        # Best effort: the row is already gone, and a stranded file must not
+        # turn a completed deletion into a 500 for the person who asked.
+        try:
+            (UPLOAD_DIR / resume_name).unlink(missing_ok=True)
+        except OSError:
+            access_log.warning("resume file left behind after account deletion")
+
+    request.session.clear()
+    return RedirectResponse("/?deleted=1", status_code=303)
 
 
 @app.post("/logout")

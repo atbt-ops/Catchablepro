@@ -66,6 +66,9 @@
         </form>
       </div>
     {% endif %}
+    {% if request.query_params.get('deleted') %}
+      <div class="flash-ok">{{ icon('check', 15) }} Your account and its data have been deleted.</div>
+    {% endif %}
     {% if request.query_params.get('verification_sent') %}
       <div class="flash-ok">{{ icon('check', 15) }} Verification email sent — check your inbox.</div>
     {% endif %}
