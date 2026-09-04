@@ -316,6 +316,15 @@ or redeploy. That's fine for a demo. To keep data, change `plan: free` to
 Any Docker host works too — the image needs only `ENV=production` and a
 `SECRET_KEY`, with a volume on `/app/data` for persistence.
 
+### Performance
+
+[`docs/performance.md`](docs/performance.md) records a measured baseline and how
+to reproduce it with `scripts/loadtest.py`. The short version: a trivial
+endpoint serves ~500 req/s, but the candidate dashboard does not run
+concurrently — p95 crosses one second at about ten simultaneous users, and
+throughput falls as concurrency rises. Nothing errors; it degrades into
+slowness.
+
 ### When it breaks
 
 [`docs/runbook.md`](docs/runbook.md) is the operational runbook: how to tell a
@@ -646,6 +655,8 @@ single-instance by design today (see the SQLite note above), so this matches.
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
 ├─ docs/runbook.md   # what to do when it breaks
+├─ docs/performance.md       # measured baseline + how to reproduce
+├─ scripts/loadtest.py       # load generator (httpx + asyncio, no new deps)
 ├─ .github/workflows/ci.yml   # CI: tests + docker build
 ├─ data/             # portal.db + uploads/ (git-ignored)
 ├─ Dockerfile
