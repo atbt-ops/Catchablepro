@@ -84,6 +84,24 @@ if IS_PROD and SECRET_KEY == _DEV_SECRET:
         "SECRET_KEY must be set to a strong random value when ENV=production."
     )
 
+# A job portal that cannot send email cannot onboard anyone: verification gates
+# applying and posting, and a password reset link that only reaches the log
+# leaves the user locked out. The console backend is the right default for
+# development precisely because it sends nothing — which in production is a
+# silent failure that looks exactly like a working deploy. So production has to
+# say out loud that it wants it.
+ALLOW_CONSOLE_EMAIL = os.environ.get("ALLOW_CONSOLE_EMAIL", "").strip().lower() in (
+    "1", "true", "yes",
+)
+if IS_PROD and not ALLOW_CONSOLE_EMAIL and not mailer.is_configured():
+    raise RuntimeError(
+        f"Email is not deliverable (EMAIL_BACKEND={mailer.backend()!r}) but "
+        "ENV=production. Signup verification and password resets would go to "
+        "the log instead of to users. Configure EMAIL_BACKEND=smtp or "
+        "sendgrid with its credentials, or set ALLOW_CONSOLE_EMAIL=1 to run a "
+        "demo deploy that knowingly sends no mail."
+    )
+
 
 # --------------------------------------------------------------------------- #
 # CSRF protection (double-submit token stored in the signed session)

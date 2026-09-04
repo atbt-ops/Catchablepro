@@ -321,6 +321,7 @@ Any Docker host works too — the image needs only `ENV=production` and a
 | Variable | Purpose |
 |----------|---------|
 | `ENV` | Set to `production` to enable `Secure` cookies. |
+| `ALLOW_CONSOLE_EMAIL` | Set to `1` to let a **production** deploy run on the console mailer, which sends nothing. Without it, `ENV=production` refuses to start unless a real provider is configured — see **Email**. |
 | `SECRET_KEY` | Session-cookie signing key. **Required** in production — the app refuses to start with the dev default. Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 
 ### Health checks
@@ -363,6 +364,16 @@ Errors name the failure without echoing filesystem paths, since the endpoint is
 public.
 
 ## Email
+
+> **Production will not start on a mailer that sends nothing.** The `console`
+> backend writes messages to the log — correct for development, and in
+> production a silent failure that looks exactly like a working deploy while
+> every signup dead-ends on an unconfirmed address. With `ENV=production` the
+> app refuses to boot unless a real provider is configured, or
+> `ALLOW_CONSOLE_EMAIL=1` says the deploy knows it sends no mail (which is how
+> `render.yaml` currently runs the demo — delete that entry when you go live).
+> Naming a backend without its credentials counts as not configured.
+
 
 Employers contact candidates from **Matches → Contact**, which opens a compose
 page prefilled with the candidate's address, the role, and a draft message. The

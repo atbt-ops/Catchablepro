@@ -17,11 +17,18 @@ services:
       - key: SECRET_KEY
         generateValue: true # Render generates a strong random value for you
 
-      # Email. Defaults to "console" (logs only, sends nothing). To deliver for
-      # real, set EMAIL_BACKEND to "smtp" or "sendgrid" in the Render dashboard
-      # and fill in the secrets below (sync: false keeps them out of git).
+      # Email. "console" logs mail and sends nothing — fine for a demo, fatal
+      # for real users, since signup verification and password resets would go
+      # to the log. ENV=production refuses to boot on it unless the deploy says
+      # out loud that it knows, which is what ALLOW_CONSOLE_EMAIL does.
+      #
+      # GOING LIVE: set EMAIL_BACKEND to "smtp" or "sendgrid" in the Render
+      # dashboard, fill in the secrets below (sync: false keeps them out of
+      # git), and DELETE the ALLOW_CONSOLE_EMAIL entry.
       - key: EMAIL_BACKEND
         value: console
+      - key: ALLOW_CONSOLE_EMAIL
+        value: "true"        # demo deploy: knowingly sends no mail
       - key: EMAIL_FROM
         value: no-reply@example.com
       - key: SMTP_HOST
