@@ -121,3 +121,55 @@ def test_a_wrong_token_gets_404_not_401(prod_client):
 
     assert api.get("/metrics", headers={"Authorization": "Bearer wrong"}).status_code == 404
     assert api.get("/metrics").status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# Readiness, as something alertable
+# --------------------------------------------------------------------------- #
+def test_readiness_is_published_as_a_gauge(client):
+    client.get("/readyz")
+
+    body = client.get("/metrics").text
+
+    assert "app_ready 1.0" in body
+
+
+def test_each_dependency_is_published_separately(client):
+    """The alert has to name which dependency broke, not just that one did."""
+    client.get("/readyz")
+
+    body = client.get("/metrics").text
+
+    assert 'app_dependency_up{check="database"} 1.0' in body
+    assert 'app_dependency_up{check="uploads"} 1.0' in body
+
+
+def test_a_failing_dependency_shows_up_as_zero(client, monkeypatch, tmp_path):
+    from app import db as dbmod
+
+    monkeypatch.setattr(dbmod, "DB_PATH", tmp_path / "gone.db")
+
+    assert client.get("/readyz").status_code == 503
+
+    body = client.get("/metrics").text
+    assert "app_ready 0.0" in body
+    assert 'app_dependency_up{check="database"} 0.0' in body
+    # The dependency that still works must not be dragged down with it.
+    assert 'app_dependency_up{check="uploads"} 1.0' in body
+
+
+def test_recovery_clears_the_gauge(client, monkeypatch, tmp_path):
+    """A gauge that latches at 0 keeps paging after the outage ends."""
+    from app import db as dbmod
+
+    # Restore by hand, not with monkeypatch.undo(): the client fixture shares
+    # this monkeypatch, so undo() would also unpatch the temp database it
+    # depends on and the "recovery" would never happen.
+    working = dbmod.DB_PATH
+    monkeypatch.setattr(dbmod, "DB_PATH", tmp_path / "gone.db")
+    client.get("/readyz")
+    monkeypatch.setattr(dbmod, "DB_PATH", working)
+
+    client.get("/readyz")
+
+    assert "app_ready 1.0" in client.get("/metrics").text

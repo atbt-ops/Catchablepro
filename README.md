@@ -338,6 +338,21 @@ throughput at four users, and it also closes a hole where two parallel requests
 could each close and each audit the same expired job. Ranking is still O(active
 jobs) per render; the doc explains why persisting scores is the next step.
 
+### Monitoring
+
+[`docs/monitoring.md`](docs/monitoring.md) covers the other half of `/metrics`:
+`ops/` holds a Prometheus scrape config, five alert rules, Alertmanager routing
+and a git-provisioned Grafana dashboard, started with one `docker compose`
+command and validated in CI so a typo in an alert expression fails a pull
+request rather than a 2am page.
+
+One alert per fault, split into *page* (wake up) and *ticket* (morning) to match
+section 9 of the runbook. Readiness is published as `app_ready` and
+`app_dependency_up{check}`, so a broken database pages someone instead of
+waiting for a person to think to curl `/readyz`. As shipped, Alertmanager
+delivers **nothing** until a receiver is filled in — the doc says how to prove
+it works, because alerting nobody has ever received is not alerting.
+
 ### When it breaks
 
 [`docs/runbook.md`](docs/runbook.md) is the operational runbook: how to tell a
@@ -669,8 +684,10 @@ single-instance by design today (see the SQLite note above), so this matches.
 ├─ tests/            # pytest: matching unit tests + app integration tests
 ├─ docs/runbook.md   # what to do when it breaks
 ├─ docs/performance.md       # measured baseline + how to reproduce
+├─ docs/monitoring.md        # scraping, alerting, dashboard
+├─ ops/               # prometheus + alertmanager + grafana, compose-startable
 ├─ scripts/loadtest.py       # load generator (httpx + asyncio, no new deps)
-├─ .github/workflows/ci.yml   # CI: tests + docker build
+├─ .github/workflows/ci.yml   # CI: tests + docker build + config checks
 ├─ data/             # portal.db + uploads/ (git-ignored)
 ├─ Dockerfile
 ├─ requirements.txt  # runtime deps

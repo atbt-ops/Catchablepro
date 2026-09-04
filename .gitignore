@@ -7,3 +7,6 @@ __pycache__/
 data/portal.db
 data/uploads/*
 !data/uploads/.gitkeep
+
+# The Prometheus scrape credential, created locally, never committed.
+ops/prometheus/metrics_token

@@ -19,6 +19,7 @@ the launch-readiness list.
 | Uploads | Resumes on local disk at `/app/data/uploads` |
 | Health | `/healthz` liveness · `/readyz` readiness (Render routes on `/readyz`) |
 | Logs | One JSON object per line on stdout, each carrying a `request_id` |
+| Metrics | `/metrics`, bearer-token guarded — scrape config in `ops/`, see `docs/monitoring.md` |
 
 **The single most important fact:** on Render's `free` plan there is no
 persistent disk. Every restart, redeploy and idle spin-down destroys the
@@ -208,6 +209,24 @@ account. If you are locked out, `make-admin` is the only way back in.
 An alert that fires for everything trains you to ignore it, which is worse than
 no alert.
 
+That table is implemented, not just asserted. `ops/prometheus/alerts.yml`
+carries one alert per fault, each labelled `severity: page` (wake up) or
+`severity: ticket` (morning), each annotated with the section below that says
+what to do:
+
+| Alert | Means | Go to |
+|---|---|---|
+| `CatchableproDown` | No successful scrape for 2m — **or the scrape token is wrong** | §2 |
+| `CatchableproDependencyDown` | `{{ check }}` failed readiness; out of rotation | §3 or §5 |
+| `CatchableproErrorRateHigh` | >5% of requests are 5xx | §4 |
+| `CatchableproLatencyHigh` | p95 above 2s | `docs/performance.md` |
+| `CatchableproRestarted` | The process restarted — on the free plan, the data is gone | §3.3 |
+
+Before believing `CatchableproDown`, curl `/healthz`. A 200 there means the
+scrape credential is wrong, not that the site is down — `/metrics` answers 404
+to a caller without the token, which is indistinguishable from an outage to
+Prometheus. Setup and the rest of the reasoning: `docs/monitoring.md`.
+
 ---
 
 ## 10. Never, during an incident
@@ -234,6 +253,9 @@ these once, deliberately:
 - [ ] Roll back a deploy on purpose and confirm the previous version serves.
 - [ ] Break `/readyz` (rename the database file) and watch traffic stop.
 - [ ] Find one specific request in the logs from its `request_id`.
+- [ ] Fire a test alert at Alertmanager and confirm your phone buzzes
+      (`docs/monitoring.md`, "Prove the alerts deliver"). Alerting nobody has
+      ever received is not alerting.
 
 The restore is the one that matters most, and the one most often skipped. An
 untested backup is not a backup.

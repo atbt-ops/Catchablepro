@@ -585,6 +585,10 @@ def readyz():
     the endpoint a load balancer or `healthCheckPath` should point at.
     """
     report = health.readiness()
+    # Also publish it as gauges. The platform calls this endpoint on a schedule,
+    # so a dependency failure becomes something Prometheus can alert on rather
+    # than something a human has to think to check.
+    metrics.observe_readiness(report)
     return JSONResponse(
         report, status_code=200 if report["status"] == "ok" else 503
     )
