@@ -98,4 +98,36 @@
     <a class="btn" href="/account/2fa/setup">{{ icon('bolt', 16) }} Set up 2FA</a>
   {% endif %}
 </section>
+
+<section class="panel">
+  <h2>{{ icon('target', 18) }} Your data</h2>
+  <p class="hint">
+    Download everything this account holds about you as a JSON file — your
+    profile and, depending on your role, your applications or your postings.
+    Passwords and two-factor secrets are never included.
+  </p>
+  <a class="btn ghost" href="/account/export">{{ icon('check', 16) }} Download my data</a>
+</section>
+
+<section class="panel">
+  <h2>{{ icon('bolt', 18) }} Delete this account</h2>
+  <p class="hint">
+    This erases your account and everything attached to it
+    {% if user.role == 'candidate' %}
+      — your profile, your uploaded resume and every application you have made.
+    {% else %}
+      — your company profile, every job you have posted, and the applications
+      candidates made to those jobs.
+    {% endif %}
+    It cannot be undone, and it is immediate. Download your data first if you
+    want to keep a copy.
+  </p>
+  <form action="/account/delete" method="post">
+    {{ csrf_field(request) }}
+    <label>Confirm your password to delete this account
+      <input type="password" name="current_password" required>
+    </label>
+    <button class="btn danger" type="submit">Delete my account permanently</button>
+  </form>
+</section>
 {% endblock %}

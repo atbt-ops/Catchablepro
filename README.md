@@ -405,6 +405,44 @@ Shared by both roles:
 | `/verify-email?token=…` | Confirm an email address from the signup link |
 | `/resend-verification` | Send a fresh verification link |
 | `/account` | View account details, verification status, change password |
+| `/account/export` | Download everything the account holds about you, as JSON |
+| `/account/delete` | Erase the account and its data, confirmed by password |
+
+### Your data: export and erasure
+
+Real users are entrusting the site with resumes, email addresses and phone
+numbers. Two routes make that reversible, and both live on `/account`:
+
+**Export** (`/account/export`) hands over a JSON file of what the account holds
+— the account fields plus, for a candidate, their profile and applications, or,
+for an employer, their company profile and postings. Two deliberate exclusions:
+
+- **Credentials are never exported.** A password hash and a TOTP secret are not
+  the user's data to take away; they are the means of impersonating them.
+- **The export stops at the account boundary.** An employer's file carries their
+  jobs, never the candidates who applied — that is somebody else's personal
+  data, and a data-access right over your own account is not a right over
+  theirs.
+
+**Deletion** (`/account/delete`) erases the account, confirmed by password. It
+is immediate and cannot be undone. Every table referencing a user cascades, so
+one `DELETE` takes the profile, applications, jobs, recovery codes and tokens
+with it; the uploaded resume is removed from disk in the same request. Deleting
+an employer takes their postings, and with them the applications made to those
+postings.
+
+The **audit entry survives the account**, on purpose: it is written before the
+delete, so `actor_id` becomes `NULL` while the snapshotted email keeps the
+record readable. That is what the audit table's `ON DELETE SET NULL` and its
+snapshot columns were built for.
+
+An **admin cannot delete their own account** from here — the same guard rail
+that stops an admin suspending themselves. Revoke the rights first
+(`manage.py revoke-admin`), then delete.
+
+> **Still missing:** the privacy policy and terms these routes exist to honour.
+> The mechanism is here; the wording is a decision for whoever runs the site,
+> and if you operate in India, the DPDP Act 2023 governs what it has to say.
 
 ### Email verification
 
