@@ -255,7 +255,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-170 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+230 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
