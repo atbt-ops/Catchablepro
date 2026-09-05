@@ -338,6 +338,16 @@ throughput at four users, and it also closes a hole where two parallel requests
 could each close and each audit the same expired job. Ranking is still O(active
 jobs) per render; the doc explains why persisting scores is the next step.
 
+### Where this is going
+
+[`docs/architecture.md`](docs/architecture.md) records the decisions that native
+iOS and Android clients will depend on, while they are still cheap: keep data
+logic out of rendering so one service function serves both a Jinja template and
+a JSON response, version the API from its first endpoint, settle token auth
+before the first mobile build, and reach Postgres before push notifications. It
+is explicit that no handler follows the rule yet — it governs code written from
+here on.
+
 ### Monitoring
 
 [`docs/monitoring.md`](docs/monitoring.md) covers the other half of `/metrics`:
@@ -685,6 +695,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 ├─ docs/runbook.md   # what to do when it breaks
 ├─ docs/performance.md       # measured baseline + how to reproduce
 ├─ docs/monitoring.md        # scraping, alerting, dashboard
+├─ docs/architecture.md      # the mobile-client constraint, decided early
 ├─ ops/               # prometheus + alertmanager + grafana, compose-startable
 ├─ scripts/loadtest.py       # load generator (httpx + asyncio, no new deps)
 ├─ .github/workflows/ci.yml   # CI: tests + docker build + config checks
