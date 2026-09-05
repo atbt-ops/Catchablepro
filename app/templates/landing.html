@@ -1,44 +1,93 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
 {% block content %}
-<section class="hero">
-  <span class="eyebrow">{{ icon('sparkle', 14) }} Skill-driven matching</span>
-  <h1>Get matched by <span class="grad">skills</span>,<br>not luck.</h1>
-  <p class="lead">
-    Employers post jobs. Candidates build a profile and upload a resume.
-    Every profile is ranked against each job by <strong>skill-match percentage</strong> —
-    and with <strong>Auto-Apply</strong> on, candidates never miss a single opportunity.
-  </p>
-  <div class="cta">
-    <a class="btn" href="/register">{{ icon('user', 16) }} Find a job</a>
-    <a class="btn ghost" href="/employer/register">{{ icon('building', 16) }} Hire talent</a>
-  </div>
-  <p class="cta-sub muted">
-    Already with us? <a href="/login">Candidate login</a> ·
-    <a href="/employer/login">Employer login</a>
-  </p>
-  <div class="stats">
-    <div class="stat"><b>%</b><span>Every match scored</span></div>
-    <div class="stat"><b>1-click</b><span>Auto-Apply</span></div>
-    <div class="stat"><b>0</b><span>Opportunities missed</span></div>
-  </div>
-</section>
+<div class="landing">
+  <section class="landing-hero">
+    <div class="hero-copy">
+      <span class="eyebrow">{{ icon('sparkle', 14) }} Explainable skill matching</span>
+      <h1>Find work that fits your <span class="grad">real skills.</span></h1>
+      <p class="lead">
+        Catchablepro makes the next step obvious: see how your experience maps to a role,
+        then act with confidence. Hiring teams get a focused shortlist built on the same signal.
+      </p>
+      <div class="cta">
+        <a class="btn" href="/register">{{ icon('user', 16) }} Find a job</a>
+        <a class="btn ghost" href="/employer/register">{{ icon('building', 16) }} Hire with clarity</a>
+      </div>
+      <p class="cta-sub muted">
+        Already a member? <a href="/login">Candidate login</a> ·
+        <a href="/employer/login">Employer login</a>
+      </p>
+      <div class="hero-reassurance">
+        <span>{{ icon('check', 14) }} Clear match reasons</span>
+        <span>{{ icon('check', 14) }} Built for candidates and employers</span>
+      </div>
+    </div>
 
-<section class="cards">
-  <div class="feature i1">
-    <span class="fico">{{ icon('briefcase', 22) }}</span>
-    <h3>For employers</h3>
-    <p>Post a role with its required skills and instantly see candidates ranked by how well they match.</p>
-  </div>
-  <div class="feature i2">
-    <span class="fico">{{ icon('user', 22) }}</span>
-    <h3>For candidates</h3>
-    <p>List your skills, upload your resume — skills are auto-detected — and see your match score on every job.</p>
-  </div>
-  <div class="feature i3">
-    <span class="fico">{{ icon('bolt', 22) }}</span>
-    <h3>Auto-Apply</h3>
-    <p>Flip one toggle and you're automatically applied to every matching job — old and newly posted.</p>
-  </div>
-</section>
+    <aside class="match-preview" aria-label="Example of a skill match">
+      <div class="preview-topline">
+        <span class="preview-live"><i></i> Live match preview</span>
+        <span class="preview-brand">Catchable<span>pro</span></span>
+      </div>
+      <div class="preview-role">
+        <span class="role-icon">{{ icon('briefcase', 19) }}</span>
+        <div>
+          <p>Backend Engineer</p>
+          <span>Atlas Cloud · Remote</span>
+        </div>
+        <div class="preview-score"><b>92</b><span>% fit</span></div>
+      </div>
+      <div class="preview-divider"></div>
+      <p class="preview-label">Skills that line up</p>
+      <div class="preview-skills">
+        <span class="preview-skill good">{{ icon('check', 12) }} Python</span>
+        <span class="preview-skill good">{{ icon('check', 12) }} FastAPI</span>
+        <span class="preview-skill good">{{ icon('check', 12) }} SQL</span>
+        <span class="preview-skill good">{{ icon('check', 12) }} Docker</span>
+        <span class="preview-skill">AWS</span>
+      </div>
+      <div class="preview-insight">
+        <span class="insight-icon">{{ icon('sparkle', 16) }}</span>
+        <p><strong>Strong fit.</strong> Your core backend skills match this role.</p>
+      </div>
+      <div class="preview-foot">
+        <span>Score recalculated from your profile</span>
+        <span>{{ icon('arrow-right', 15) }}</span>
+      </div>
+    </aside>
+  </section>
+
+  <section class="outcomes" aria-label="What Catchablepro helps you do">
+    <article class="outcome">
+      <span class="outcome-number">01</span>
+      <span class="fico">{{ icon('target', 20) }}</span>
+      <h2>Know where you stand</h2>
+      <p>Every job shows the skills you already bring, the ones that are related, and the gaps to close.</p>
+    </article>
+    <article class="outcome">
+      <span class="outcome-number">02</span>
+      <span class="fico">{{ icon('briefcase', 20) }}</span>
+      <h2>Focus the hiring process</h2>
+      <p>Post a role once and review candidates in match order, with a practical application pipeline.</p>
+    </article>
+    <article class="outcome">
+      <span class="outcome-number">03</span>
+      <span class="fico">{{ icon('bolt', 20) }}</span>
+      <h2>Keep momentum</h2>
+      <p>Auto-Apply can put matching opportunities to work while candidates keep their profile current.</p>
+    </article>
+  </section>
+
+  <section class="landing-steps">
+    <div>
+      <span class="eyebrow">A calmer way to move forward</span>
+      <h2>From profile to progress in three clear steps.</h2>
+    </div>
+    <ol>
+      <li><span>1</span><p><strong>Build your profile</strong> Add the skills and experience you want to be known for.</p></li>
+      <li><span>2</span><p><strong>Review the fit</strong> See a score and the evidence behind it before applying.</p></li>
+      <li><span>3</span><p><strong>Track the outcome</strong> Follow each application through a transparent hiring journey.</p></li>
+    </ol>
+  </section>
+</div>
 {% endblock %}

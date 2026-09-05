@@ -41,7 +41,7 @@ WORKDIR /app
 # Application code stays root-owned and world-readable: the app user needs to
 # read it, and nothing at runtime should be able to rewrite it.
 COPY app ./app
-COPY run.py seed.py ./
+COPY run.py seed.py manage.py ./
 
 # The SQLite DB and uploaded resumes live here, so this is the one path the app
 # user must own. Docker seeds a fresh named volume from the image directory and

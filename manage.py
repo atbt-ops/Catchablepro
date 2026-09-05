@@ -10,9 +10,11 @@ in-app promotion. Granting them requires shell access to the deployment:
 from __future__ import annotations
 
 import sys
+import sqlite3
+from pathlib import Path
 
 from app import audit
-from app.db import _connect, init_db
+from app.db import DB_PATH, _connect, init_db
 
 
 def _set_admin(email: str, value: int) -> int:
@@ -64,6 +66,29 @@ def _list_admins() -> int:
         conn.close()
 
 
+def _backup(destination: str) -> int:
+    """Make a transactionally consistent SQLite backup without stopping users."""
+    init_db()
+    target = Path(destination).expanduser()
+    if target.resolve() == DB_PATH.resolve():
+        print("Refusing to overwrite the live database with a backup.")
+        return 1
+    if not target.parent.exists():
+        print(f"Backup directory does not exist: {target.parent}")
+        return 1
+
+    source = _connect()
+    backup = sqlite3.connect(target)
+    try:
+        source.backup(backup)
+        backup.commit()
+    finally:
+        backup.close()
+        source.close()
+    print(f"Backup written to {target.resolve()}")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print(__doc__)
@@ -71,6 +96,11 @@ def main(argv: list[str]) -> int:
     command = argv[1]
     if command == "list-admins":
         return _list_admins()
+    if command == "backup":
+        if len(argv) < 3:
+            print("Usage: python manage.py backup <destination.db>")
+            return 1
+        return _backup(argv[2])
     if command in ("make-admin", "revoke-admin"):
         if len(argv) < 3:
             print(f"Usage: python manage.py {command} <email>")
