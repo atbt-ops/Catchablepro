@@ -24,7 +24,7 @@
 
 <form method="get" action="/admin/jobs" class="filterbar">
   <label>Status
-    <select name="status" onchange="this.form.submit()">
+    <select name="status" data-auto-submit>
       <option value="">All</option>
       {% for s in ['active', 'draft', 'closed'] %}
         <option value="{{ s }}" {{ 'selected' if sel_status == s }}>{{ s | capitalize }}</option>

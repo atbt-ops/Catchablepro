@@ -54,3 +54,23 @@ def test_loopback_stays_allowed_without_a_public_url(monkeypatch):
     finally:
         monkeypatch.undo()
         importlib.reload(mainmod)
+
+
+def test_script_src_forbids_inline_script(client):
+    """The line between a CSP that stops XSS and one that only looks like it.
+
+    With 'unsafe-inline' an injected <script> still runs; the policy only stops
+    it loading something external. Every script here is a file under /static,
+    so the allowance is not needed — and a template that reintroduces an inline
+    script or an onclick= will fail this test rather than silently forcing the
+    allowance back.
+    """
+    policy = client.get("/").headers["content-security-policy"]
+
+    directives = dict(
+        (part.split(" ", 1) + [""])[:2]
+        for part in (p.strip() for p in policy.split(";"))
+        if part
+    )
+
+    assert directives["script-src"] == "'self'"

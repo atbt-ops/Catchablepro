@@ -347,11 +347,22 @@ access_log = logging.getLogger("catchablepro.access")
 # A request id is echoed back so a user can quote it, and accepted from a proxy
 # so one trace spans hops. It is still user input: anything that could smuggle
 # a newline into a log line is replaced rather than trusted.
+#: script-src carries no 'unsafe-inline': every script is a file under
+#: /static, so an injected <script> is refused by the browser rather than
+#: merely prevented from loading something external. That is the difference
+#: between a CSP that stops the common XSS and one that only looks like it
+#: does, and it is why the theme toggle and the job editor were moved out of
+#: their templates.
+#:
+#: style-src still allows it. Twenty-six inline style= attributes remain across
+#: twelve templates, one of them computed per request
+#: (style="width: {{ score }}%"), so tightening it is its own piece of work.
+#: Left honest rather than quietly claimed.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; base-uri 'self'; form-action 'self'; "
     "frame-ancestors 'none'; object-src 'none'; connect-src 'self'; "
     "font-src 'self' data:; img-src 'self' data:; "
-    "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+    "script-src 'self'; style-src 'self' 'unsafe-inline'"
 )
 
 

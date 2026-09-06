@@ -6,13 +6,9 @@
   <title>{% block title %}Catchablepro{% endblock %}</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
-  <script>
-    // Apply saved theme before first paint to avoid a flash.
-    (function () {
-      var t = localStorage.getItem('sm-theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+  <!-- No defer: the theme must be on <html> before the first paint. -->
+  <script src="/static/theme.js"></script>
+  <script src="/static/forms.js" defer></script>
 </head>
 {% from "macros.html" import icon %}
 <body>
@@ -22,8 +18,8 @@
       Catchable<span class="brand-accent">pro</span>
     </a>
     <nav>
-      <button class="iconbtn theme-toggle" type="button" title="Toggle theme" aria-label="Toggle light/dark theme"
-              onclick="(function(){var r=document.documentElement;var n=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',n);localStorage.setItem('sm-theme',n);})()">
+      <button class="iconbtn theme-toggle" type="button" data-theme-toggle
+              title="Toggle theme" aria-label="Toggle light/dark theme">
         <span class="only-dark">{{ icon('sun', 18) }}</span>
         <span class="only-light">{{ icon('moon', 18) }}</span>
       </button>
