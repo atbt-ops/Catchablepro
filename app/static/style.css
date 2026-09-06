@@ -113,6 +113,18 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; }
 .topbar nav { display: flex; align-items: center; gap: 12px; }
 .navlink { color: var(--text-soft); font-weight: 500; }
 
+/* A header control that wraps mid-word reads as broken, not as responsive.
+   Keep every label on one line and buy the room back from the spacing, which
+   nobody notices. "For employers" is already hidden at this width. */
+.navlink, .btn { white-space: nowrap; }
+@media (max-width: 560px) {
+  .topbar { padding: 10px 14px; gap: 10px; }
+  .topbar nav { gap: 8px; }
+  .brand { font-size: 17px; gap: 7px; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 8px; }
+  .btn.small { padding: 8px 11px; }
+}
+
 .who { display: inline-flex; align-items: center; gap: 9px; }
 .avatar {
   width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;

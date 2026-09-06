@@ -24,6 +24,7 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
+    PlainTextResponse,
     RedirectResponse,
     Response,
 )
@@ -145,8 +146,12 @@ def _configured_hosts() -> list[str]:
         public_host = urlparse(PUBLIC_URL).netloc
         if public_host not in explicit:
             explicit.append(public_host)
-        # Docker's health probe and the loopback-only operator endpoint need
-        # to remain valid without opening the app to a LAN or Internet host.
+    if explicit:
+        # Docker's health probe and the loopback-only operator endpoint need to
+        # remain valid without opening the app to a LAN or Internet host. This
+        # applies whenever an allow-list is active at all: setting TRUSTED_HOSTS
+        # without PUBLIC_URL used to reject the container's own HEALTHCHECK,
+        # which marks it unhealthy and restarts it forever.
         explicit.extend(["localhost", "127.0.0.1"])
     return list(dict.fromkeys(explicit))
 
@@ -342,6 +347,45 @@ access_log = logging.getLogger("catchablepro.access")
 # A request id is echoed back so a user can quote it, and accepted from a proxy
 # so one trace spans hops. It is still user input: anything that could smuggle
 # a newline into a log line is replaced rather than trusted.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; base-uri 'self'; form-action 'self'; "
+    "frame-ancestors 'none'; object-src 'none'; connect-src 'self'; "
+    "font-src 'self' data:; img-src 'self' data:; "
+    "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+)
+
+
+def apply_security_headers(response: Response) -> Response:
+    """Attach the browser-facing safeguards every response should carry."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
+    response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    if IS_PROD:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception) -> Response:
+    """Serve a 500 that still carries the security headers.
+
+    Middleware cannot do this. An unhandled exception never returns a response
+    through ``call_next`` — Starlette's outermost error middleware builds the
+    500 itself, outside every middleware we can add — so the headers had to be
+    attached here or not at all. An error page is still HTML rendered in a
+    browser, and it is the page most likely to echo something back.
+
+    Starlette re-raises after this returns, so the traceback is still logged.
+    """
+    return apply_security_headers(
+        PlainTextResponse("Internal Server Error", status_code=500)
+    )
+
+
 _SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
@@ -361,22 +405,7 @@ async def request_context(request: Request, call_next):
         response = await call_next(request)
         status = response.status_code
         response.headers["X-Request-ID"] = request_id
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
-        response.headers[
-            "Content-Security-Policy"
-        ] = (
-            "default-src 'self'; base-uri 'self'; form-action 'self'; "
-            "frame-ancestors 'none'; object-src 'none'; connect-src 'self'; "
-            "font-src 'self' data:; img-src 'self' data:; "
-            "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
-        )
-        if IS_PROD:
-            response.headers[
-                "Strict-Transport-Security"
-            ] = "max-age=31536000; includeSubDomains"
+        apply_security_headers(response)
         return response
     finally:
         elapsed = time.perf_counter() - started
