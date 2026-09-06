@@ -73,6 +73,74 @@ guide](https://developers.cloudflare.com/tunnel/routing/) covers that model.
 - Browser responses include framing, MIME, referrer, permission, transport, and
   content-security headers.
 
+## Every day, and after a reboot
+
+**You should not need to restart anything by hand.** Both containers use
+`restart: unless-stopped`, so Docker brings them back after a crash, after
+Docker Desktop restarts, and after the desktop reboots — provided two things
+are true:
+
+- Docker Desktop is set to start when you sign in (Settings → General →
+  *Start Docker Desktop when you sign in*), and
+- somebody signs in to Windows. Containers do not start at the login screen.
+  A desktop that reboots overnight and sits at the lock screen is a desktop
+  whose site is down until morning.
+
+What you actually need each day is not a restart but an *answer*: is it
+serving? A container can be "running" and failing every request.
+
+```powershell
+.\scripts\day-start.ps1
+```
+
+It waits for the Docker engine, brings the stack up if it is not already up
+(`up -d` is idempotent — it will not disturb healthy containers), then polls
+`/readyz` and refuses to report success without a 200. If it does not come
+good it prints container status and the last log lines from both services
+rather than leaving you to go looking.
+
+After pulling code changes, rebuild the image as part of the same step:
+
+```powershell
+.\scripts\day-start.ps1 -Rebuild
+```
+
+### Run it automatically at sign-in
+
+```powershell
+$action  = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PWD\scripts\day-start.ps1`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName "Catchablepro day start" -Action $action -Trigger $trigger
+```
+
+The task's Last Run Result then becomes a daily health signal: `0x0` means the
+site answered `/readyz`, anything else means it did not. That is worth more
+than the task simply having run.
+
+## Which URL do I open?
+
+| URL | What it is for |
+|---|---|
+| `http://127.0.0.1:8000/readyz` | Health checks from this desktop. Works. |
+| `http://127.0.0.1:8000/` | Renders, but **you cannot sign in.** |
+| `https://<your-public-host>` | The real site. Use this for everything else. |
+
+The loopback URL cannot log you in, and this is deliberate rather than broken:
+`ENV=production` marks session cookies `Secure`, so a browser will not send
+them back over plain HTTP. Test sign-in, sign-up, verification email and
+password reset at the public HTTPS address.
+
+For local *development* — where sign-in over loopback does work, because
+`ENV` is unset and the cookie is not `Secure` — run the app directly instead:
+
+```powershell
+python run.py    # http://127.0.0.1:8000
+```
+
+That uses your local `data/portal.db`, not the container's volume, so it
+cannot disturb live data.
+
 ## Backups and operations
 
 Run this after the site is started to create a transactionally consistent
