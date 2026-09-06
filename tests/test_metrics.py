@@ -1,5 +1,6 @@
 """The /metrics endpoint: what it measures, and who may read it."""
 import importlib
+import re
 
 import pytest
 
@@ -52,13 +53,22 @@ def test_requests_are_counted_by_outcome(client):
 
 
 def test_routes_are_labelled_by_template_not_by_id(client):
-    """One series per route, not one per job — the cardinality trap."""
+    """One series per route, not one per job — the cardinality trap.
+
+    Asserted against the route labels rather than the whole document. The
+    exposition is full of floats — a process start time, request durations to
+    sixteen significant digits, memory sizes — and a bare substring search over
+    all of it can fail on a coincidence: any four consecutive digits anywhere
+    have a one-in-ten-thousand chance of reading "4242", and a small body
+    already holds a couple of hundred such windows. This exact test failed that
+    way once on main. What it means to assert is that no *label* carries the id.
+    """
     client.get("/candidate/apply/4242", follow_redirects=False)
 
-    body = client.get("/metrics").text
+    routes = set(re.findall(r'route="([^"]*)"', client.get("/metrics").text))
 
-    assert "/candidate/apply/{job_id}" in body
-    assert "4242" not in body
+    assert "/candidate/apply/{job_id}" in routes
+    assert not any("4242" in route for route in routes)
 
 
 def test_unmatched_paths_collapse_into_one_series(client):
