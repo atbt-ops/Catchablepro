@@ -146,3 +146,40 @@ def test_expired_job_leaves_candidate_search(client, register, post, post_job):
     page = client.get("/candidate").text       # sweep runs here too
     assert "Stale Role" not in page
     assert _job(1)["status"] == "closed"
+
+
+# --------------------------------------------------------------------------- #
+# The sweep is throttled: bookkeeping must not be paid for on every render
+# --------------------------------------------------------------------------- #
+def test_sweep_does_not_run_on_every_page_load(client, register, post_job):
+    """A second job aged past the cap waits for the interval, not the next click."""
+    register("thr@x.io", "employer", company_name="THR")
+    post_job(title="First Expired", required_skills="python")
+    post_job(title="Second Expired", required_skills="python")
+
+    _age_job(1, pricing.CAP_DAYS + 2)
+    client.get("/employer")                    # sweeps, closing job 1
+    assert _job(1)["status"] == "closed"
+
+    _age_job(2, pricing.CAP_DAYS + 2)
+    client.get("/employer")                    # throttled — no second sweep
+    assert _job(2)["status"] == "active"
+
+
+def test_forcing_the_sweep_ignores_the_throttle(client, register, post_job):
+    from app import db as dbmod
+    from app.main import sweep_expired_jobs
+
+    register("frc@x.io", "employer", company_name="FRC")
+    post_job(title="Forced", required_skills="python")
+    client.get("/employer")                    # consumes the interval
+    _age_job(1, pricing.CAP_DAYS + 2)
+
+    session = dbmod.get_db()
+    db = next(session)
+    try:
+        assert sweep_expired_jobs(db) == 0      # throttled
+        assert sweep_expired_jobs(db, force=True) == 1
+    finally:
+        session.close()
+    assert _job(1)["status"] == "closed"

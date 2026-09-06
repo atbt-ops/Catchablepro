@@ -1,0 +1,40 @@
+# Prometheus scrape configuration for Catchablepro.
+#
+# One target, because there is one instance. When that stops being true, replace
+# the static_configs block with service discovery — everything else here,
+# including every alert, is written to work unchanged across many instances.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    env: production
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # Prometheus watching itself. Cheap, and it is the thing that tells you the
+  # monitoring is up when everything else looks suspiciously quiet.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: catchablepro
+    metrics_path: /metrics
+    scheme: https
+    # /metrics is off in production unless METRICS_TOKEN is set, and answers 404
+    # — not 401 — without the right bearer token. A scrape failing with 404 on a
+    # service that is plainly serving traffic almost always means this file and
+    # the deployed token disagree.
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics_token
+    static_configs:
+      - targets: ["REPLACE-ME.onrender.com"]
+        labels:
+          service: catchablepro

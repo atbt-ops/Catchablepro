@@ -24,6 +24,31 @@ jobs:
       - name: Run tests
         run: pytest
 
+  # A monitoring config that does not load is discovered during the incident it
+  # was meant to catch. These run in seconds and catch a typo in an alert
+  # expression before it is the only thing standing between users and silence.
+  monitoring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check alert rules and scrape config
+        run: |
+          # rule_files points at the in-container path; make it resolve here too.
+          sudo mkdir -p /etc/prometheus
+          sudo cp ops/prometheus/alerts.yml /etc/prometheus/
+          printf 'ci' | sudo tee /etc/prometheus/metrics_token > /dev/null
+          docker run --rm -v "$PWD/ops/prometheus:/w:ro" -v /etc/prometheus:/etc/prometheus:ro \
+            --entrypoint promtool prom/prometheus:v3.1.0 check config /w/prometheus.yml
+
+      - name: Check alert routing
+        run: |
+          docker run --rm -v "$PWD/ops/alertmanager:/w:ro" \
+            --entrypoint amtool prom/alertmanager:v0.28.0 check-config /w/alertmanager.yml
+
+      - name: Check the Grafana dashboard is valid JSON
+        run: python -c "import json;json.load(open('ops/grafana/dashboards/catchablepro.json'))"
+
   docker:
     runs-on: ubuntu-latest
     needs: test

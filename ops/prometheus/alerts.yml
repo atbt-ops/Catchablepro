@@ -1,0 +1,106 @@
+# Alert rules for Catchablepro.
+#
+# One alert per fault, not one per symptom. A broken database would otherwise
+# fire "not ready", "dependency down" and "error rate high" at once, and three
+# pages for one problem is how a person learns to silence the phone.
+#
+# Severity is the routing decision, and it maps to section 9 of the runbook:
+#   page   — wake someone up; users are affected now
+#   ticket — look at it in the morning
+#
+# Every alert carries a `runbook` annotation naming the section that says what
+# to do. An alert without one is a puzzle handed to someone at 2am.
+groups:
+  - name: catchablepro-availability
+    rules:
+      - alert: CatchableproDown
+        expr: up{job="catchablepro"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "Catchablepro is not answering scrapes"
+          description: >-
+            Prometheus cannot scrape {{ $labels.instance }}. Usually the process
+            is down or crash-looping. It can also mean the scrape credentials
+            are wrong — /metrics answers 404 without the right bearer token —
+            so confirm with a plain request to /healthz before assuming an
+            outage.
+          runbook: "docs/runbook.md §2 — It will not start"
+
+      - alert: CatchableproDependencyDown
+        # Alert per dependency so the page names the fault instead of just
+        # asserting that something is wrong. min_over_time, not the raw gauge:
+        # these are refreshed by the platform's readiness probe, so a single
+        # scrape landing between probes is not evidence of anything.
+        expr: min_over_time(app_dependency_up{job="catchablepro"}[3m]) == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "Catchablepro dependency '{{ $labels.check }}' is failing"
+          description: >-
+            Readiness has been failing on {{ $labels.check }} for two minutes,
+            so the platform has taken this instance out of rotation. Read
+            /readyz for the underlying error.
+          runbook: "docs/runbook.md §3 (database) or §5 (uploads)"
+
+  - name: catchablepro-traffic
+    rules:
+      - alert: CatchableproErrorRateHigh
+        # No traffic makes this 0/0, which is NaN, which never satisfies a
+        # comparison — so a quiet service cannot page anyone. That is deliberate:
+        # "nobody is using it" is not an incident, and pretending otherwise
+        # would page every night.
+        expr: >-
+          sum(rate(http_requests_total{job="catchablepro",status=~"5.."}[5m]))
+            /
+          sum(rate(http_requests_total{job="catchablepro"}[5m]))
+            > 0.05
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "More than 5% of requests are failing"
+          description: >-
+            {{ $value | humanizePercentage }} of requests have returned 5xx for
+            ten minutes. Break it down by route in Grafana, then pull one
+            request_id out of the logs and follow it.
+          runbook: "docs/runbook.md §4 — Find the request behind a complaint"
+
+      - alert: CatchableproLatencyHigh
+        expr: >-
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{job="catchablepro"}[10m]))
+          ) > 2
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "p95 latency is above 2s"
+          description: >-
+            p95 is {{ $value | humanizeDuration }}. Slow is not down, so this
+            waits for morning — but it is the shape the concurrency cliff in
+            docs/performance.md takes when real traffic arrives, and it gets
+            worse, not better, as the job list grows.
+          runbook: "docs/performance.md — Why /candidate did not scale"
+
+  - name: catchablepro-data
+    rules:
+      - alert: CatchableproRestarted
+        # On Render's free plan there is no persistent disk: every restart
+        # destroys the database and every uploaded resume. This alert is not
+        # "a process restarted", it is "the data is gone" — which is why it
+        # exists at all, and why it fires often enough to be annoying. The
+        # annoyance is the measurement. Delete this rule once a disk is
+        # attached and a restart is once again a non-event.
+        expr: changes(process_start_time_seconds{job="catchablepro"}[15m]) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Catchablepro restarted — on the free plan, the data is gone"
+          description: >-
+            The process started within the last 15 minutes. With no persistent
+            disk this means the SQLite database and every uploaded resume were
+            destroyed. Tell affected users plainly; there is no restore.
+          runbook: "docs/runbook.md §3.3 — If there is no backup"
