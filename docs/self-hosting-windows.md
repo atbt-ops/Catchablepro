@@ -28,6 +28,24 @@ tunnel, and published-hostname requirements. See [Set up Cloudflare Tunnel](http
 
 ## Configure the app
 
+Run the setup script rather than editing by hand — it generates a strong
+`SECRET_KEY`, puts the hostname in the two places that must agree, writes the
+tunnel token where Compose expects it, and then reports what is still missing:
+
+```powershell
+.\scripts\setup-production.ps1
+```
+
+It is safe to re-run; an existing `.env.production` is left alone unless you
+pass `-Force`, which rotates `SECRET_KEY` and therefore signs out every user.
+
+What it cannot do, because each needs your own login: register the domain on
+Cloudflare, create the tunnel, or open an email account. Those are steps 2 and
+3 below and the rest of this section.
+
+<details>
+<summary>Doing it by hand instead</summary>
+
 1. Copy `.env.production.example` to `.env.production` and replace every
    placeholder. `PUBLIC_URL` and `TRUSTED_HOSTS` must exactly match the public
    HTTPS hostname. Generate a fresh `SECRET_KEY`; rotating it later signs every
@@ -42,6 +60,8 @@ tunnel, and published-hostname requirements. See [Set up Cloudflare Tunnel](http
 
    `app` is the Compose service name. Do not use `localhost:8000` here: inside
    the connector container, `localhost` is the connector, not the web app.
+</details>
+
 4. Start the stack from the project directory:
 
    ```powershell
