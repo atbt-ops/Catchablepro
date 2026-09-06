@@ -12,6 +12,7 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -541,12 +542,43 @@ def _set_job_status(db: sqlite3.Connection, job: sqlite3.Row, new_status: str) -
     db.commit()
 
 
-def sweep_expired_jobs(db: sqlite3.Connection) -> int:
+#: How often the lazy sweep may actually run. Expiring a job is bookkeeping
+#: against a 30-day cap, not part of rendering any page, and it costs
+#: O(active jobs) of pure Python. Doing that inside every list view is what
+#: turns 0.7 ms at one user into 37 ms at four — Python threads doing CPU work
+#: contend for the GIL rather than running side by side. Once a minute is as
+#: timely as a daily cap can possibly need.
+SWEEP_MIN_INTERVAL_SECONDS = 60.0
+
+_last_sweep_at = 0.0
+#: Guards the interval check, so concurrent requests cannot all decide to sweep
+#: at once. That also closes an existing hole: two requests sweeping the same
+#: expired job in parallel would each close and each audit it.
+_sweep_gate = threading.Lock()
+
+
+def _sweep_is_due(force: bool) -> bool:
+    """Claim the right to sweep, at most one caller per interval."""
+    global _last_sweep_at
+    now = time.monotonic()
+    with _sweep_gate:
+        if not force and now - _last_sweep_at < SWEEP_MIN_INTERVAL_SECONDS:
+            return False
+        _last_sweep_at = now
+        return True
+
+
+def sweep_expired_jobs(db: sqlite3.Connection, *, force: bool = False) -> int:
     """Auto-close any active job that has passed the pricing cap.
 
-    Called lazily on the busy list views so expiry happens without a scheduler.
-    Returns the number closed. Each closure is audited and the employer emailed.
+    Called lazily on the busy list views so expiry happens without a scheduler,
+    but throttled to SWEEP_MIN_INTERVAL_SECONDS: a page render should not pay
+    for bookkeeping it does not need. Pass ``force`` when the answer has to be
+    current right now. Returns the number closed — 0 when the sweep was skipped.
+    Each closure is audited and the employer emailed.
     """
+    if not _sweep_is_due(force):
+        return 0
     active = db.execute(
         "SELECT id, employer_id, title, billable_seconds, active_since "
         "FROM jobs WHERE status = 'active' AND active_since != ''"
@@ -665,6 +697,10 @@ def readyz():
     the endpoint a load balancer or `healthCheckPath` should point at.
     """
     report = health.readiness()
+    # Also publish it as gauges. The platform calls this endpoint on a schedule,
+    # so a dependency failure becomes something Prometheus can alert on rather
+    # than something a human has to think to check.
+    metrics.observe_readiness(report)
     return JSONResponse(
         report, status_code=200 if report["status"] == "ok" else 503
     )

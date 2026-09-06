@@ -13,3 +13,6 @@ secrets/*
 !secrets/.gitkeep
 server.*.log
 backups/
+
+# The Prometheus scrape credential, created locally, never committed.
+ops/prometheus/metrics_token

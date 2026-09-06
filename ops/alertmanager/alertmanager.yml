@@ -1,0 +1,46 @@
+# Where alerts actually go.
+#
+# READ THIS BEFORE YOU TRUST IT: as shipped, this file delivers nothing. The
+# default receiver is empty on purpose — a fake destination that silently
+# swallows pages is worse than no monitoring at all, because it looks like
+# monitoring. Fill in one receiver below, then prove it by firing a test alert
+# (the command is in docs/monitoring.md).
+route:
+  receiver: default
+  group_by: [alertname, check]
+  group_wait: 30s        # let a burst settle into one notification
+  group_interval: 5m
+  repeat_interval: 4h    # an unacknowledged page comes back
+  routes:
+    - matchers: [severity = "page"]
+      receiver: default
+      repeat_interval: 1h
+    - matchers: [severity = "ticket"]
+      receiver: default
+      repeat_interval: 24h
+
+receivers:
+  - name: default
+    # Pick one and delete this comment.
+    #
+    # slack_configs:
+    #   - api_url_file: /etc/alertmanager/slack_webhook
+    #     channel: "#alerts"
+    #     title: '{{ .CommonAnnotations.summary }}'
+    #     text: >-
+    #       {{ .CommonAnnotations.description }}
+    #       Runbook: {{ .CommonAnnotations.runbook }}
+    #
+    # email_configs:
+    #   - to: you@example.com
+    #     from: alerts@example.com
+    #     smarthost: smtp.example.com:587
+    #     auth_username: alerts@example.com
+    #     auth_password_file: /etc/alertmanager/smtp_password
+
+inhibit_rules:
+  # The instance being down explains every other complaint about it. Suppress
+  # the consequences so the notification names the cause.
+  - source_matchers: [alertname = "CatchableproDown"]
+    target_matchers: [severity =~ "page|ticket"]
+    equal: [instance]

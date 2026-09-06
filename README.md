@@ -255,7 +255,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-170 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
+230 tests cover the matching logic (`parse_skills`, `match_pct`, `extract_skills`)
 and the end-to-end flows (register/login, job posting, manual apply, CSRF
 rejection, and the Auto-Apply backfill + new-job coverage). CI runs them on
 every push via [GitHub Actions](.github/workflows/ci.yml).
@@ -333,10 +333,42 @@ Scoring every job against the candidate was ~70% of a dashboard render, so
 arguments, and the tables they consult are built at import. That took a render
 from 30 ms to 7 ms and single-user throughput from 46 to 161 req/s.
 
-It did **not** fix behaviour under concurrency, which is the open question:
-`/candidate` collapses between two and four simultaneous users while `/account`
-sustains 284 req/s and `/healthz` 517 req/s. Nothing errors; it degrades into
-slowness. The doc records what has been ruled out.
+Timing the handler's phases under load explained what remained: the two phases
+that loop over **every active job in pure Python** — the expiry sweep and
+ranking — grow 50–80× at four concurrent users, while template rendering barely
+moves. CPU-bound Python threads contend for the GIL rather than running side by
+side, so per-request work proportional to the job count is what does not scale.
+
+The sweep is bookkeeping, not part of drawing a page, so it is now throttled to
+once a minute behind a lock (`SWEEP_MIN_INTERVAL_SECONDS`) — worth +46%
+throughput at four users, and it also closes a hole where two parallel requests
+could each close and each audit the same expired job. Ranking is still O(active
+jobs) per render; the doc explains why persisting scores is the next step.
+
+### Where this is going
+
+[`docs/architecture.md`](docs/architecture.md) records the decisions that native
+iOS and Android clients will depend on, while they are still cheap: keep data
+logic out of rendering so one service function serves both a Jinja template and
+a JSON response, version the API from its first endpoint, settle token auth
+before the first mobile build, and reach Postgres before push notifications. It
+is explicit that no handler follows the rule yet — it governs code written from
+here on.
+
+### Monitoring
+
+[`docs/monitoring.md`](docs/monitoring.md) covers the other half of `/metrics`:
+`ops/` holds a Prometheus scrape config, five alert rules, Alertmanager routing
+and a git-provisioned Grafana dashboard, started with one `docker compose`
+command and validated in CI so a typo in an alert expression fails a pull
+request rather than a 2am page.
+
+One alert per fault, split into *page* (wake up) and *ticket* (morning) to match
+section 9 of the runbook. Readiness is published as `app_ready` and
+`app_dependency_up{check}`, so a broken database pages someone instead of
+waiting for a person to think to curl `/readyz`. As shipped, Alertmanager
+delivers **nothing** until a receiver is filled in — the doc says how to prove
+it works, because alerting nobody has ever received is not alerting.
 
 ### When it breaks
 
@@ -669,8 +701,11 @@ single-instance by design today (see the SQLite note above), so this matches.
 ├─ tests/            # pytest: matching unit tests + app integration tests
 ├─ docs/runbook.md   # what to do when it breaks
 ├─ docs/performance.md       # measured baseline + how to reproduce
+├─ docs/monitoring.md        # scraping, alerting, dashboard
+├─ docs/architecture.md      # the mobile-client constraint, decided early
+├─ ops/               # prometheus + alertmanager + grafana, compose-startable
 ├─ scripts/loadtest.py       # load generator (httpx + asyncio, no new deps)
-├─ .github/workflows/ci.yml   # CI: tests + docker build
+├─ .github/workflows/ci.yml   # CI: tests + docker build + config checks
 ├─ data/             # portal.db + uploads/ (git-ignored)
 ├─ Dockerfile
 ├─ requirements.txt  # runtime deps
