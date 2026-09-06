@@ -3,10 +3,16 @@ __pycache__/
 *.pyc
 .env
 .env.local
+.env.production
 .pytest_cache/
 data/portal.db
+data/portal.db-*
 data/uploads/*
 !data/uploads/.gitkeep
+secrets/*
+!secrets/.gitkeep
+server.*.log
+backups/
 
 # The Prometheus scrape credential, created locally, never committed.
 ops/prometheus/metrics_token

@@ -17,7 +17,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
@@ -25,6 +25,7 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
+    PlainTextResponse,
     RedirectResponse,
     Response,
 )
@@ -32,6 +33,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from html import escape
 
@@ -106,6 +108,63 @@ if IS_PROD and not ALLOW_CONSOLE_EMAIL and not mailer.is_configured():
     )
 
 
+def _public_url_from_env() -> str:
+    """Return the canonical public origin, if the host has configured one.
+
+    Email links must never be assembled from a client-controlled Host header on
+    a public deployment. ``PUBLIC_URL`` fixes that while preserving the simple
+    request-derived links used by local development and existing deployments.
+    """
+    value = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.path not in ("", "/")
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError(
+            "PUBLIC_URL must be an HTTPS site origin, for example "
+            "https://jobs.example.com (with no path, query, or fragment)."
+        )
+    return value
+
+
+PUBLIC_URL = _public_url_from_env()
+
+
+def _configured_hosts() -> list[str]:
+    """Build a narrow production Host allow-list when one is configured."""
+    explicit = [
+        host.strip() for host in os.environ.get("TRUSTED_HOSTS", "").split(",")
+        if host.strip()
+    ]
+    if PUBLIC_URL:
+        public_host = urlparse(PUBLIC_URL).netloc
+        if public_host not in explicit:
+            explicit.append(public_host)
+    if explicit:
+        # Docker's health probe and the loopback-only operator endpoint need to
+        # remain valid without opening the app to a LAN or Internet host. This
+        # applies whenever an allow-list is active at all: setting TRUSTED_HOSTS
+        # without PUBLIC_URL used to reject the container's own HEALTHCHECK,
+        # which marks it unhealthy and restarts it forever.
+        explicit.extend(["localhost", "127.0.0.1"])
+    return list(dict.fromkeys(explicit))
+
+
+TRUSTED_HOSTS = _configured_hosts()
+
+
+def public_base_url(request: Request) -> str:
+    """Prefer the configured external origin for password and verification mail."""
+    return PUBLIC_URL or str(request.base_url).rstrip("/")
+
+
 # --------------------------------------------------------------------------- #
 # CSRF protection (double-submit token stored in the signed session)
 # --------------------------------------------------------------------------- #
@@ -172,7 +231,7 @@ def _client_ip(request: Request) -> str:
 
 def _send_verification_email(request: Request, db: sqlite3.Connection, user) -> None:
     token = auth.create_verification_token(db, user["id"])
-    link = str(request.base_url).rstrip("/") + f"/verify-email?token={token}"
+    link = public_base_url(request) + f"/verify-email?token={token}"
     mailer.send_email(
         to=user["email"],
         subject="Confirm your Catchablepro email address",
@@ -280,6 +339,8 @@ app.add_middleware(
     same_site="lax",
     https_only=IS_PROD,  # Secure cookie flag when served over HTTPS in production
 )
+if TRUSTED_HOSTS:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=TRUSTED_HOSTS)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 access_log = logging.getLogger("catchablepro.access")
@@ -287,6 +348,56 @@ access_log = logging.getLogger("catchablepro.access")
 # A request id is echoed back so a user can quote it, and accepted from a proxy
 # so one trace spans hops. It is still user input: anything that could smuggle
 # a newline into a log line is replaced rather than trusted.
+#: script-src carries no 'unsafe-inline': every script is a file under
+#: /static, so an injected <script> is refused by the browser rather than
+#: merely prevented from loading something external. That is the difference
+#: between a CSP that stops the common XSS and one that only looks like it
+#: does, and it is why the theme toggle and the job editor were moved out of
+#: their templates.
+#:
+#: style-src still allows it. Twenty-six inline style= attributes remain across
+#: twelve templates, one of them computed per request
+#: (style="width: {{ score }}%"), so tightening it is its own piece of work.
+#: Left honest rather than quietly claimed.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; base-uri 'self'; form-action 'self'; "
+    "frame-ancestors 'none'; object-src 'none'; connect-src 'self'; "
+    "font-src 'self' data:; img-src 'self' data:; "
+    "script-src 'self'; style-src 'self' 'unsafe-inline'"
+)
+
+
+def apply_security_headers(response: Response) -> Response:
+    """Attach the browser-facing safeguards every response should carry."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
+    response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    if IS_PROD:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception) -> Response:
+    """Serve a 500 that still carries the security headers.
+
+    Middleware cannot do this. An unhandled exception never returns a response
+    through ``call_next`` — Starlette's outermost error middleware builds the
+    500 itself, outside every middleware we can add — so the headers had to be
+    attached here or not at all. An error page is still HTML rendered in a
+    browser, and it is the page most likely to echo something back.
+
+    Starlette re-raises after this returns, so the traceback is still logged.
+    """
+    return apply_security_headers(
+        PlainTextResponse("Internal Server Error", status_code=500)
+    )
+
+
 _SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
@@ -306,6 +417,7 @@ async def request_context(request: Request, call_next):
         response = await call_next(request)
         status = response.status_code
         response.headers["X-Request-ID"] = request_id
+        apply_security_headers(response)
         return response
     finally:
         elapsed = time.perf_counter() - started
@@ -1143,7 +1255,7 @@ def forgot_password(
         return done
 
     token = auth.create_reset_token(db, user["id"])
-    link = str(request.base_url).rstrip("/") + f"/reset-password?token={token}"
+    link = public_base_url(request) + f"/reset-password?token={token}"
     mailer.send_email(
         to=user["email"],
         subject="Reset your Catchablepro password",

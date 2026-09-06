@@ -30,7 +30,7 @@
 
 <form method="get" action="/admin/audit" class="filterbar">
   <label>Action
-    <select name="action" onchange="this.form.submit()">
+    <select name="action" data-auto-submit>
       <option value="">All actions</option>
       {% for key, label in actions.items() %}
         <option value="{{ key }}" {{ 'selected' if sel_action == key }}>{{ label }}</option>

@@ -37,7 +37,7 @@
 
 <form method="get" action="/admin/users" class="filterbar">
   <label>Role
-    <select name="role" onchange="this.form.submit()">
+    <select name="role" data-auto-submit>
       <option value="">All</option>
       <option value="candidate" {{ 'selected' if sel_role == 'candidate' }}>Candidates</option>
       <option value="employer" {{ 'selected' if sel_role == 'employer' }}>Employers</option>

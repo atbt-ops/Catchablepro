@@ -299,6 +299,13 @@ dependency is down, a connection error when the server is not listening.
 
 ## Deploy
 
+### Host it from a Windows desktop
+
+For a persistent local desktop server exposed through a secure outbound tunnel,
+use the production Compose package in [the Windows self-hosting guide](docs/self-hosting-windows.md).
+It keeps the app off the public network, uses a named Cloudflare Tunnel for
+HTTPS, requires real email delivery, and includes a backup workflow.
+
 The repo ships a [Render Blueprint](render.yaml). To go live:
 
 1. Push this repo to GitHub (already done).

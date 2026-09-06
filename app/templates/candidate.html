@@ -119,7 +119,7 @@
 
   <form method="get" action="/candidate" class="filterbar">
     <label>Work mode
-      <select name="work_mode" onchange="this.form.submit()">
+      <select name="work_mode" data-auto-submit>
         <option value="">Any</option>
         {% for w in work_modes %}
           <option value="{{ w }}" {{ 'selected' if sel_work_mode == w }}>{{ w }}</option>
@@ -127,7 +127,7 @@
       </select>
     </label>
     <label>Employment type
-      <select name="employment_type" onchange="this.form.submit()">
+      <select name="employment_type" data-auto-submit>
         <option value="">Any</option>
         {% for t in employment_types %}
           <option value="{{ t }}" {{ 'selected' if sel_employment_type == t }}>{{ t }}</option>

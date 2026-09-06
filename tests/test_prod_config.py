@@ -12,7 +12,7 @@ def _boot(monkeypatch, **env):
     """Import app.main under the given environment; raises if a guard trips."""
     for key in (
         "ENV", "SECRET_KEY", "EMAIL_BACKEND", "SMTP_HOST",
-        "SENDGRID_API_KEY", "ALLOW_CONSOLE_EMAIL",
+        "SENDGRID_API_KEY", "ALLOW_CONSOLE_EMAIL", "PUBLIC_URL", "TRUSTED_HOSTS",
     ):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
@@ -88,3 +88,17 @@ def test_production_refuses_the_development_secret(monkeypatch):
         _boot(monkeypatch, ENV="production", ALLOW_CONSOLE_EMAIL="1")
 
     assert "SECRET_KEY" in str(caught.value)
+
+
+def test_public_url_must_be_a_plain_https_origin(monkeypatch):
+    with pytest.raises(RuntimeError) as caught:
+        _boot(
+            monkeypatch,
+            ENV="production",
+            SECRET_KEY="a-real-secret-value",
+            EMAIL_BACKEND="smtp",
+            SMTP_HOST="smtp.example.com",
+            PUBLIC_URL="http://jobs.example.com/a-path",
+        )
+
+    assert "PUBLIC_URL" in str(caught.value)
