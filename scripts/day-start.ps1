@@ -6,15 +6,15 @@
     You should not normally need this. Both containers use
     `restart: unless-stopped`, so Docker restarts them after a crash and after
     Docker Desktop itself restarts. What this script really does is answer the
-    question that matters at the start of a day — *is the site up?* — instead of
+    question that matters at the start of a day - *is the site up?* - instead of
     leaving you to assume it, and it starts the stack if the answer is no.
 
     It is safe to run when everything is already running: `docker compose up -d`
     is idempotent and will not restart healthy containers.
 
     The check is the point. A container that is "running" can still be failing
-    every request, so this polls /readyz — the endpoint that reports the
-    database and uploads directory — and refuses to claim success without a 200.
+    every request, so this polls /readyz - the endpoint that reports the
+    database and uploads directory - and refuses to claim success without a 200.
 
 .PARAMETER Rebuild
     Rebuild the image first. Use this after pulling code changes; skip it

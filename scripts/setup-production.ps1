@@ -6,7 +6,7 @@
     The parts of going live that are mechanical: generating a strong SECRET_KEY,
     putting the same hostname in the two places that must agree, writing the
     tunnel token where Compose expects it, and checking that no placeholder
-    survived. Doing this by hand is where the mistakes happen — a PUBLIC_URL and
+    survived. Doing this by hand is where the mistakes happen - a PUBLIC_URL and
     TRUSTED_HOSTS that disagree, or a SECRET_KEY someone "temporarily" left as
     the example value.
 
@@ -105,7 +105,7 @@ if ($haveToken -and -not $Force) {
         [System.IO.File]::WriteAllText($tokenPath, $plain.Trim())
         Write-Done "Token written to secrets\cloudflare-tunnel-token.txt (gitignored)"
     } else {
-        Write-Todo "Tunnel token skipped — the cloudflared container will not start without it"
+        Write-Todo "Tunnel token skipped - the cloudflared container will not start without it"
     }
 }
 
@@ -117,7 +117,7 @@ Write-Step "Readiness"
 
 $content = Get-Content -LiteralPath $envPath -Raw
 $settings = @{}
-foreach ($line in ($content -split "`r?`n")) {
+foreach ($line in ($content -split '\r?\n')) {
     if ($line -match '^\s*([A-Z_]+)\s*=\s*(.*)$') { $settings[$Matches[1]] = $Matches[2].Trim().Trim('"') }
 }
 
