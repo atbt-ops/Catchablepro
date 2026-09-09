@@ -3,17 +3,20 @@
 Admin rights are deliberately NOT self-service — there is no signup path and no
 in-app promotion. Granting them requires shell access to the deployment:
 
+    python manage.py create-admin you@example.com
     python manage.py make-admin you@example.com
     python manage.py revoke-admin you@example.com
     python manage.py list-admins
+    python manage.py backup /path/to/backup.db
 """
 from __future__ import annotations
 
+import getpass
 import sys
 import sqlite3
 from pathlib import Path
 
-from app import audit
+from app import audit, auth
 from app.db import DB_PATH, _connect, init_db
 
 
@@ -89,6 +92,63 @@ def _backup(destination: str) -> int:
     return 0
 
 
+def _create_admin(email: str) -> int:
+    """Create a verified admin account without going through signup.
+
+    The bootstrap problem: a fresh deployment has no accounts, and the signup
+    flow needs a working mailer to deliver the verification link. Before an
+    email provider is configured that link goes to the container log, which is
+    a miserable way to make your first account. This creates one directly, with
+    email_verified already set, because someone with shell access to the
+    database has no verifying left to do.
+    """
+    init_db()
+    email = email.strip().lower()
+    if "@" not in email:
+        print(f"That does not look like an email address: {email!r}")
+        return 1
+
+    conn = _connect()
+    try:
+        if conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+            print(f"{email} already exists. Use make-admin to grant it admin rights.")
+            return 1
+
+        # getpass, so the password is not echoed and does not reach the shell
+        # history the way a command-line argument would.
+        password = getpass.getpass("Password: ")
+        if password != getpass.getpass("Repeat password: "):
+            print("Passwords did not match.")
+            return 1
+        problem = auth.validate_password(password)
+        if problem:
+            print(problem)
+            return 1
+
+        conn.execute(
+            "INSERT INTO users (email, password_hash, role, name, email_verified, is_admin) "
+            "VALUES (?, ?, 'employer', ?, 1, 1)",
+            (email, auth.hash_password(password), email.split("@")[0]),
+        )
+        conn.commit()
+        audit.record(
+            conn,
+            "admin.create",
+            actor_email="manage.py (server)",
+            target_type="user",
+            target_id=conn.execute(
+                "SELECT id FROM users WHERE email = ?", (email,)
+            ).fetchone()["id"],
+            target_label=email,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    print(f"Created {email} as a verified admin. Sign in at your public URL.")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print(__doc__)
@@ -101,6 +161,11 @@ def main(argv: list[str]) -> int:
             print("Usage: python manage.py backup <destination.db>")
             return 1
         return _backup(argv[2])
+    if command == "create-admin":
+        if len(argv) < 3:
+            print("Usage: python manage.py create-admin <email>")
+            return 1
+        return _create_admin(argv[2])
     if command in ("make-admin", "revoke-admin"):
         if len(argv) < 3:
             print(f"Usage: python manage.py {command} <email>")
