@@ -6,6 +6,17 @@ def test_public_pages_ok(client):
         assert client.get(path).status_code == 200
 
 
+def test_employer_pages_show_employer_auth_in_the_header(client):
+    seeker = client.get("/login").text
+    assert "For employers" in seeker and ">Sign up<" in seeker
+
+    hiring = client.get("/employer/register").text
+    assert "Employer sign up" in hiring and "For candidates" in hiring
+    # The candidate call-to-action is gone from the header on the employer side.
+    assert ">Sign up<" not in hiring
+    assert 'class="jobsearch-bar' not in hiring  # no job-seeker search bar either
+
+
 def test_employer_register_goes_to_onboarding(client, register):
     r = register("boss@acme.io", "employer", company_name="Acme", onboard=False)
     assert r.status_code == 303

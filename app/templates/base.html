@@ -9,14 +9,17 @@
   <script src="{{ static_url('forms.js') }}" defer></script>
 </head>
 {% from "macros.html" import icon, job_search_bar %}
+{% set employer_area = request.url.path.startswith('/employer') %}
 <body>
   <header class="topbar">
     <a class="brand" href="/">
       <span class="brand-mark">{{ icon('target', 22) }}</span>
       Catch <span class="brand-accent">Able Pro</span>
     </a>
-    {{ job_search_bar('/jobs', request.query_params.get('q', ''),
-                      request.query_params.get('location', ''), india_locations, compact=true) }}
+    {% if not employer_area %}
+      {{ job_search_bar('/jobs', request.query_params.get('q', ''),
+                        request.query_params.get('location', ''), india_locations, compact=true) }}
+    {% endif %}
     <nav>
       {% if user %}
         <span class="who">
@@ -32,6 +35,10 @@
           {{ csrf_field(request) }}
           <button class="iconbtn" title="Log out" aria-label="Log out">{{ icon('logout', 18) }}</button>
         </form>
+      {% elif employer_area %}
+        <a class="navlink nav-employer" href="/">For candidates</a>
+        <a class="navlink" href="/employer/login">Employer login</a>
+        <a class="btn small" href="/employer/register">Employer sign up</a>
       {% else %}
         <a class="navlink nav-employer" href="/employer/register">For employers</a>
         <a class="navlink" href="/login">Log in</a>
