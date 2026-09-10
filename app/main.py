@@ -8,10 +8,12 @@ Server-rendered (Jinja) with an in-process SQLite database. Two roles:
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import logging
 import os
 import re
+import zipfile
 import secrets
 import sqlite3
 import threading
@@ -1842,6 +1844,41 @@ def _safe_next(target: str, fallback: str) -> str:
     return fallback
 
 
+def _slug(text: str) -> str:
+    """Lowercase, hyphenated, filesystem-safe stub of a string."""
+    return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")[:60]
+
+
+def _plain_to_html(text: str) -> str:
+    """Turn a plain-text draft into the light HTML the job editor expects.
+
+    Blank lines separate paragraphs; runs of '- ' lines become a bullet list.
+    The server re-sanitises this before storing, so it only needs to be close.
+    """
+    from html import escape as _esc
+
+    out: list[str] = []
+    bullets: list[str] = []
+
+    def _flush_bullets() -> None:
+        if bullets:
+            out.append("<ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>")
+            bullets.clear()
+
+    for raw in (text or "").replace("\r\n", "\n").split("\n"):
+        line = raw.strip()
+        if not line:
+            _flush_bullets()
+            continue
+        if line[:2] in ("- ", "* ") or line[:2] == "• ":
+            bullets.append(_esc(line[2:].strip()))
+        else:
+            _flush_bullets()
+            out.append(f"<p>{_esc(line)}</p>")
+    _flush_bullets()
+    return "".join(out)
+
+
 @app.get("/jobs", response_class=HTMLResponse)
 def public_jobs(
     request: Request,
@@ -2237,6 +2274,27 @@ def candidate_toggle_auto_apply(
     if new_val:
         _auto_apply_candidate_to_all_jobs(db, user["id"])
     return RedirectResponse("/candidate", status_code=303)
+
+
+@app.post("/candidate/job-alerts")
+def candidate_toggle_job_alerts(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    prof = _profile(db, user["id"])
+    new_val = 0 if prof["job_alerts"] else 1
+    if new_val and not user["email_verified"]:
+        return RedirectResponse("/candidate?verify_required=1", status_code=303)
+    db.execute(
+        "UPDATE candidate_profiles SET job_alerts = ? WHERE user_id = ?",
+        (new_val, user["id"]),
+    )
+    db.commit()
+    return RedirectResponse("/candidate#alerts", status_code=303)
 
 
 @app.post("/candidate/apply/{job_id}")
@@ -2697,9 +2755,11 @@ def employer_new_job_form(request: Request, db: sqlite3.Connection = Depends(get
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
-    return templates.TemplateResponse(
-        request, "job_new.html", _job_form_context(request, user, {}, [])
-    )
+    # A one-shot prefill from the AI assistant ("Post this role").
+    prefill = request.session.pop("job_prefill", {}) or {}
+    ctx = _job_form_context(request, user, prefill, [])
+    ctx["prefilled"] = bool(prefill)
+    return templates.TemplateResponse(request, "job_new.html", ctx)
 
 
 @app.post("/employer/jobs")
@@ -2937,26 +2997,33 @@ def _rank_candidates_by_skills(
     return rows[:limit]
 
 
+def _assistant_ctx(request: Request, user, **over) -> dict:
+    ctx = {
+        "request": request, "user": user,
+        "ai_configured": ai.is_configured(), "ai_model": ai.model_name(),
+        "jd_text": "", "brief_text": "", "result": None, "draft": None,
+        "error": None, "draft_error": None,
+    }
+    ctx.update(over)
+    return ctx
+
+
 @app.get("/employer/assistant", response_class=HTMLResponse)
 def employer_assistant(request: Request, db: sqlite3.Connection = Depends(get_db)):
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
     return templates.TemplateResponse(
-        request,
-        "employer_assistant.html",
-        {
-            "request": request, "user": user,
-            "ai_configured": ai.is_configured(), "ai_model": ai.model_name(),
-            "jd_text": "", "result": None, "error": None,
-        },
+        request, "employer_assistant.html", _assistant_ctx(request, user)
     )
 
 
 @app.post("/employer/assistant", response_class=HTMLResponse)
 def employer_assistant_run(
     request: Request,
+    action: str = Form("match"),
     job_description: str = Form(""),
+    brief: str = Form(""),
     _csrf: None = Depends(verify_csrf),
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -2964,33 +3031,110 @@ def employer_assistant_run(
     if redirect:
         return redirect
 
-    jd = job_description.strip()
-    ctx = {
-        "request": request, "user": user,
-        "ai_configured": ai.is_configured(), "ai_model": ai.model_name(),
-        "jd_text": jd, "result": None, "error": None,
-    }
+    jd, brief = job_description.strip(), brief.strip()
+    ekey = "draft_error" if action == "draft" else "error"
+    ctx = _assistant_ctx(request, user, jd_text=jd, brief_text=brief)
+
     if not ai.is_configured():
-        ctx["error"] = (
+        ctx[ekey] = (
             "The AI assistant isn't configured on this deployment. "
             "An administrator needs to set AI_MODEL to a local Ollama model."
         )
         return templates.TemplateResponse(request, "employer_assistant.html", ctx)
-
     allowed, retry = ratelimit.check(f"ai:{user['id']}", *AI_CALL_LIMIT)
     if not allowed:
-        ctx["error"] = f"You've run a lot of searches — try again in {retry // 60 + 1} min."
+        ctx[ekey] = f"You've made a lot of AI requests — try again in {retry // 60 + 1} min."
         return templates.TemplateResponse(request, "employer_assistant.html", ctx)
 
     try:
-        reqs = ai.extract_job_requirements(jd)
+        if action == "draft":
+            ctx["draft"] = ai.draft_job_description(brief, user["company_name"])
+        else:
+            reqs = ai.extract_job_requirements(jd)
+            ctx["result"] = {
+                "reqs": reqs,
+                "rows": _rank_candidates_by_skills(db, ", ".join(reqs["skills"])),
+            }
     except ai.AIUnavailable as exc:
-        ctx["error"] = str(exc)
-        return templates.TemplateResponse(request, "employer_assistant.html", ctx)
-
-    ranked = _rank_candidates_by_skills(db, ", ".join(reqs["skills"]))
-    ctx["result"] = {"reqs": reqs, "rows": ranked}
+        ctx[ekey] = str(exc)
     return templates.TemplateResponse(request, "employer_assistant.html", ctx)
+
+
+@app.post("/employer/jobs/new/prefill")
+def employer_prefill_job(
+    request: Request,
+    title: str = Form(""),
+    required_skills: str = Form(""),
+    description: str = Form(""),
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Stash an AI draft in the session, then open the posting form on it."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    desc = description.strip()[:8000]
+    request.session["job_prefill"] = {
+        "title": title.strip()[:200],
+        "required_skills": required_skills.strip()[:600],
+        "description": _plain_to_html(desc) if desc and "<" not in desc else desc,
+    }
+    return RedirectResponse("/employer/jobs/new", status_code=303)
+
+
+@app.get("/employer/jobs/{job_id}/resumes.zip")
+def employer_download_resumes(
+    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+):
+    """A zip of every applicant's resume for one of the employer's own jobs."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job = db.execute(
+        "SELECT id, title FROM jobs WHERE id = ? AND employer_id = ?",
+        (job_id, user["id"]),
+    ).fetchone()
+    if job is None:
+        return RedirectResponse("/employer", status_code=303)
+
+    rows = db.execute(
+        "SELECT u.name, u.email, p.resume_filename FROM applications a "
+        "JOIN users u ON u.id = a.candidate_id "
+        "JOIN candidate_profiles p ON p.user_id = a.candidate_id "
+        "WHERE a.job_id = ? AND p.resume_filename != '' "
+        "ORDER BY a.match_pct DESC, a.id",
+        (job_id,),
+    ).fetchall()
+
+    buf = io.BytesIO()
+    added = 0
+    seen: set[str] = set()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for r in rows:
+            path = UPLOAD_DIR / r["resume_filename"]
+            if not path.exists():
+                continue
+            who = _slug(r["name"] or r["email"].split("@")[0]) or "applicant"
+            ext = path.suffix or ".pdf"
+            arcname = f"{who}{ext}"
+            n = 2
+            while arcname in seen:
+                arcname = f"{who}-{n}{ext}"
+                n += 1
+            seen.add(arcname)
+            zf.write(path, arcname)
+            added += 1
+
+    if not added:
+        return RedirectResponse(
+            f"/employer/jobs/{job_id}/applicants?flash=no-resumes", status_code=303
+        )
+    fname = f"{_slug(job['title']) or 'job'}-resumes.zip"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @app.get("/employer/jobs/{job_id}/applicants", response_class=HTMLResponse)

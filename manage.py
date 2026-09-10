@@ -9,6 +9,7 @@ in-app promotion. Granting them requires shell access to the deployment:
     python manage.py list-admins
     python manage.py backup /path/to/backup.db
     python manage.py send-test-email you@example.com
+    python manage.py send-job-alerts [--dry-run]
 """
 from __future__ import annotations
 
@@ -225,6 +226,11 @@ def main(argv: list[str]) -> int:
             print("Usage: python manage.py send-test-email <address>")
             return 1
         return _send_test_email(argv[2])
+    if command == "send-job-alerts":
+        from app import alerts
+
+        print(alerts.run(dry_run="--dry-run" in argv[2:]))
+        return 0
     if command == "create-admin":
         if len(argv) < 3:
             print("Usage: python manage.py create-admin <email>")

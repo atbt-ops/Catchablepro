@@ -245,6 +245,25 @@ docker compose -f compose.production.yaml logs --tail=100 app
 docker compose -f compose.production.yaml logs --tail=100 cloudflared
 ```
 
+### Job-match alerts (scheduled)
+
+If candidates opt into job-match alerts, a scheduled task has to send them —
+nothing sends them from a web request. It runs *inside* the app container so it
+uses the same database and mail config:
+
+```powershell
+docker compose -f compose.production.yaml exec app python manage.py send-job-alerts
+# dry run first:
+docker compose -f compose.production.yaml exec app python manage.py send-job-alerts --dry-run
+```
+
+Wire that into **Task Scheduler** on a cadence that suits you (daily is plenty)
+— create a Basic Task that runs `powershell.exe` with the `docker compose ...
+exec ...` line above, "Run whether user is logged on or not" unchecked (Docker
+Desktop needs a session). Each candidate is only emailed about jobs posted
+since their last alert, so a missed run just folds into the next one. Alerts do
+nothing until `EMAIL_BACKEND` is a real provider.
+
 Before opening signups, test the public registration, verification email,
 password reset, job posting, resume upload, and a backup/restore drill. Set
 Cloudflare rate-limit rules for the login and password-reset routes, and publish

@@ -16,15 +16,22 @@ already pinned in `requirements.txt` — no extra dependency.
 
 ### 1. Employer AI assistant — `/employer/assistant`
 
-An employer pastes a free-text job description. The model returns a structured
-`{title, seniority, skills[], summary}`; the app then runs the **existing**
-deterministic matcher over every candidate profile and shows them ranked by
-skill-match %, with the matched / partial / missing skills per candidate.
+Two modes, one shared rate limit (20 model calls per employer per hour):
 
-- It does **not** post the job, contact anyone, or write to the database.
-- To actually reach the candidates the employer still posts the role — the
-  match list and contact tools live on the posted job (`/employer/jobs/{id}/matches`).
-- One model call per run. Rate-limited to 20 runs per employer per hour.
+- **Match** — paste a free-text job description. The model returns a structured
+  `{title, seniority, skills[], summary}`; the app then runs the **existing**
+  deterministic matcher over every candidate profile and shows them ranked by
+  skill-match %, with matched / partial / missing skills per candidate.
+- **Draft** — a one-line brief (`"senior react dev, fintech, remote, 5 yrs"`) →
+  a full job description with the standard sections.
+
+Either result has a **Post this role** button: it stashes the title, skills and
+description in the session and opens `/employer/jobs/new` prefilled. The
+employer reviews (salary and experience are never guessed) and posts.
+
+- It does **not** post the job or contact anyone by itself.
+- The match list and contact tools live on the posted job
+  (`/employer/jobs/{id}/matches`).
 
 ### 2. Admin feedback digest — `/admin/feedback`
 

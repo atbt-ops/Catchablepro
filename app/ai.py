@@ -131,6 +131,42 @@ def extract_job_requirements(jd_text: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Rough brief -> a full job description
+# --------------------------------------------------------------------------- #
+_DRAFT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+    },
+    "required": ["title", "description"],
+}
+
+_DRAFT_SYSTEM = (
+    "You write clear, concise job descriptions for an Indian job board. From a "
+    "short brief, produce a role title and a description with these plain-text "
+    "sections, each on its own lines:\n"
+    "About the role\nWhat you'll do\nWhat we're looking for\nNice to have\n\n"
+    "Use short paragraphs and simple '- ' bullets. No markdown headers, no "
+    "salary claims, no company boilerplate you weren't given, no emoji. "
+    "Respond with JSON only."
+)
+
+
+def draft_job_description(brief: str, company: str = "") -> dict:
+    """{'title', 'description'} — a full JD written from a one-line brief."""
+    brief = (brief or "").strip()[:1500]
+    if len(brief) < 8:
+        raise AIUnavailable("Give a little more detail about the role.")
+    user = f"Company: {company or 'the company'}\nBrief: {brief}"
+    data = _chat_json(_DRAFT_SYSTEM, user, _DRAFT_SCHEMA)
+    return {
+        "title": str(data.get("title", "")).strip()[:120] or "Untitled role",
+        "description": str(data.get("description", "")).strip()[:6000],
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Feedback -> themed digest
 # --------------------------------------------------------------------------- #
 _DIGEST_SCHEMA = {
