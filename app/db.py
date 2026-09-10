@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS candidate_profiles (
     skills           TEXT    NOT NULL DEFAULT '',
     resume_filename  TEXT    NOT NULL DEFAULT '',
     auto_apply       INTEGER NOT NULL DEFAULT 0,
+    job_alerts       INTEGER NOT NULL DEFAULT 0,
+    last_alert_at    TEXT    NOT NULL DEFAULT '',
     updated_at       TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -234,6 +236,10 @@ _ADDED_COLUMNS = {
     "applications": {
         "notes": "TEXT NOT NULL DEFAULT ''",          # private employer notes
         "updated_at": "TEXT NOT NULL DEFAULT ''",
+    },
+    "candidate_profiles": {
+        "job_alerts": "INTEGER NOT NULL DEFAULT 0",
+        "last_alert_at": "TEXT NOT NULL DEFAULT ''",
     },
 }
 

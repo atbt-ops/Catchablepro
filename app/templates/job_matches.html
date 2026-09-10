@@ -11,6 +11,9 @@
       Required: {{ job.required_skills or '—' }}
     </p>
   </div>
+  <a class="btn ghost" href="/employer/jobs/{{ job.id }}/resumes.zip">
+    {{ icon('doc', 15) }} Download resumes (.zip)
+  </a>
 </div>
 
 {% if sent_to %}

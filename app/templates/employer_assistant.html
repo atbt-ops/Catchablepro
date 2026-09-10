@@ -14,18 +14,17 @@
 
 {% block rightrail %}
   <div class="railcard">
-    <h4>{{ icon('sparkle', 13) }} How it works</h4>
-    <p class="tip">
-      Paste a job description. The assistant reads it, pulls out the required
-      skills, then ranks every candidate profile by how well their skills match —
-      the same score employers see on a posted job.
-    </p>
-    <p class="tip">It doesn't post the job or contact anyone. Nothing changes until you act.</p>
+    <h4>{{ icon('sparkle', 13) }} Two things it does</h4>
+    <p class="tip"><strong>Match:</strong> paste a JD → it pulls the skills and ranks
+      every candidate profile by how well they match.</p>
+    <p class="tip"><strong>Draft:</strong> a rough note → a full job description you
+      can post in one click.</p>
+    <p class="tip">It never contacts a candidate. Nothing changes until you post.</p>
   </div>
   {% if ai_configured %}
     <div class="railcard">
       <h4>{{ icon('bolt', 13) }} Model</h4>
-      <p class="tip">{{ ai_model }}</p>
+      <p class="tip">{{ ai_model }} (local)</p>
     </div>
   {% endif %}
 {% endblock %}
@@ -34,7 +33,7 @@
 <div class="page-head">
   <div>
     <h1>AI hiring assistant</h1>
-    <p class="sub">Describe a role in plain language and get a ranked shortlist of matching candidates.</p>
+    <p class="sub">Match a job description to candidates, or draft one from scratch.</p>
   </div>
 </div>
 
@@ -46,24 +45,68 @@
   </div>
 {% endif %}
 
-<section class="panel">
-  <h2>{{ icon('doc', 18) }} Job description</h2>
-  {% if error %}<div class="errorlist">{{ error }}</div>{% endif %}
-  <form method="post" action="/employer/assistant">
+<div class="grid2">
+  <section class="panel">
+    <h2>{{ icon('doc', 18) }} Match a job description</h2>
+    <p class="hint">Paste a JD; get a ranked shortlist of matching candidates.</p>
+    {% if error %}<div class="errorlist">{{ error }}</div>{% endif %}
+    <form method="post" action="/employer/assistant">
+      {{ csrf_field(request) }}
+      <input type="hidden" name="action" value="match">
+      <label class="sr-only" for="jd">Job description</label>
+      <textarea id="jd" name="job_description" rows="8" required
+                placeholder="e.g. Senior backend engineer to own our payments services. Strong Python and PostgreSQL, FastAPI, Docker, AWS. Design APIs, mentor two engineers.">{{ jd_text }}</textarea>
+      <button class="btn" type="submit" {{ 'disabled' if not ai_configured }}>
+        {{ icon('sparkle', 16) }} Find matching candidates
+      </button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('plus', 18) }} Draft a job description</h2>
+    <p class="hint">A one-line brief; get a full JD ready to post.</p>
+    {% if draft_error %}<div class="errorlist">{{ draft_error }}</div>{% endif %}
+    <form method="post" action="/employer/assistant">
+      {{ csrf_field(request) }}
+      <input type="hidden" name="action" value="draft">
+      <label class="sr-only" for="brief">Role brief</label>
+      <textarea id="brief" name="brief" rows="8" required
+                placeholder="e.g. Senior React developer, fintech, remote-first, 5+ years, TypeScript and Next.js, some backend Node.">{{ brief_text }}</textarea>
+      <button class="btn ghost" type="submit" {{ 'disabled' if not ai_configured }}>
+        {{ icon('sparkle', 16) }} Write the JD
+      </button>
+    </form>
+  </section>
+</div>
+
+{% macro post_button(title, skills, description) %}
+  <form method="post" action="/employer/jobs/new/prefill" style="display:inline">
     {{ csrf_field(request) }}
-    <label class="sr-only" for="jd">Job description</label>
-    <textarea id="jd" name="job_description" rows="9" required
-              placeholder="e.g. We're hiring a senior backend engineer to own our payments services. Strong Python and PostgreSQL, experience with FastAPI, Docker and AWS. You'll design APIs, mentor two engineers, and work closely with product.">{{ jd_text }}</textarea>
-    <button class="btn" type="submit" {{ 'disabled' if not ai_configured }}>
-      {{ icon('sparkle', 16) }} Find matching candidates
-    </button>
+    <input type="hidden" name="title" value="{{ title }}">
+    <input type="hidden" name="required_skills" value="{{ skills }}">
+    <input type="hidden" name="description" value="{{ description }}">
+    <button class="btn small" type="submit">{{ icon('plus', 15) }} Post this role</button>
   </form>
-</section>
+{% endmacro %}
+
+{% if draft %}
+  <section class="panel">
+    <div class="page-head" style="margin-bottom:8px">
+      <h2 style="margin:0">{{ icon('doc', 18) }} {{ draft.title }}</h2>
+      {{ post_button(draft.title, '', draft.description) }}
+    </div>
+    <div class="jd-desc" style="white-space:pre-wrap">{{ draft.description }}</div>
+  </section>
+{% endif %}
 
 {% if result %}
   {% set r = result %}
   <section class="panel">
-    <h2>{{ icon('sparkle', 18) }} {{ r.reqs.title }}</h2>
+    <div class="page-head" style="margin-bottom:8px">
+      <h2 style="margin:0">{{ icon('sparkle', 18) }} {{ r.reqs.title }}</h2>
+      {{ post_button(r.reqs.title, r.reqs.skills | join(', '),
+                     r.reqs.summary ~ ('\n\nSeniority: ' ~ r.reqs.seniority if r.reqs.seniority)) }}
+    </div>
     <p class="hint">{{ r.reqs.summary }}</p>
     <div class="jcard-meta" style="margin-bottom:10px">
       {% if r.reqs.seniority %}<span>{{ icon('clock', 13) }} {{ r.reqs.seniority }}</span>{% endif %}
@@ -106,8 +149,8 @@
         {% endfor %}
       </div>
       <p class="hint" style="margin-top:14px">
-        To reach these candidates, <a href="/employer/jobs/new">post this role</a> — the match
-        list and contact tools live on the posted job.
+        Post this role to reach these candidates — the match list and contact
+        tools live on the posted job.
       </p>
     {% else %}
       <div class="empty">

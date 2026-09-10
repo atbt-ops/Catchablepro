@@ -17,6 +17,11 @@
   </div>
 {% endif %}
 
+{% if prefilled %}
+  <div class="flash-ok">{{ icon('sparkle', 15) }}
+    Prefilled from the AI assistant — review everything, especially salary and experience, before you post.</div>
+{% endif %}
+
 <form action="/employer/jobs" method="post" id="job-form">
   {{ csrf_field(request) }}
 

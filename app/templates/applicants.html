@@ -9,10 +9,21 @@
     <h1>{{ job.title }}</h1>
     <p class="sub">{{ total }} applicant{{ 's' if total != 1 }} · move candidates through your hiring pipeline</p>
   </div>
-  <a class="btn ghost" href="/employer/jobs/{{ job.id }}/matches">
-    {{ icon('target', 15) }} See all matches
-  </a>
+  <div class="row-actions">
+    <a class="btn ghost" href="/employer/jobs/{{ job.id }}/resumes.zip">
+      {{ icon('doc', 15) }} Download resumes (.zip)
+    </a>
+    <a class="btn ghost" href="/employer/jobs/{{ job.id }}/matches">
+      {{ icon('target', 15) }} See all matches
+    </a>
+  </div>
 </div>
+
+{% if request.query_params.get('flash') == 'no-resumes' %}
+  <div class="notice">{{ icon('bolt', 16) }}
+    <div>No applicant has uploaded a resume yet — nothing to download.</div>
+  </div>
+{% endif %}
 
 <!-- Pipeline summary / stage filter -->
 <div class="pipeline">

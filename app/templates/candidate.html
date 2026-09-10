@@ -137,6 +137,26 @@
         </div>
       </div>
     </div>
+
+    <h2 id="alerts" style="margin-top:22px">{{ icon('mail', 18) }} Job-match alerts</h2>
+    <p class="hint">
+      Get an email when new jobs match your skills. No spam — only when there's
+      something worth seeing.
+    </p>
+    <div class="autoapply {{ 'active' if profile.job_alerts else '' }}">
+      <form action="/candidate/job-alerts" method="post" class="switch {{ 'on' if profile.job_alerts else '' }}">
+        {{ csrf_field(request) }}
+        <button type="submit" aria-label="Toggle job-match alerts"><span class="knob"></span></button>
+      </form>
+      <div>
+        <div class="state {{ 'on' if profile.job_alerts else 'off' }}">
+          Alerts are {{ 'ON' if profile.job_alerts else 'OFF' }}
+        </div>
+        <div class="muted" style="font-size:13px;">
+          {{ 'We\'ll email you when matching jobs are posted.' if profile.job_alerts else 'Turn on to be emailed about new matching jobs.' }}
+        </div>
+      </div>
+    </div>
   </section>
 </div>
 

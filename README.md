@@ -229,21 +229,31 @@ Any signed-in user can send feedback at `/feedback` (topic, optional 1–5
 rating, message). Entries move through `new → reviewed → actioned` (or
 `dismissed`) on the admin **Feedback** page.
 
-### Auto-Apply
+### Auto-Apply & job-match alerts
 
 When a candidate turns Auto-Apply **ON**:
 - they are immediately applied to every existing job they share at least one skill with, and
 - whenever an employer posts a **new** job, matching auto-apply candidates are applied automatically.
 
-So a candidate never misses a single opportunity. Applications are tagged `Auto` vs `Manual`.
+Separately, **job-match alerts** (opt-in toggle on the dashboard) email a
+digest of newly-posted jobs that match the candidate's skills. Sending is a
+scheduled task, not a web request:
+
+```
+python manage.py send-job-alerts            # send
+python manage.py send-job-alerts --dry-run  # preview
+```
+
+Run it from Windows Task Scheduler / cron (details in
+`docs/self-hosting-windows.md`). It uses whatever `EMAIL_BACKEND` is
+configured; with `console` the digests are logged, not sent.
 
 ## UI / UX
 
 Server-rendered with a self-contained design system (no external CSS/JS/CDN — keeps
 payloads tiny and the app offline-friendly):
 
-- **Light & dark themes** with a one-click toggle (persisted in `localStorage`, applied
-  before first paint to avoid a flash).
+- **Light theme**, warm-neutral, one committed look — no toggle, no flash.
 - **Animated circular match-score rings** (inline SVG) — the match % is the visual centerpiece.
 - Inline SVG icon set, avatar initials, skill chips (matched vs missing), status pills,
   a real toggle switch for Auto-Apply, friendly empty states, and a responsive layout.
@@ -721,6 +731,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 │  ├─ auth.py        # PBKDF2 password hashing + session helper (stdlib only)
 │  ├─ matching.py    # keyword-overlap skill match + resume skill extraction
 │  ├─ ai.py          # optional local-LLM helpers via Ollama (JD → skills, digest)
+│  ├─ alerts.py      # job-match email alerts (run from manage.py on a schedule)
 │  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
 │  ├─ health.py     # liveness + readiness dependency probes
 │  ├─ logging_config.py       # JSON log records + request-id context
