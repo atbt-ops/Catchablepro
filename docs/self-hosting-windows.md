@@ -49,8 +49,9 @@ Cloudflare, create the tunnel, or open an email account. Those are steps 2 and
 1. Copy `.env.production.example` to `.env.production` and replace every
    placeholder. `PUBLIC_URL` and `TRUSTED_HOSTS` must exactly match the public
    HTTPS hostname. Generate a fresh `SECRET_KEY`; rotating it later signs every
-   user out. `ANTHROPIC_API_KEY` is optional — leave it out unless you want the
-   AI assistant and feedback digest ([docs/ai-features.md](ai-features.md)).
+   user out. `AI_MODEL` / `OLLAMA_URL` are optional — leave them out unless you
+   run a local Ollama server for the AI assistant and feedback digest
+   ([docs/ai-features.md](ai-features.md)).
 2. In the Cloudflare dashboard, create a **named** tunnel. Use the Docker
    connector option and copy its token into
    `secrets/cloudflare-tunnel-token.txt`. This file is ignored by Git.

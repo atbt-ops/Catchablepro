@@ -232,19 +232,20 @@ Prometheus. Setup and the rest of the reasoning: `docs/monitoring.md`.
 ## 9a. The AI features misbehave
 
 The employer assistant and the admin feedback digest are the only things that
-call an external API. They **never page** — a failure there shows the user a
-notice, not a 500, and the rest of the site is unaffected. So this is always a
-"morning" item.
+call a model (a local Ollama server). They **never page** — a failure there
+shows the user a notice, not a 500, and the rest of the site is unaffected. So
+this is always a "morning" item.
 
-- "Not configured" everywhere → `ANTHROPIC_API_KEY` is missing from the
-  container. Add it to `.env.production`, `day-start.ps1 -Rebuild`.
-- `flash=ai-error` on the digest, or the assistant erroring → `docker compose
-  -f compose.production.yaml logs --tail=50 app | Select-String catchablepro.ai`
-  for the exception and request id. Usual causes: bad key, spending cap hit,
-  outbound HTTPS blocked.
-- Suspected runaway spend → the per-user limit is 20 calls/hour
-  (`AI_CALL_LIMIT` in `app/main.py`); to stop it entirely, remove
-  `ANTHROPIC_API_KEY` and rebuild.
+- "Not configured" everywhere → `AI_MODEL` is unset in the container. Set it in
+  `.env.production` and run `day-start.ps1` (no rebuild needed for an env change).
+- `flash=ai-error`, or the assistant erroring → `docker compose -f
+  compose.production.yaml logs --tail=50 app | Select-String catchablepro.ai`
+  for the exception. Then on the host: `curl http://127.0.0.1:11434/api/tags`
+  (is Ollama up?) and `ollama list` (is the model pulled?). "Connection
+  refused" from the container means Ollama is bound to loopback only — restart
+  it with `OLLAMA_HOST=0.0.0.0:11434`.
+- To turn the features off: comment out `AI_MODEL` in `.env.production` and run
+  `day-start.ps1`.
 
 Full reference: `docs/ai-features.md`.
 

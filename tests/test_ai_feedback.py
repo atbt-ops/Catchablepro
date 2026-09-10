@@ -1,12 +1,9 @@
 """Feedback capture, the employer AI assistant, and the admin feedback digest.
 
-The Anthropic call is stubbed everywhere — the suite never touches the network.
+The model call is stubbed everywhere — the suite never touches the network or a
+local Ollama server.
 """
-import json
 import sqlite3
-import types
-
-import pytest
 
 from app import ai
 from app import db as dbmod
@@ -19,29 +16,11 @@ def make_admin(email: str) -> None:
     conn.close()
 
 
-class _FakeBlock:
-    type = "text"
-
-    def __init__(self, text: str):
-        self.text = text
-
-
-class _FakeResp:
-    def __init__(self, payload: dict):
-        self.content = [_FakeBlock(json.dumps(payload))]
-
-
 def stub_ai(monkeypatch, payload: dict):
-    """Point ai._client at a fake Anthropic client that returns `payload`."""
+    """Make ai._chat_json return `payload` without any HTTP call."""
+    monkeypatch.setattr(ai, "MODEL", "test-model")
     monkeypatch.setattr(ai, "is_configured", lambda: True)
-
-    class _Client:
-        class messages:  # noqa: N801
-            @staticmethod
-            def create(**kwargs):
-                return _FakeResp(payload)
-
-    monkeypatch.setattr(ai, "_client", lambda: _Client())
+    monkeypatch.setattr(ai, "_chat_json", lambda *a, **k: payload)
 
 
 # --------------------------------------------------------------------------- #

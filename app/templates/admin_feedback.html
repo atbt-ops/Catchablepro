@@ -29,7 +29,7 @@
 </div>
 
 {% if flash == 'digest-ready' %}<div class="flash-ok">{{ icon('check', 15) }} Digest generated.</div>{% endif %}
-{% if flash == 'not-configured' %}<div class="notice">{{ icon('bolt', 16) }}<div>Set <code>ANTHROPIC_API_KEY</code> to enable the digest.</div></div>{% endif %}
+{% if flash == 'not-configured' %}<div class="notice">{{ icon('bolt', 16) }}<div>Set <code>AI_MODEL</code> (a local Ollama model) to enable the digest.</div></div>{% endif %}
 {% if flash == 'rate-limited' %}<div class="notice">{{ icon('bolt', 16) }}<div>Too many AI calls this hour — try again later.</div></div>{% endif %}
 {% if flash == 'ai-error' %}<div class="notice">{{ icon('bolt', 16) }}<div>The AI call failed. Check the logs and try again.</div></div>{% endif %}
 
@@ -45,7 +45,7 @@
   </div>
 
   {% if not ai_configured %}
-    <p class="hint">Not configured — set <code>ANTHROPIC_API_KEY</code>.</p>
+    <p class="hint">Not configured — set <code>AI_MODEL</code> to a local Ollama model.</p>
   {% elif not digest %}
     <p class="hint">No digest yet. Generate one once you have a handful of entries.</p>
   {% else %}
