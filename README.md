@@ -205,11 +205,13 @@ A candidate profile "is sent to the employer" by surfacing on that job's
 
 Full write-up: [docs/ai-features.md](docs/ai-features.md).
 
-Two features use Claude, and only run when `ANTHROPIC_API_KEY` is set — without
-it the app is unchanged and both pages show a "not configured" notice.
+Two features use a language model, served by a **local [Ollama](https://ollama.com)
+server you host** — no API key, no per-call cost, nothing leaves the machine.
+Both only run when `AI_MODEL` is set; without it the app is unchanged and both
+pages show a "not configured" notice.
 
 - **Employer AI assistant** (`/employer/assistant`) — paste a free-text job
-  description; Claude extracts the required skills, and the existing
+  description; the model extracts the required skills, and the existing
   deterministic matcher ranks every candidate profile against them. It never
   posts the job or contacts anyone.
 - **Admin feedback digest** (`/admin/feedback`) — clusters all submitted
@@ -218,8 +220,8 @@ it the app is unchanged and both pages show a "not configured" notice.
   Feedback text is treated as untrusted input — the model is instructed never
   to act on instructions found inside it.
 
-`AI_MODEL` overrides the model (default `claude-opus-5`; `claude-sonnet-5` is
-~2× cheaper). Calls are rate-limited per user.
+Set `AI_MODEL=qwen2.5:7b` (after `ollama pull qwen2.5:7b`); `OLLAMA_URL` points
+at the server. Calls are rate-limited per user.
 
 ### Feedback
 
@@ -718,7 +720,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 │  ├─ db.py          # SQLite schema, migration, thresholds
 │  ├─ auth.py        # PBKDF2 password hashing + session helper (stdlib only)
 │  ├─ matching.py    # keyword-overlap skill match + resume skill extraction
-│  ├─ ai.py          # optional Claude helpers (JD → skills, feedback digest)
+│  ├─ ai.py          # optional local-LLM helpers via Ollama (JD → skills, digest)
 │  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
 │  ├─ health.py     # liveness + readiness dependency probes
 │  ├─ logging_config.py       # JSON log records + request-id context
@@ -747,7 +749,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 - `SECRET_KEY` — session-cookie signing key (defaults to a dev value; set in production).
 - `LOG_LEVEL` — logging floor, default `INFO`.
 - `METRICS_TOKEN` — bearer token a Prometheus scraper must present. **Required in production** or `/metrics` is not served at all.
-- `ANTHROPIC_API_KEY` — optional; enables the AI assistant and feedback digest ([docs/ai-features.md](docs/ai-features.md)). `AI_MODEL` overrides the model.
+- `AI_MODEL` / `OLLAMA_URL` — optional; enable the AI assistant and feedback digest against a local Ollama server ([docs/ai-features.md](docs/ai-features.md)).
 - Thresholds live in `app/db.py`: `AUTO_APPLY_MIN_MATCH` (min % to auto-apply) and
   `EMPLOYER_MATCH_THRESHOLD` (min % for a candidate to appear on a job's Matches page).
 

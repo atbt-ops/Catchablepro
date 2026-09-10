@@ -2973,7 +2973,7 @@ def employer_assistant_run(
     if not ai.is_configured():
         ctx["error"] = (
             "The AI assistant isn't configured on this deployment. "
-            "Set ANTHROPIC_API_KEY to enable it."
+            "An administrator needs to set AI_MODEL to a local Ollama model."
         )
         return templates.TemplateResponse(request, "employer_assistant.html", ctx)
 
