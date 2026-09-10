@@ -78,8 +78,8 @@
 {% endmacro %}
 
 {# One labelled group of auto-submitting radio filters in the job-search rail. #}
-{% macro filter_group(name, title, options, selected, any_label='Any') %}
-  <details class="fgroup" open>
+{% macro filter_group(name, title, options, selected, any_label='Any', start_open=true) %}
+  <details class="fgroup" {{ 'open' if start_open }}>
     <summary>{{ title }}
       {% if selected %}<span class="fgroup-on">1</span>{% endif %}
       <span class="fgroup-chev">{{ icon('chevron-down', 15) }}</span>

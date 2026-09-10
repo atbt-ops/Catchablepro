@@ -18,12 +18,13 @@
       {% if sel_q %}<input type="hidden" name="q" value="{{ sel_q }}">{% endif %}
       {% if sel_location %}<input type="hidden" name="location" value="{{ sel_location }}">{% endif %}
       {% if sel_sort and sel_sort != 'match' %}<input type="hidden" name="sort" value="{{ sel_sort }}">{% endif %}
-      {{ filter_group('posted', 'Date posted', date_posted, sel_posted, 'Any time') }}
-      {{ filter_group('experience', 'Experience', experience_buckets, sel_experience, 'Any experience') }}
-      {{ filter_group('salary', 'Salary', salary_buckets, sel_salary, 'Any salary') }}
-      {{ filter_group('department', 'Department', departments, sel_department, 'All departments') }}
-      {{ filter_group('work_mode', 'Work mode', work_modes, sel_work_mode, 'Any mode') }}
-      {{ filter_group('employment_type', 'Employment type', employment_types, sel_employment_type, 'Any type') }}
+      {% set fo = not bar %}
+      {{ filter_group('posted', 'Date posted', date_posted, sel_posted, 'Any time', fo) }}
+      {{ filter_group('experience', 'Experience', experience_buckets, sel_experience, 'Any experience', fo) }}
+      {{ filter_group('salary', 'Salary', salary_buckets, sel_salary, 'Any salary', fo) }}
+      {{ filter_group('department', 'Department', departments, sel_department, 'All departments', fo) }}
+      {{ filter_group('work_mode', 'Work mode', work_modes, sel_work_mode, 'Any mode', fo) }}
+      {{ filter_group('employment_type', 'Employment type', employment_types, sel_employment_type, 'Any type', fo) }}
     </form>
     <div class="filter-note">
       <strong>Built for India</strong>
