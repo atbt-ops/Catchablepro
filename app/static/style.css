@@ -563,7 +563,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .jobcard.is-draft { border-left: 3px solid var(--amber); }
 .jobcard.is-active { border-left: 3px solid var(--green); }
 .jobcard.is-closed { border-left: 3px solid var(--muted); opacity: .8; }
+.jobcard-main { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
+.jobcard-logo { flex: none; }
 .jobcard h3 { margin: 0 0 6px; font-size: 16.5px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.jobcard h3 a { color: inherit; }
+.jobcard h3 a:hover { color: var(--brand); text-decoration: none; }
+@media (max-width: 560px) { .jobcard-logo { display: none; } }
 .jobcard-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 8px 0 0; }
 .jobcard-meta .m { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-soft); }
 .jobcard-meta .m b { color: var(--text); font-weight: 600; }
