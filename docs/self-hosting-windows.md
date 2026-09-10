@@ -171,6 +171,55 @@ python run.py    # http://127.0.0.1:8000
 That uses your local `data/portal.db`, not the container's volume, so it
 cannot disturb live data.
 
+## Email, the last gate before real users
+
+Until outbound email works, nobody but you can hold an account. Signup
+verification and password reset are the only paths that send mail, and both
+fail silently from the user's side - they see "check your inbox" either way.
+
+```powershell
+.\scripts\setup-email.ps1
+```
+
+It asks which provider, takes the credential as hidden input, restarts, sends
+a real test message, and **only removes `ALLOW_CONSOLE_EMAIL` once that
+message is accepted**. That order matters: dropping the flag first means a
+wrong password leaves you with a container that refuses to boot and a site
+that is down.
+
+### What it cannot do
+
+Create the provider account, and add the DNS records. Both need your own
+logins, and skipping the records means your mail is accepted by the provider
+and then dropped in the recipient's spam folder - which looks like the app
+being broken.
+
+Your provider gives you the exact values. In Cloudflare DNS you will add:
+
+| Type | Purpose |
+|---|---|
+| TXT | SPF, saying which servers may send as your domain |
+| CNAME or TXT | DKIM, so receivers can verify the signature |
+| TXT at `_dmarc` | DMARC. **Start at `p=none`** |
+
+Start DMARC at `p=none` and read the reports for a week before moving to
+`p=reject`. Going straight to reject bounces mail you did not know you were
+sending, and you find out when someone tells you they never got their
+verification link.
+
+### Prove it, do not assume it
+
+```powershell
+docker compose -f compose.production.yaml exec app python manage.py send-test-email you@example.com
+```
+
+Send it to an inbox on a **different** provider - Gmail is ideal - so you learn
+what a stranger's mail server makes of your domain. Then check the spam folder:
+accepted by your provider is not the same as delivered to a person.
+
+Before announcing the site, complete a real signup and a real password reset
+from the emails themselves, not from the container logs.
+
 ## Backups and operations
 
 Run this after the site is started to create a transactionally consistent

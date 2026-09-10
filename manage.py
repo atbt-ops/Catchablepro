@@ -8,6 +8,7 @@ in-app promotion. Granting them requires shell access to the deployment:
     python manage.py revoke-admin you@example.com
     python manage.py list-admins
     python manage.py backup /path/to/backup.db
+    python manage.py send-test-email you@example.com
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import sys
 import sqlite3
 from pathlib import Path
 
-from app import audit, auth
+from app import audit, auth, mailer
 
 #: A password typed blind invites typos; give a few goes before giving up.
 PASSWORD_ATTEMPTS = 3
@@ -162,6 +163,51 @@ def _create_admin(email: str) -> int:
     return 0
 
 
+def _send_test_email(address: str) -> int:
+    """Send one real message through whatever backend is configured.
+
+    Configuring a provider and assuming it works is how a deployment discovers,
+    weeks later, that nobody has ever been able to reset a password. Signup and
+    reset are the only paths that send mail, and both fail silently from the
+    user's side: they see "check your inbox" either way. This is the cheap way
+    to find out now.
+    """
+    chosen = mailer.backend()
+    if chosen == "console":
+        print(
+            "EMAIL_BACKEND is 'console', so nothing will leave this machine.\n"
+            "Configure a real provider first; this command would prove nothing."
+        )
+        return 1
+    if not mailer.is_configured():
+        missing = "SMTP_HOST" if chosen == "smtp" else "SENDGRID_API_KEY"
+        print(f"EMAIL_BACKEND is {chosen!r} but {missing} is not set.")
+        return 1
+
+    print(f"Sending via {chosen} as {mailer.default_from()} to {address} ...")
+    ok, error = mailer.send_email(
+        to=address,
+        subject="Catchablepro: your email provider works",
+        body=(
+            "If you are reading this, outbound email is working.\n\n"
+            "That means signup verification and password reset can reach real\n"
+            "people, which is the thing this message exists to prove.\n\n"
+            "Check that it did not land in spam. If it did, your SPF and DKIM\n"
+            "records are the place to look, not this application.\n"
+        ),
+    )
+    if not ok:
+        print(f"FAILED: {error}")
+        return 1
+
+    print(
+        "Accepted by the provider.\n"
+        "That is not the same as delivered: open the inbox, and check the spam\n"
+        "folder too. Landing in spam means SPF or DKIM, not the app."
+    )
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print(__doc__)
@@ -174,6 +220,11 @@ def main(argv: list[str]) -> int:
             print("Usage: python manage.py backup <destination.db>")
             return 1
         return _backup(argv[2])
+    if command == "send-test-email":
+        if len(argv) < 3:
+            print("Usage: python manage.py send-test-email <address>")
+            return 1
+        return _send_test_email(argv[2])
     if command == "create-admin":
         if len(argv) < 3:
             print("Usage: python manage.py create-admin <email>")
