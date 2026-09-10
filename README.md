@@ -696,7 +696,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 │  ├─ health.py     # liveness + readiness dependency probes
 │  ├─ logging_config.py       # JSON log records + request-id context
 │  ├─ metrics.py    # Prometheus counters/histograms + scrape helpers
-│  ├─ static/        # style.css (design system: light/dark themes)
+│  ├─ static/        # style.css (design system), forms.js
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
 ├─ docs/runbook.md   # what to do when it breaks

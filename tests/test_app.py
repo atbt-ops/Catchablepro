@@ -294,7 +294,7 @@ def test_description_formatting_is_kept_but_scripts_are_stripped(
 
     page = client.get("/candidate").text
     # Inspect only the rendered description block, not the whole page (the
-    # layout has its own legitimate <script> for the theme toggle).
+    # layout loads its own legitimate <script> for form helpers).
     block = re.search(r'<div class="jcard-desc jobdesc">(.*?)</div>', page, re.S)
     assert block, "job description block not rendered"
     desc = block.group(1)

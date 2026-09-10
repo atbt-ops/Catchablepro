@@ -6,7 +6,7 @@
  * later that carries the attribute — <select>s as well as the radio/checkbox
  * inputs in the job-filter rail.
  *
- * Deferred, unlike theme.js: nothing here affects the first paint.
+ * Deferred: nothing here affects the first paint.
  */
 document.addEventListener('change', function (event) {
   var control = event.target;

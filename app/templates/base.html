@@ -1,13 +1,11 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Catchablepro{% endblock %}</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
-  <!-- No defer: the theme must be on <html> before the first paint. -->
-  <script src="/static/theme.js"></script>
   <script src="/static/forms.js" defer></script>
 </head>
 {% from "macros.html" import icon %}
@@ -18,11 +16,6 @@
       Catch <span class="brand-accent">Able Pro</span>
     </a>
     <nav>
-      <button class="iconbtn theme-toggle" type="button" data-theme-toggle
-              title="Toggle theme" aria-label="Toggle light/dark theme">
-        <span class="only-dark">{{ icon('sun', 18) }}</span>
-        <span class="only-light">{{ icon('moon', 18) }}</span>
-      </button>
       {% if user %}
         <span class="who">
           <span class="avatar">{{ (user.name or user.email)[0] | upper }}</span>
