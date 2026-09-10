@@ -15,6 +15,15 @@ document.addEventListener('change', function (event) {
   if (control.form) control.form.submit();
 });
 
+/* A form with data-confirm="…" asks before it submits — a destructive-action
+ * guard without an inline onsubmit= (which the CSP forbids).
+ */
+document.addEventListener('submit', function (event) {
+  var form = event.target;
+  var message = form && form.getAttribute && form.getAttribute('data-confirm');
+  if (message && !window.confirm(message)) event.preventDefault();
+});
+
 /* Homepage filter bar: the filters are <details> dropdowns. Keep at most one
  * open, and close it when the click lands outside. (In the rail layout the
  * <details> are plain accordions and this never fires — they aren't .filters-top.)

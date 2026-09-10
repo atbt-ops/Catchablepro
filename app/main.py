@@ -2413,6 +2413,24 @@ def candidate_apply(
     return RedirectResponse(back, status_code=303)
 
 
+@app.post("/candidate/applications/{application_id}/withdraw")
+def candidate_withdraw_application(
+    request: Request,
+    application_id: int,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    db.execute(
+        "DELETE FROM applications WHERE id = ? AND candidate_id = ?",
+        (application_id, user["id"]),
+    )
+    db.commit()
+    return RedirectResponse("/candidate?flash=withdrawn#applications", status_code=303)
+
+
 @app.get("/resume/{candidate_id}")
 def download_resume(
     request: Request, candidate_id: int, db: sqlite3.Connection = Depends(get_db)
@@ -2818,6 +2836,46 @@ def employer_update_company(
     return RedirectResponse("/employer", status_code=303)
 
 
+def _job_form_fields(**f) -> dict:
+    """The submitted job fields as a dict, for re-rendering the form on error."""
+    return {
+        "title": f["title"], "location": f["location"],
+        "required_skills": f["required_skills"], "description": f["description"],
+        "employment_type": f["employment_type"], "work_mode": f["work_mode"],
+        "exp_min": f["exp_min"], "exp_max": f["exp_max"],
+        "salary_min": f["salary_min"], "salary_max": f["salary_max"],
+        "hide_salary": bool(f["hide_salary"]), "vacancies": f["vacancies"],
+        "education": f["education"], "department": f["department"],
+        "deadline": f["deadline"],
+    }
+
+
+def _validate_job(exp_min: int, exp_max: int, salary_min: float, salary_max: float):
+    """Clamp the experience range and validate salary. Returns (exp_min, exp_max, errors)."""
+    exp_min, exp_max = max(0, exp_min), max(0, exp_max)
+    if exp_max and exp_max < exp_min:
+        exp_min, exp_max = exp_max, exp_min
+
+    errors: list[str] = []
+    if salary_min <= 0 or salary_max <= 0:
+        errors.append(
+            "Minimum and maximum salary are required. Enter the amount in "
+            "lakhs per annum (LPA) — for example 12 means ₹12,00,000 a year."
+        )
+    else:
+        for label, value in (("Minimum", salary_min), ("Maximum", salary_max)):
+            if not (SALARY_MIN_LPA <= value <= SALARY_MAX_LPA):
+                errors.append(
+                    f"{label} salary must be given in lakhs per annum, between "
+                    f"{SALARY_MIN_LPA:g} and {SALARY_MAX_LPA:g} LPA. "
+                    f"You entered {value:g} — if that was rupees, enter "
+                    f"{value / 100000:g} instead."
+                )
+        if not errors and salary_max < salary_min:
+            errors.append("Maximum salary cannot be less than the minimum salary.")
+    return exp_min, exp_max, errors
+
+
 def _job_form_context(request: Request, user, form: dict, errors: list) -> dict:
     return {
         "request": request,
@@ -2898,42 +2956,19 @@ def employer_create_job(
             status_code=403,
         )
 
-    # Keep experience ranges sane rather than rejecting the whole form.
-    exp_min, exp_max = max(0, exp_min), max(0, exp_max)
-    if exp_max and exp_max < exp_min:
-        exp_min, exp_max = exp_max, exp_min
-
     # Descriptions arrive as HTML from the editor — allowlist it before storing.
     description = sanitize_html(description)
-
-    # --- Salary is mandatory and must be expressed in lakhs per annum -------- #
-    errors: list[str] = []
-    if salary_min <= 0 or salary_max <= 0:
-        errors.append(
-            "Minimum and maximum salary are required. Enter the amount in "
-            "lakhs per annum (LPA) — for example 12 means ₹12,00,000 a year."
-        )
-    else:
-        for label, value in (("Minimum", salary_min), ("Maximum", salary_max)):
-            if not (SALARY_MIN_LPA <= value <= SALARY_MAX_LPA):
-                errors.append(
-                    f"{label} salary must be given in lakhs per annum, between "
-                    f"{SALARY_MIN_LPA:g} and {SALARY_MAX_LPA:g} LPA. "
-                    f"You entered {value:g} — if that was rupees, enter "
-                    f"{value / 100000:g} instead."
-                )
-        if not errors and salary_max < salary_min:
-            errors.append("Maximum salary cannot be less than the minimum salary.")
+    exp_min, exp_max, errors = _validate_job(exp_min, exp_max, salary_min, salary_max)
 
     if errors:
-        form = {
-            "title": title, "location": location, "required_skills": required_skills,
-            "description": description, "employment_type": employment_type,
-            "work_mode": work_mode, "exp_min": exp_min, "exp_max": exp_max,
-            "salary_min": salary_min, "salary_max": salary_max,
-            "hide_salary": bool(hide_salary), "vacancies": vacancies,
-            "education": education, "department": department, "deadline": deadline,
-        }
+        form = _job_form_fields(
+            title=title, location=location, required_skills=required_skills,
+            description=description, employment_type=employment_type,
+            work_mode=work_mode, exp_min=exp_min, exp_max=exp_max,
+            salary_min=salary_min, salary_max=salary_max, hide_salary=hide_salary,
+            vacancies=vacancies, education=education, department=department,
+            deadline=deadline,
+        )
         return templates.TemplateResponse(
             request,
             "job_new.html",
@@ -2966,6 +3001,129 @@ def employer_create_job(
     # Auto-apply candidates never miss a new posting (drafts are skipped).
     _auto_apply_all_candidates_to_job(db, cur.lastrowid)
     return RedirectResponse("/employer", status_code=303)
+
+
+_JOB_COLS = (
+    "title", "location", "required_skills", "description", "employment_type",
+    "work_mode", "exp_min", "exp_max", "salary_min", "salary_max", "vacancies",
+    "education", "department", "deadline",
+)
+
+
+@app.get("/employer/jobs/{job_id}/edit", response_class=HTMLResponse)
+def employer_edit_job_form(
+    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job = db.execute(
+        "SELECT * FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
+    ).fetchone()
+    if job is None:
+        return RedirectResponse("/employer", status_code=303)
+    form = {c: job[c] for c in _JOB_COLS}
+    form["hide_salary"] = bool(job["hide_salary"])
+    ctx = _job_form_context(request, user, form, [])
+    ctx["edit_job_id"] = job_id
+    ctx["job_status"] = job["status"]
+    return templates.TemplateResponse(request, "job_new.html", ctx)
+
+
+@app.post("/employer/jobs/{job_id}/edit")
+def employer_edit_job(
+    request: Request,
+    job_id: int,
+    _csrf: None = Depends(verify_csrf),
+    title: str = Form(...),
+    location: str = Form(""),
+    required_skills: str = Form(""),
+    description: str = Form(""),
+    employment_type: str = Form("Full-time"),
+    work_mode: str = Form("On-site"),
+    exp_min: int = Form(0),
+    exp_max: int = Form(0),
+    salary_min: float = Form(0),
+    salary_max: float = Form(0),
+    hide_salary: Optional[str] = Form(None),
+    vacancies: int = Form(1),
+    education: str = Form(""),
+    department: str = Form(""),
+    deadline: str = Form(""),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job = db.execute(
+        "SELECT id, status FROM jobs WHERE id = ? AND employer_id = ?",
+        (job_id, user["id"]),
+    ).fetchone()
+    if job is None:
+        return RedirectResponse("/employer", status_code=303)
+
+    description = sanitize_html(description)
+    exp_min, exp_max, errors = _validate_job(exp_min, exp_max, salary_min, salary_max)
+    if errors:
+        ctx = _job_form_context(
+            request, user,
+            _job_form_fields(
+                title=title, location=location, required_skills=required_skills,
+                description=description, employment_type=employment_type,
+                work_mode=work_mode, exp_min=exp_min, exp_max=exp_max,
+                salary_min=salary_min, salary_max=salary_max,
+                hide_salary=hide_salary, vacancies=vacancies, education=education,
+                department=department, deadline=deadline,
+            ),
+            errors,
+        )
+        ctx["edit_job_id"] = job_id
+        ctx["job_status"] = job["status"]
+        return templates.TemplateResponse(
+            request, "job_new.html", ctx, status_code=400
+        )
+
+    # active_since / billable_seconds are deliberately left alone — editing a
+    # posting does not restart or pause its pricing meter.
+    db.execute(
+        "UPDATE jobs SET title = ?, location = ?, required_skills = ?, "
+        "description = ?, employment_type = ?, work_mode = ?, exp_min = ?, "
+        "exp_max = ?, salary_min = ?, salary_max = ?, hide_salary = ?, "
+        "vacancies = ?, education = ?, department = ?, deadline = ? WHERE id = ?",
+        (
+            title.strip(), location.strip(), required_skills.strip(),
+            description.strip(), employment_type, work_mode, exp_min, exp_max,
+            salary_min, salary_max, 1 if hide_salary else 0, max(1, vacancies),
+            education.strip(), department.strip(), deadline.strip(), job_id,
+        ),
+    )
+    db.commit()
+    # Required skills may have changed — refresh the auto-applied set.
+    if job["status"] == "active":
+        _auto_apply_all_candidates_to_job(db, job_id)
+    return RedirectResponse("/employer?flash=edited", status_code=303)
+
+
+@app.post("/employer/jobs/{job_id}/duplicate")
+def employer_duplicate_job(
+    request: Request, job_id: int,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Prefill the posting form from an existing job (a fresh draft, not a copy)."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    job = db.execute(
+        "SELECT * FROM jobs WHERE id = ? AND employer_id = ?", (job_id, user["id"])
+    ).fetchone()
+    if job is None:
+        return RedirectResponse("/employer", status_code=303)
+    prefill = {c: job[c] for c in _JOB_COLS}
+    prefill["title"] = f"{job['title']} (copy)"[:200]
+    prefill["hide_salary"] = bool(job["hide_salary"])
+    request.session["job_prefill"] = prefill
+    return RedirectResponse("/employer/jobs/new", status_code=303)
 
 
 @app.post("/employer/jobs/{job_id}/status")

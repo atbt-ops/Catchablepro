@@ -1,28 +1,31 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
-{% block title %}Post a job · Catchablepro{% endblock %}
+{% block title %}{{ 'Edit job' if edit_job_id else 'Post a job' }} · Catchablepro{% endblock %}
 {% block content %}
 <a class="backlink" href="/employer">{{ icon('arrow-right', 14) }} Back to dashboard</a>
 <div class="page-head">
   <div>
-    <h1>Post a job</h1>
-    <p class="sub">The more detail you give, the better we can match candidates to this role.</p>
+    <h1>{{ 'Edit job' if edit_job_id else 'Post a job' }}</h1>
+    <p class="sub">
+      {% if edit_job_id %}Changes go live immediately. Editing doesn't restart the pricing meter.
+      {% else %}The more detail you give, the better we can match candidates to this role.{% endif %}
+    </p>
   </div>
 </div>
 
 {% if errors %}
   <div class="errorlist">
-    <strong>Please fix the following before posting:</strong>
+    <strong>Please fix the following before {{ 'saving' if edit_job_id else 'posting' }}:</strong>
     <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
   </div>
 {% endif %}
 
 {% if prefilled %}
   <div class="flash-ok">{{ icon('sparkle', 15) }}
-    Prefilled from the AI assistant — review everything, especially salary and experience, before you post.</div>
+    Prefilled — review everything, especially salary and experience, before you post.</div>
 {% endif %}
 
-<form action="/employer/jobs" method="post" id="job-form">
+<form action="{{ ('/employer/jobs/' ~ edit_job_id ~ '/edit') if edit_job_id else '/employer/jobs' }}" method="post" id="job-form">
   {{ csrf_field(request) }}
 
   <section class="panel">
@@ -163,10 +166,14 @@
   </section>
 
   <div class="form-actions">
-    <button class="btn" type="submit" name="action" value="publish">
-      {{ icon('check', 16) }} Publish job
-    </button>
-    <button class="btn ghost" type="submit" name="action" value="draft">Save as draft</button>
+    {% if edit_job_id %}
+      <button class="btn" type="submit">{{ icon('check', 16) }} Save changes</button>
+    {% else %}
+      <button class="btn" type="submit" name="action" value="publish">
+        {{ icon('check', 16) }} Publish job
+      </button>
+      <button class="btn ghost" type="submit" name="action" value="draft">Save as draft</button>
+    {% endif %}
     <a class="btn ghost" href="/employer">Cancel</a>
   </div>
 </form>

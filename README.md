@@ -52,9 +52,12 @@ Employers post from a dedicated page (`/employer/jobs/new`) with:
 - **Description** — free-text role details
 
 **Job lifecycle:** `Draft → Active → Closed` (reopenable). Only **Active** jobs are
-visible to candidates or eligible for Auto-Apply, so drafts stay private.
+visible to candidates or eligible for Auto-Apply, so drafts stay private. A
+posting can be **edited** in place (editing never restarts the pricing meter)
+or used as the starting point for a new one (**Post similar**).
 
-Candidates can filter the job list by **work mode** and **employment type**.
+Candidates apply from any job view and can **withdraw** an application from
+their dashboard while it's still in play.
 
 ### On-demand posting cost
 
