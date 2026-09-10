@@ -70,34 +70,54 @@ def test_refuses_an_email_that_already_exists(db_at, monkeypatch):
         conn.close()
 
 
-def test_refuses_when_the_two_passwords_differ(db_at, monkeypatch):
-    """A typo must not become an account nobody can sign in to."""
-    import manage
-
-    _answer(monkeypatch, "correct-horse-battery", "correct-horse-bettery")
-
-    assert manage.main(["manage.py", "create-admin", "boss@example.com"]) == 1
-
-    conn = db_at._connect()
+def _count(dbmod):
+    conn = dbmod._connect()
     try:
-        assert conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0
+        return conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"]
     finally:
         conn.close()
+
+
+def test_a_mismatched_repeat_asks_again_rather_than_giving_up(db_at, monkeypatch):
+    """Typing blind invites typos, and the email was already entered.
+
+    Aborting the whole run over one mistyped character means re-entering
+    everything, which is where someone gives up on their own product.
+    """
+    import manage
+
+    _answer(
+        monkeypatch,
+        "correct-horse-battery", "correct-horse-bettery",   # typo: try again
+        "correct-horse-battery", "correct-horse-battery",   # right this time
+    )
+
+    assert manage.main(["manage.py", "create-admin", "boss@example.com"]) == 0
+    assert _count(db_at) == 1
+
+
+def test_gives_up_after_the_attempt_limit(db_at, monkeypatch):
+    """A typo must never become an account nobody can sign in to."""
+    import manage
+
+    _answer(monkeypatch, *(["correct-horse-battery", "wrong-every-time"] * 3))
+
+    assert manage.main(["manage.py", "create-admin", "boss@example.com"]) == 1
+    assert _count(db_at) == 0
 
 
 def test_applies_the_same_password_rules_as_signup(db_at, monkeypatch):
-    """The bootstrap path must not be the weakest way in."""
+    """The bootstrap path must not be the weakest way in.
+
+    A password that fails validation is rejected before the repeat is asked
+    for, so each rejected attempt costs one prompt rather than two.
+    """
     import manage
 
-    _answer(monkeypatch, "x", "x")
+    _answer(monkeypatch, "x", "x", "x")
 
     assert manage.main(["manage.py", "create-admin", "boss@example.com"]) == 1
-
-    conn = db_at._connect()
-    try:
-        assert conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0
-    finally:
-        conn.close()
+    assert _count(db_at) == 0
 
 
 def test_rejects_something_that_is_not_an_address(db_at, monkeypatch):

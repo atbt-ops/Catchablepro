@@ -17,6 +17,9 @@ import sqlite3
 from pathlib import Path
 
 from app import audit, auth
+
+#: A password typed blind invites typos; give a few goes before giving up.
+PASSWORD_ATTEMPTS = 3
 from app.db import DB_PATH, _connect, init_db
 
 
@@ -115,14 +118,24 @@ def _create_admin(email: str) -> int:
             return 1
 
         # getpass, so the password is not echoed and does not reach the shell
-        # history the way a command-line argument would.
-        password = getpass.getpass("Password: ")
-        if password != getpass.getpass("Repeat password: "):
-            print("Passwords did not match.")
-            return 1
-        problem = auth.validate_password(password)
-        if problem:
-            print(problem)
+        # history the way a command-line argument would. Typing blind means
+        # typos, so a mismatch asks again rather than throwing the whole run
+        # away and making someone re-enter the email too.
+        password = ""
+        for _ in range(PASSWORD_ATTEMPTS):
+            password = getpass.getpass("Password: ")
+            problem = auth.validate_password(password)
+            if problem:
+                print(f"  {problem}")
+                password = ""
+                continue
+            if password != getpass.getpass("Repeat password: "):
+                print("  The two entries did not match. Try again.")
+                password = ""
+                continue
+            break
+        if not password:
+            print(f"No account created after {PASSWORD_ATTEMPTS} attempts.")
             return 1
 
         conn.execute(
