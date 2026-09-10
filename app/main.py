@@ -265,6 +265,10 @@ STAGE_LABELS = {
 
 EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship", "Freelance"]
 WORK_MODES = ["On-site", "Hybrid", "Remote"]
+INDIA_LOCATIONS = [
+    "Bengaluru", "Chennai", "Hyderabad", "Pune", "Mumbai", "Delhi NCR",
+    "Gurugram", "Noida", "Kolkata", "Ahmedabad", "Jaipur", "Remote",
+]
 EDUCATION_LEVELS = ["Any", "Diploma", "Graduate", "Post Graduate", "Doctorate"]
 DEPARTMENTS = [
     "Engineering", "Data Science", "Product", "Design", "Sales", "Marketing",
@@ -294,6 +298,28 @@ def fmt_exp(job) -> str:
     return f"{lo}–{hi} yrs"
 
 
+def posted_ago(value: str) -> str:
+    """'Just posted', 'Posted 3d ago', 'Posted 30+ days ago' from a UTC timestamp."""
+    if not value:
+        return ""
+    try:
+        when = datetime.fromisoformat(str(value)).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return ""
+    secs = (datetime.now(timezone.utc) - when).total_seconds()
+    if secs < 3600:
+        return "Just posted"
+    if secs < 86400:
+        hrs = int(secs // 3600)
+        return f"Posted {hrs}h ago"
+    days = int(secs // 86400)
+    if days == 1:
+        return "Posted 1 day ago"
+    if days <= 30:
+        return f"Posted {days} days ago"
+    return "Posted 30+ days ago"
+
+
 def description_html(value: str) -> Markup:
     """Render a job description safely.
 
@@ -309,10 +335,14 @@ def description_html(value: str) -> Markup:
 
 templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
+templates.env.globals["posted_ago"] = posted_ago
 templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
 templates.env.globals["pipeline_stages"] = PIPELINE_STAGES
+#: The header job-search bar renders on every page, so its location list has to
+#: be reachable without every route passing it in.
+templates.env.globals["india_locations"] = INDIA_LOCATIONS
 
 
 def page_url(request: Request, page: int, param: str = "page") -> str:
@@ -322,7 +352,20 @@ def page_url(request: Request, page: int, param: str = "page") -> str:
     return f"{request.url.path}?{urlencode(params)}"
 
 
+def with_query(request: Request, **overrides: object) -> str:
+    """Current URL with the given params set (or dropped when the value is falsy)."""
+    params = dict(request.query_params)
+    for key, value in overrides.items():
+        if value in (None, "", False):
+            params.pop(key, None)
+        else:
+            params[key] = str(value)
+    query = urlencode(params)
+    return f"{request.url.path}?{query}" if query else request.url.path
+
+
 templates.env.globals["page_url"] = page_url
+templates.env.globals["with_query"] = with_query
 
 
 @asynccontextmanager
@@ -1642,11 +1685,138 @@ def logout(request: Request, _csrf: None = Depends(verify_csrf)):
 # --------------------------------------------------------------------------- #
 # Candidate
 # --------------------------------------------------------------------------- #
+def _search_active_jobs(
+    db: sqlite3.Connection,
+    *,
+    q: str = "",
+    location: str = "",
+    work_mode: str = "",
+    employment_type: str = "",
+    department: str = "",
+) -> list:
+    """Live postings from non-suspended employers, filtered, newest first.
+
+    Shared by the candidate dashboard (which then scores each row against the
+    signed-in profile) and the public /jobs page (which does not).
+    """
+    sql = (
+        "SELECT j.*, u.company_name FROM jobs j "
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE j.status = 'active' AND u.is_suspended = 0"
+    )
+    params: list = []
+    if q:
+        term = f"%{q}%"
+        sql += (
+            " AND (j.title LIKE ? COLLATE NOCASE OR j.description LIKE ? COLLATE NOCASE "
+            "OR j.required_skills LIKE ? COLLATE NOCASE OR j.location LIKE ? COLLATE NOCASE "
+            "OR u.company_name LIKE ? COLLATE NOCASE)"
+        )
+        params.extend([term] * 5)
+    if location:
+        sql += " AND j.location LIKE ? COLLATE NOCASE"
+        params.append(f"%{location}%")
+    if work_mode:
+        sql += " AND j.work_mode = ?"
+        params.append(work_mode)
+    if employment_type:
+        sql += " AND j.employment_type = ?"
+        params.append(employment_type)
+    if department:
+        sql += " AND j.department = ?"
+        params.append(department)
+    sql += " ORDER BY j.created_at DESC, j.id DESC"
+    return db.execute(sql, params).fetchall()
+
+
+def _sort_by_salary(job_rows: list) -> None:
+    """Order rows (each carrying a ``job``) by the top of the salary band."""
+    job_rows.sort(
+        key=lambda r: (r["job"]["salary_max"] or r["job"]["salary_min"] or 0),
+        reverse=True,
+    )
+
+
+@app.get("/jobs", response_class=HTMLResponse)
+def public_jobs(
+    request: Request,
+    q: str = "",
+    location: str = "",
+    work_mode: str = "",
+    employment_type: str = "",
+    department: str = "",
+    sort: str = "new",
+    page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Public job search — no login. Candidates are sent to their ranked view."""
+    user = auth.current_user(request, db)
+    q, location = q.strip(), location.strip()
+    if user and user["role"] == "candidate":
+        qs = urlencode(
+            {k: v for k, v in request.query_params.items() if v}, doseq=True
+        )
+        return RedirectResponse(f"/candidate{'?' + qs if qs else ''}", status_code=303)
+
+    sweep_expired_jobs(db)
+    jobs = _search_active_jobs(
+        db,
+        q=q,
+        location=location,
+        work_mode=work_mode,
+        employment_type=employment_type,
+        department=department,
+    )
+    sort = sort if sort in ("new", "salary") else "new"
+    job_rows = [
+        {
+            "job": job,
+            "skills": [
+                s.strip()
+                for s in (job["required_skills"] or "").replace("\n", ",").split(",")
+                if s.strip()
+            ][:10],
+        }
+        for job in jobs
+    ]
+    if sort == "salary":
+        _sort_by_salary(job_rows)
+    jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
+    job_rows = jobs_page.slice(job_rows)
+
+    return templates.TemplateResponse(
+        request,
+        "jobs.html",
+        {
+            "request": request,
+            "user": user,
+            "job_rows": job_rows,
+            "jobs_page": jobs_page,
+            "work_modes": WORK_MODES,
+            "employment_types": EMPLOYMENT_TYPES,
+            "india_locations": INDIA_LOCATIONS,
+            "departments": DEPARTMENTS,
+            "sel_q": q,
+            "sel_location": location,
+            "sel_work_mode": work_mode,
+            "sel_employment_type": employment_type,
+            "sel_department": department,
+            "sel_sort": sort,
+            "show_match": False,
+            "results_action": "/jobs",
+        },
+    )
+
+
 @app.get("/candidate", response_class=HTMLResponse)
 def candidate_dashboard(
     request: Request,
+    q: str = "",
+    location: str = "",
     work_mode: str = "",
     employment_type: str = "",
+    department: str = "",
+    sort: str = "match",
     page: int = 1,
     apps_page: int = 1,
     db: sqlite3.Connection = Depends(get_db),
@@ -1657,21 +1827,16 @@ def candidate_dashboard(
     sweep_expired_jobs(db)  # drop postings that hit the pricing cap from search
     prof = _profile(db, user["id"])
 
-    # Only live postings are visible to candidates.
-    sql = (
-        "SELECT j.*, u.company_name FROM jobs j "
-        "JOIN users u ON u.id = j.employer_id "
-        "WHERE j.status = 'active' AND u.is_suspended = 0"
+    q = q.strip()
+    location = location.strip()
+    jobs = _search_active_jobs(
+        db,
+        q=q,
+        location=location,
+        work_mode=work_mode,
+        employment_type=employment_type,
+        department=department,
     )
-    params: list = []
-    if work_mode:
-        sql += " AND j.work_mode = ?"
-        params.append(work_mode)
-    if employment_type:
-        sql += " AND j.employment_type = ?"
-        params.append(employment_type)
-    sql += " ORDER BY j.created_at DESC, j.id DESC"
-    jobs = db.execute(sql, params).fetchall()
 
     applied_ids = {
         r["job_id"]
@@ -1695,8 +1860,13 @@ def candidate_dashboard(
             }
         )
     # Ranking depends on every job's score, so the list is ordered in memory and
-    # then sliced. This bounds what is rendered, not what is scanned.
-    job_rows.sort(key=lambda r: r["pct"], reverse=True)
+    # then sliced. This bounds what is rendered, not what is scanned. The SQL
+    # already returns newest-first, so "new" just keeps that order.
+    sort = sort if sort in ("match", "new", "salary") else "match"
+    if sort == "match":
+        job_rows.sort(key=lambda r: r["pct"], reverse=True)
+    elif sort == "salary":
+        _sort_by_salary(job_rows)
     jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
     job_rows = jobs_page.slice(job_rows)
 
@@ -1727,8 +1897,16 @@ def candidate_dashboard(
             "auto_min": AUTO_APPLY_MIN_MATCH,
             "work_modes": WORK_MODES,
             "employment_types": EMPLOYMENT_TYPES,
+            "india_locations": INDIA_LOCATIONS,
+            "departments": DEPARTMENTS,
+            "sel_q": q,
+            "sel_location": location,
             "sel_work_mode": work_mode,
             "sel_employment_type": employment_type,
+            "sel_department": department,
+            "sel_sort": sort,
+            "show_match": True,
+            "results_action": "/candidate",
         },
     )
 

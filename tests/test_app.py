@@ -190,6 +190,25 @@ def test_candidate_can_filter_by_work_mode(client, register, post, post_job):
     assert "Onsite Role" not in filtered
 
 
+def test_candidate_can_search_and_filter_by_indian_location(
+    client, register, post, post_job
+):
+    register("search-emp@x.io", "employer", company_name="Bharat Tech")
+    post_job(title="Python Platform", location="Bengaluru, Karnataka")
+    post_job(title="Java Platform", location="Pune, Maharashtra", required_skills="java")
+    post("/logout")
+    register("search-cand@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+
+    searched = client.get("/candidate?q=python").text
+    assert "Python Platform" in searched
+    assert "Java Platform" not in searched
+
+    located = client.get("/candidate?location=Bengaluru").text
+    assert "Python Platform" in located
+    assert "Java Platform" not in located
+
+
 def test_auto_apply_backfills_and_covers_new_jobs(client, register, post, post_job):
     # Employer posts one job.
     register("e2@x.io", "employer", company_name="E2")
@@ -275,8 +294,8 @@ def test_description_formatting_is_kept_but_scripts_are_stripped(
 
     page = client.get("/candidate").text
     # Inspect only the rendered description block, not the whole page (the
-    # layout has its own legitimate <script> for the theme toggle).
-    block = re.search(r'<div class="row-desc jobdesc">(.*?)</div>', page, re.S)
+    # layout loads its own legitimate <script> for form helpers).
+    block = re.search(r'<div class="jcard-desc jobdesc">(.*?)</div>', page, re.S)
     assert block, "job description block not rendered"
     desc = block.group(1)
 

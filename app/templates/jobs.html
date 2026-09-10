@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}{% if sel_q %}{{ sel_q }} jobs{% else %}Jobs{% endif %} · Catchablepro{% endblock %}
+
+{% block content %}
+<section class="panel marketplace-panel">
+  <div class="marketplace-intro">
+    <div>
+      <span class="eyebrow">{{ icon('briefcase', 14) }} {{ jobs_page.total }} live openings</span>
+      <h2>
+        {% if sel_q %}"{{ sel_q }}" jobs{% else %}Jobs across India{% endif %}
+        {% if sel_location %} in {{ sel_location }}{% endif %}
+      </h2>
+      <p class="hint">
+        Filter by department, location and work mode.
+        {% if not user %}<a href="/register">Create a free profile</a> to see your skill-match score and apply.{% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% include "_job_results.html" %}
+</section>
+{% endblock %}
