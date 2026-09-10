@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, match_ring, job_mini %}
+{% block title %}
+  {% if job %}{{ job.title }} at {{ job.company_name }}{% else %}Job not found{% endif %} · Catchablepro
+{% endblock %}
+
+{% block content %}
+{% if not job %}
+  <div class="empty" style="margin-top:40px">
+    <span class="eico">{{ icon('briefcase', 24) }}</span>
+    <p>This job is no longer available.</p>
+    <a class="btn small" href="/jobs">Browse all jobs</a>
+  </div>
+{% else %}
+<a class="backlink" href="{{ '/candidate' if show_match else '/jobs' }}">
+  {{ icon('arrow-right', 14) }} {{ 'Back to your matches' if show_match else 'Back to all jobs' }}
+</a>
+
+<div class="jd-layout">
+  <div class="jd-main">
+    <article class="panel jd-head">
+      <div class="jd-headrow">
+        <div class="jcard-logo jd-logo" aria-hidden="true">{{ job.company_name[0] | upper }}</div>
+        <div style="min-width:0">
+          <h1 class="jd-title">{{ job.title }}</h1>
+          <p class="jd-company">
+            {{ icon('building', 14) }} {{ job.company_name }}
+            {% if job.location %}<span class="dot"></span>{{ icon('pin', 13) }} {{ job.location }}{% endif %}
+          </p>
+        </div>
+        {% if show_match %}<div class="jd-ring">{{ match_ring(pct) }}</div>{% endif %}
+      </div>
+
+      <div class="jd-meta">
+        <span class="meta">{{ icon('clock', 14) }} {{ fmt_exp(job) }}</span>
+        <span class="meta">{{ icon('rupee', 14) }} {{ fmt_salary(job) }}</span>
+        <span class="meta">{{ icon('pin', 14) }} {{ job.work_mode }}</span>
+        <span class="meta">{{ job.employment_type }}</span>
+        {% if job.department %}<span class="meta">{{ job.department }}</span>{% endif %}
+        {% if job.vacancies > 1 %}<span class="meta">{{ job.vacancies }} openings</span>{% endif %}
+        {% if job.education and job.education != 'Any' %}<span class="meta">{{ job.education }}</span>{% endif %}
+      </div>
+
+      <div class="jd-actions">
+        {% if show_match %}
+          {% if applied %}
+            <span class="applied-pill">{{ icon('check', 16) }} Applied</span>
+          {% else %}
+            <form method="post" action="/candidate/apply/{{ job.id }}">
+              {{ csrf_field(request) }}
+              <input type="hidden" name="next" value="/jobs/{{ job.id }}">
+              <button class="btn" type="submit">{{ icon('check', 16) }} Apply now</button>
+            </form>
+          {% endif %}
+          <form method="post" action="/candidate/save/{{ job.id }}">
+            {{ csrf_field(request) }}
+            <input type="hidden" name="next" value="/jobs/{{ job.id }}">
+            <button class="btn ghost {{ 'is-saved' if saved }}" type="submit">
+              {{ icon('bookmark', 16) }} {{ 'Saved' if saved else 'Save' }}
+            </button>
+          </form>
+        {% elif user %}
+          <a class="btn" href="/candidate">{{ icon('user', 16) }} Go to your dashboard to apply</a>
+        {% else %}
+          <a class="btn" href="/register">{{ icon('user', 16) }} Sign up to apply</a>
+          <a class="btn ghost" href="/login">Log in</a>
+        {% endif %}
+        <span class="jd-posted">{{ icon('clock', 13) }} {{ posted_ago(job.created_at) }}</span>
+      </div>
+    </article>
+
+    {% if job.description %}
+    <section class="panel">
+      <h2>{{ icon('doc', 18) }} Job description</h2>
+      <div class="jobdesc jd-desc">{{ description_html(job.description) }}</div>
+    </section>
+    {% endif %}
+
+    {% if skills %}
+    <section class="panel">
+      <h2>{{ icon('bolt', 18) }} Skills</h2>
+      {% if show_match %}
+        <p class="hint">Green skills are on your profile.</p>
+        <div class="chips">
+          {% for s in matched %}<span class="chip on">{{ s }}</span>{% endfor %}
+          {% for p in partial %}<span class="chip part">{{ p.skill }} <em>≈ {{ p.via }}</em></span>{% endfor %}
+          {% for s in missing %}<span class="chip">{{ s }}</span>{% endfor %}
+        </div>
+      {% else %}
+        <div class="chips">
+          {% for s in skills %}<span class="chip">{{ s }}</span>{% endfor %}
+        </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>{{ icon('building', 18) }} About {{ job.company_name }}</h2>
+      {% if company and company.about %}
+        <p class="jd-about">{{ company.about }}</p>
+      {% else %}
+        <p class="hint">This employer hasn't added a company description yet.</p>
+      {% endif %}
+      {% if company %}
+      <div class="jd-companymeta">
+        {% if company.industry %}<span class="meta">{{ icon('briefcase', 13) }} {{ company.industry }}</span>{% endif %}
+        {% if company.size %}<span class="meta">{{ icon('user', 13) }} {{ company.size }}</span>{% endif %}
+        {% if company.hq_location %}<span class="meta">{{ icon('pin', 13) }} {{ company.hq_location }}</span>{% endif %}
+        {% if company.website %}
+          <a class="meta" href="{{ company.website }}" target="_blank" rel="noopener nofollow">
+            {{ icon('arrow-right', 13) }} Website
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="jd-side">
+    {% if show_match %}
+    <div class="railcard">
+      <h4>{{ icon('sparkle', 13) }} Your match</h4>
+      <div class="jd-sidering">{{ match_ring(pct, 84) }}</div>
+      <p class="tip">
+        {{ matched | length }} of {{ (matched | length) + (missing | length) }} required
+        skills are on your profile.
+      </p>
+    </div>
+    {% endif %}
+
+    {% if more_jobs %}
+    <div class="railcard">
+      <h4>{{ icon('briefcase', 13) }} More jobs like this</h4>
+      <div class="jmini-list">
+        {% for j in more_jobs %}{{ job_mini(j) }}{% endfor %}
+      </div>
+      <a class="btn ghost block small" href="/jobs?department={{ job.department | urlencode }}">See all</a>
+    </div>
+    {% endif %}
+  </aside>
+</div>
+{% endif %}
+{% endblock %}

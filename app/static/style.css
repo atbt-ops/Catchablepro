@@ -929,11 +929,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 .jcard-body { min-width: 0; }
 .jcard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.jcard-title { margin: 0; font-size: 16.5px; color: var(--text); }
-.jcard:hover .jcard-title { color: var(--brand); }
+.jcard-title { margin: 0; font-size: 16.5px; color: var(--text); min-width: 0; }
+.jcard-title a { color: inherit; }
+.jcard-title a:hover { color: var(--brand); text-decoration: none; }
+.jcard-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.savebtn-form { margin: 0; }
+.savebtn {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); cursor: pointer; box-shadow: none;
+  transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
+}
+.savebtn:hover { color: var(--brand); border-color: var(--brand); transform: none; filter: none; }
+.savebtn.on { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 40%, var(--border)); background: color-mix(in srgb, var(--brand) 12%, transparent); }
+.savebtn.on .ico { fill: currentColor; }
+.btn.ghost.is-saved { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 40%, var(--border)); background: color-mix(in srgb, var(--brand) 10%, transparent); }
+.btn.ghost.is-saved .ico { fill: currentColor; }
 .jcard-match {
   flex: none; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
-  background: var(--chip-bg); color: var(--muted);
+  background: var(--chip-bg); color: var(--muted); white-space: nowrap;
 }
 .jcard-match.ring-tier-high { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
 .jcard-match.ring-tier-mid  { background: color-mix(in srgb, var(--brand) 15%, transparent); color: var(--brand); }
@@ -969,6 +983,61 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .marketplace-panel { padding: 18px; }
   .jcard { grid-template-columns: 1fr; }
   .jcard-logo { display: none; }
+  .jcard-head { flex-wrap: wrap; }
+}
+
+/* ---------- compact job card (rails, "more jobs") ---------- */
+.jmini-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.jmini-list { display: flex; flex-direction: column; gap: 8px; }
+.jmini {
+  display: flex; gap: 11px; padding: 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.jmini:hover { border-color: color-mix(in srgb, var(--brand) 40%, var(--border)); background: var(--surface); text-decoration: none; }
+.jmini-logo {
+  flex: none; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+  font-weight: 800; font-size: 14px; color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--violet));
+}
+.jmini-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.jmini-title { font-size: 13.5px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jmini-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jmini-meta { font-size: 11.5px; color: var(--text-soft); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.jmini-pct { color: var(--brand); font-weight: 700; }
+
+/* ---------- job detail page ---------- */
+.jd-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; align-items: start; }
+.jd-side { position: sticky; top: 90px; display: flex; flex-direction: column; }
+.jd-head { padding: 24px; }
+.jd-headrow { display: flex; gap: 16px; align-items: flex-start; }
+.jd-logo { width: 56px; height: 56px; border-radius: 14px; font-size: 22px; flex: none; }
+.jd-title { margin: 0; font-size: 24px; }
+.jd-company { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 6px 0 0; color: var(--text-soft); font-size: 14px; }
+.jd-company .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); margin: 0 3px; }
+.jd-ring { margin-left: auto; flex: none; }
+.jd-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 18px 0 0; }
+.jd-actions {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border-soft);
+}
+.jd-actions form { margin: 0; }
+.jd-posted { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-left: auto; }
+.jd-desc { color: var(--text-soft); font-size: 14.5px; line-height: 1.7; }
+.jd-about { color: var(--text-soft); font-size: 14px; line-height: 1.65; margin: 0 0 12px; }
+.jd-companymeta { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.jd-sidering { display: grid; place-items: center; margin: 4px 0 10px; }
+
+@media (max-width: 900px) {
+  .jd-layout { grid-template-columns: 1fr; }
+  .jd-side { position: static; flex-direction: row; flex-wrap: wrap; }
+  .jd-side .railcard { flex: 1 1 260px; }
+  .jd-ring { display: none; }
+}
+@media (max-width: 560px) {
+  .jd-head { padding: 18px; }
+  .jd-title { font-size: 20px; }
+  .jd-posted { margin-left: 0; width: 100%; }
 }
 
 /* ---------- job meta chips ---------- */

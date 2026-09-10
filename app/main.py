@@ -277,6 +277,18 @@ DEPARTMENTS = [
     "Human Resources", "Finance", "Operations", "Customer Support", "Other",
 ]
 
+# Job-search facets with fixed buckets (the labels double as the query values).
+EXPERIENCE_BUCKETS = ["0-1 yrs", "1-3 yrs", "3-6 yrs", "6-10 yrs", "10+ yrs"]
+SALARY_BUCKETS = ["0-3 LPA", "3-6 LPA", "6-10 LPA", "10-15 LPA", "15+ LPA"]
+DATE_POSTED = ["Last 24 hours", "Last 3 days", "Last 7 days"]
+_POSTED_DAYS = {"Last 24 hours": 1, "Last 3 days": 3, "Last 7 days": 7}
+
+
+def _bucket_low(label: str) -> float:
+    """Leading number of a '3-6 yrs' / '10+ LPA' style bucket label."""
+    m = re.match(r"\s*(\d+(?:\.\d+)?)", label)
+    return float(m.group(1)) if m else 0.0
+
 
 def fmt_salary(job) -> str:
     """'₹8–12 LPA', '₹8 LPA', or 'Not disclosed'."""
@@ -1717,6 +1729,9 @@ def _search_active_jobs(
     work_mode: str = "",
     employment_type: str = "",
     department: str = "",
+    experience: str = "",
+    salary: str = "",
+    posted: str = "",
 ) -> list:
     """Live postings from non-suspended employers, filtered, newest first.
 
@@ -1749,6 +1764,25 @@ def _search_active_jobs(
     if department:
         sql += " AND j.department = ?"
         params.append(department)
+    if experience in EXPERIENCE_BUCKETS:
+        # Overlap test: the candidate's band [lo, hi] against the job's
+        # [exp_min, exp_max] (exp_max = 0 means "no upper bound").
+        lo = _bucket_low(experience)
+        hi = 100.0 if experience.endswith("+ yrs") else float(
+            experience.split("-")[1].split()[0]
+        )
+        sql += " AND j.exp_min <= ? AND (j.exp_max >= ? OR j.exp_max = 0)"
+        params.extend([hi, lo])
+    if salary in SALARY_BUCKETS and _bucket_low(salary) > 0:
+        floor = _bucket_low(salary)
+        sql += (
+            " AND j.hide_salary = 0 AND "
+            "(j.salary_max >= ? OR (j.salary_max = 0 AND j.salary_min >= ?))"
+        )
+        params.extend([floor, floor])
+    if posted in _POSTED_DAYS:
+        sql += " AND j.created_at >= datetime('now', ?)"
+        params.append(f"-{_POSTED_DAYS[posted]} days")
     sql += " ORDER BY j.created_at DESC, j.id DESC"
     return db.execute(sql, params).fetchall()
 
@@ -1761,6 +1795,51 @@ def _sort_by_salary(job_rows: list) -> None:
     )
 
 
+def _skill_list(raw: str, limit: int = 12) -> list:
+    """Split a stored skills string into a trimmed, bounded display list."""
+    return [
+        s.strip() for s in (raw or "").replace("\n", ",").split(",") if s.strip()
+    ][:limit]
+
+
+def _search_context(sel: dict) -> dict:
+    """Filter option lists + current selections for the job-search templates."""
+    return {
+        "work_modes": WORK_MODES,
+        "employment_types": EMPLOYMENT_TYPES,
+        "india_locations": INDIA_LOCATIONS,
+        "departments": DEPARTMENTS,
+        "experience_buckets": EXPERIENCE_BUCKETS,
+        "salary_buckets": SALARY_BUCKETS,
+        "date_posted": DATE_POSTED,
+        "sel_q": sel.get("q", ""),
+        "sel_location": sel.get("location", ""),
+        "sel_work_mode": sel.get("work_mode", ""),
+        "sel_employment_type": sel.get("employment_type", ""),
+        "sel_department": sel.get("department", ""),
+        "sel_experience": sel.get("experience", ""),
+        "sel_salary": sel.get("salary", ""),
+        "sel_posted": sel.get("posted", ""),
+        "sel_sort": sel.get("sort", ""),
+    }
+
+
+def _saved_job_ids(db: sqlite3.Connection, candidate_id: int) -> set:
+    return {
+        r["job_id"]
+        for r in db.execute(
+            "SELECT job_id FROM saved_jobs WHERE candidate_id = ?", (candidate_id,)
+        ).fetchall()
+    }
+
+
+def _safe_next(target: str, fallback: str) -> str:
+    """Only follow a same-site relative path; never an absolute or scheme URL."""
+    if target and target.startswith("/") and not target.startswith("//"):
+        return target
+    return fallback
+
+
 @app.get("/jobs", response_class=HTMLResponse)
 def public_jobs(
     request: Request,
@@ -1769,6 +1848,9 @@ def public_jobs(
     work_mode: str = "",
     employment_type: str = "",
     department: str = "",
+    experience: str = "",
+    salary: str = "",
+    posted: str = "",
     sort: str = "new",
     page: int = 1,
     db: sqlite3.Connection = Depends(get_db),
@@ -1790,46 +1872,104 @@ def public_jobs(
         work_mode=work_mode,
         employment_type=employment_type,
         department=department,
+        experience=experience,
+        salary=salary,
+        posted=posted,
     )
     sort = sort if sort in ("new", "salary") else "new"
-    job_rows = [
-        {
-            "job": job,
-            "skills": [
-                s.strip()
-                for s in (job["required_skills"] or "").replace("\n", ",").split(",")
-                if s.strip()
-            ][:10],
-        }
-        for job in jobs
-    ]
+    job_rows = [{"job": job, "skills": _skill_list(job["required_skills"])} for job in jobs]
     if sort == "salary":
         _sort_by_salary(job_rows)
     jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
     job_rows = jobs_page.slice(job_rows)
 
-    return templates.TemplateResponse(
-        request,
-        "jobs.html",
-        {
-            "request": request,
-            "user": user,
-            "job_rows": job_rows,
-            "jobs_page": jobs_page,
-            "work_modes": WORK_MODES,
-            "employment_types": EMPLOYMENT_TYPES,
-            "india_locations": INDIA_LOCATIONS,
-            "departments": DEPARTMENTS,
-            "sel_q": q,
-            "sel_location": location,
-            "sel_work_mode": work_mode,
-            "sel_employment_type": employment_type,
-            "sel_department": department,
-            "sel_sort": sort,
-            "show_match": False,
-            "results_action": "/jobs",
-        },
+    ctx = {
+        "request": request,
+        "user": user,
+        "job_rows": job_rows,
+        "jobs_page": jobs_page,
+        "show_match": False,
+        "results_action": "/jobs",
+        "saved_ids": set(),
+    }
+    ctx.update(
+        _search_context(
+            dict(
+                q=q, location=location, work_mode=work_mode,
+                employment_type=employment_type, department=department,
+                experience=experience, salary=salary, posted=posted, sort=sort,
+            )
+        )
     )
+    return templates.TemplateResponse(request, "jobs.html", ctx)
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+def job_detail(
+    request: Request, job_id: int, db: sqlite3.Connection = Depends(get_db)
+):
+    """One posting in full. Public; a signed-in candidate also sees match + save."""
+    user = auth.current_user(request, db)
+    job = db.execute(
+        "SELECT j.*, u.company_name FROM jobs j "
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE j.id = ? AND j.status = 'active' AND u.is_suspended = 0",
+        (job_id,),
+    ).fetchone()
+    if job is None:
+        return templates.TemplateResponse(
+            request,
+            "job_detail.html",
+            {"request": request, "user": user, "job": None},
+            status_code=404,
+        )
+
+    company = db.execute(
+        "SELECT * FROM company_profiles WHERE user_id = ?", (job["employer_id"],)
+    ).fetchone()
+    more_jobs = db.execute(
+        "SELECT j.*, u.company_name FROM jobs j "
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE j.status = 'active' AND u.is_suspended = 0 AND j.id != ? "
+        "AND (j.department = ? OR j.employer_id = ?) "
+        "ORDER BY j.created_at DESC, j.id DESC LIMIT 4",
+        (job_id, job["department"], job["employer_id"]),
+    ).fetchall()
+
+    ctx = {
+        "request": request,
+        "user": user,
+        "job": job,
+        "company": company,
+        "skills": _skill_list(job["required_skills"], limit=40),
+        "more_jobs": more_jobs,
+        "show_match": False,
+        "applied": False,
+        "saved": False,
+    }
+    if user and user["role"] == "candidate":
+        prof = _profile(db, user["id"])
+        pct, matched, partial, missing = match_detail(
+            prof["skills"], job["required_skills"]
+        )
+        ctx.update(
+            show_match=True,
+            pct=pct,
+            matched=matched,
+            partial=partial,
+            missing=missing,
+            applied=db.execute(
+                "SELECT 1 FROM applications WHERE candidate_id = ? AND job_id = ?",
+                (user["id"], job_id),
+            ).fetchone()
+            is not None,
+            saved=db.execute(
+                "SELECT 1 FROM saved_jobs WHERE candidate_id = ? AND job_id = ?",
+                (user["id"], job_id),
+            ).fetchone()
+            is not None,
+        )
+    return templates.TemplateResponse(request, "job_detail.html", ctx)
 
 
 @app.get("/candidate", response_class=HTMLResponse)
@@ -1840,6 +1980,9 @@ def candidate_dashboard(
     work_mode: str = "",
     employment_type: str = "",
     department: str = "",
+    experience: str = "",
+    salary: str = "",
+    posted: str = "",
     sort: str = "match",
     page: int = 1,
     apps_page: int = 1,
@@ -1860,6 +2003,9 @@ def candidate_dashboard(
         work_mode=work_mode,
         employment_type=employment_type,
         department=department,
+        experience=experience,
+        salary=salary,
+        posted=posted,
     )
 
     applied_ids = {
@@ -1868,6 +2014,7 @@ def candidate_dashboard(
             "SELECT job_id FROM applications WHERE candidate_id = ?", (user["id"],)
         ).fetchall()
     }
+    saved_ids = _saved_job_ids(db, user["id"])
     job_rows = []
     for job in jobs:
         pct, matched, partial, missing = match_detail(
@@ -1894,6 +2041,24 @@ def candidate_dashboard(
     jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
     job_rows = jobs_page.slice(job_rows)
 
+    # Saved jobs — a small ranked strip, independent of the search filters.
+    saved_jobs = db.execute(
+        "SELECT j.*, u.company_name FROM saved_jobs s "
+        "JOIN jobs j ON j.id = s.job_id "
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE s.candidate_id = ? AND j.status = 'active' AND u.is_suspended = 0 "
+        "ORDER BY s.created_at DESC LIMIT 6",
+        (user["id"],),
+    ).fetchall()
+    saved_rows = [
+        {
+            "job": j,
+            "pct": match_pct(prof["skills"], j["required_skills"]),
+            "applied": j["id"] in applied_ids,
+        }
+        for j in saved_jobs
+    ]
+
     # Applications paginate in SQL — no ranking involved.
     apps_total = db.execute(
         "SELECT COUNT(*) AS n FROM applications WHERE candidate_id = ?", (user["id"],)
@@ -1907,32 +2072,59 @@ def candidate_dashboard(
         (user["id"], apps_pg.per_page, apps_pg.offset),
     ).fetchall()
 
-    return templates.TemplateResponse(
-        request,
-        "candidate.html",
-        {
-            "request": request,
-            "user": user,
-            "profile": prof,
-            "job_rows": job_rows,
-            "my_apps": my_apps,
-            "jobs_page": jobs_page,
-            "apps_page": apps_pg,
-            "auto_min": AUTO_APPLY_MIN_MATCH,
-            "work_modes": WORK_MODES,
-            "employment_types": EMPLOYMENT_TYPES,
-            "india_locations": INDIA_LOCATIONS,
-            "departments": DEPARTMENTS,
-            "sel_q": q,
-            "sel_location": location,
-            "sel_work_mode": work_mode,
-            "sel_employment_type": employment_type,
-            "sel_department": department,
-            "sel_sort": sort,
-            "show_match": True,
-            "results_action": "/candidate",
-        },
+    ctx = {
+        "request": request,
+        "user": user,
+        "profile": prof,
+        "job_rows": job_rows,
+        "saved_rows": saved_rows,
+        "saved_ids": saved_ids,
+        "my_apps": my_apps,
+        "jobs_page": jobs_page,
+        "apps_page": apps_pg,
+        "auto_min": AUTO_APPLY_MIN_MATCH,
+        "show_match": True,
+        "results_action": "/candidate",
+    }
+    ctx.update(
+        _search_context(
+            dict(
+                q=q, location=location, work_mode=work_mode,
+                employment_type=employment_type, department=department,
+                experience=experience, salary=salary, posted=posted, sort=sort,
+            )
+        )
     )
+    return templates.TemplateResponse(request, "candidate.html", ctx)
+
+
+@app.post("/candidate/save/{job_id}")
+def candidate_toggle_save(
+    request: Request,
+    job_id: int,
+    next: str = Form("/candidate"),
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    already = db.execute(
+        "SELECT 1 FROM saved_jobs WHERE candidate_id = ? AND job_id = ?",
+        (user["id"], job_id),
+    ).fetchone()
+    if already:
+        db.execute(
+            "DELETE FROM saved_jobs WHERE candidate_id = ? AND job_id = ?",
+            (user["id"], job_id),
+        )
+    elif db.execute("SELECT 1 FROM jobs WHERE id = ?", (job_id,)).fetchone():
+        db.execute(
+            "INSERT OR IGNORE INTO saved_jobs (candidate_id, job_id) VALUES (?, ?)",
+            (user["id"], job_id),
+        )
+    db.commit()
+    return RedirectResponse(_safe_next(next, "/candidate"), status_code=303)
 
 
 async def _save_resume(upload: UploadFile, user_id: int) -> tuple[str, str]:
@@ -2049,12 +2241,14 @@ def candidate_toggle_auto_apply(
 def candidate_apply(
     request: Request,
     job_id: int,
+    next: str = Form("/candidate"),
     _csrf: None = Depends(verify_csrf),
     db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "candidate")
     if redirect:
         return redirect
+    back = _safe_next(next, "/candidate")
     if not user["email_verified"]:
         return RedirectResponse("/candidate?verify_required=1", status_code=303)
     prof = _profile(db, user["id"])
@@ -2068,7 +2262,7 @@ def candidate_apply(
             (job_id, user["id"], pct),
         )
         db.commit()
-    return RedirectResponse("/candidate", status_code=303)
+    return RedirectResponse(back, status_code=303)
 
 
 @app.get("/resume/{candidate_id}")
