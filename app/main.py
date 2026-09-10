@@ -7,6 +7,7 @@ Server-rendered (Jinja) with an in-process SQLite database. Two roles:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -15,6 +16,7 @@ import sqlite3
 import threading
 import time
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
@@ -333,6 +335,27 @@ def description_html(value: str) -> Markup:
     return Markup(escape(value).replace("\n", "<br>"))
 
 
+@lru_cache(maxsize=32)
+def _asset_fingerprint(name: str) -> str:
+    """Short content hash for a /static file, or '' if it cannot be read.
+
+    Appended to the asset URL so a deploy that changes style.css or forms.js
+    also changes their URL — the browser (and Cloudflare) fetch the new file
+    instead of serving a cached copy for up to the edge TTL.
+    """
+    try:
+        data = (BASE_DIR / "static" / name).read_bytes()
+    except OSError:
+        return ""
+    return hashlib.md5(data).hexdigest()[:10]
+
+
+def static_url(name: str) -> str:
+    """URL for a /static asset, fingerprinted so caches refresh on change."""
+    fp = _asset_fingerprint(name)
+    return f"/static/{name}?v={fp}" if fp else f"/static/{name}"
+
+
 templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["posted_ago"] = posted_ago
@@ -340,6 +363,7 @@ templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
 templates.env.globals["pipeline_stages"] = PIPELINE_STAGES
+templates.env.globals["static_url"] = static_url
 #: The header job-search bar renders on every page, so its location list has to
 #: be reachable without every route passing it in.
 templates.env.globals["india_locations"] = INDIA_LOCATIONS
