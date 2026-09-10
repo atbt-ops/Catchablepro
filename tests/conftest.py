@@ -8,6 +8,21 @@ from fastapi.testclient import TestClient
 _CSRF_RE = re.compile(r'name="csrf_token" value="([^"]+)"')
 
 
+def reload_app():
+    """Reload the shared web layer then the app.
+
+    Import-time config guards and module state (patched paths, TRUSTED_HOSTS,
+    the sweep throttle) live in ``app.web`` now, so it has to be reloaded before
+    ``app.main`` for env/path monkeypatches to take effect.
+    """
+    from app import web as webmod
+    from app import main as mainmod
+
+    importlib.reload(webmod)
+    importlib.reload(mainmod)
+    return mainmod
+
+
 def csrf_token(client) -> str:
     """Fetch the current session's CSRF token from a rendered form."""
     html = client.get("/login").text
@@ -35,9 +50,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(dbmod, "DATA_DIR", tmp_path)
     monkeypatch.setattr(dbmod, "UPLOAD_DIR", tmp_path / "uploads")
 
-    # Reload main so its module-level UPLOAD_DIR import picks up the patched path.
-    from app import main as mainmod
-    importlib.reload(mainmod)
+    # Reload web+main so their module-level path/config imports pick up the patch.
+    mainmod = reload_app()
 
     with TestClient(mainmod.app) as c:
         yield c
