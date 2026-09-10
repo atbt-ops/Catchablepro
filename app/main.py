@@ -265,6 +265,10 @@ STAGE_LABELS = {
 
 EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship", "Freelance"]
 WORK_MODES = ["On-site", "Hybrid", "Remote"]
+INDIA_LOCATIONS = [
+    "Bengaluru", "Chennai", "Hyderabad", "Pune", "Mumbai", "Delhi NCR",
+    "Gurugram", "Noida", "Kolkata", "Ahmedabad", "Jaipur", "Remote",
+]
 EDUCATION_LEVELS = ["Any", "Diploma", "Graduate", "Post Graduate", "Doctorate"]
 DEPARTMENTS = [
     "Engineering", "Data Science", "Product", "Design", "Sales", "Marketing",
@@ -294,6 +298,28 @@ def fmt_exp(job) -> str:
     return f"{lo}–{hi} yrs"
 
 
+def posted_ago(value: str) -> str:
+    """'Just posted', 'Posted 3d ago', 'Posted 30+ days ago' from a UTC timestamp."""
+    if not value:
+        return ""
+    try:
+        when = datetime.fromisoformat(str(value)).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return ""
+    secs = (datetime.now(timezone.utc) - when).total_seconds()
+    if secs < 3600:
+        return "Just posted"
+    if secs < 86400:
+        hrs = int(secs // 3600)
+        return f"Posted {hrs}h ago"
+    days = int(secs // 86400)
+    if days == 1:
+        return "Posted 1 day ago"
+    if days <= 30:
+        return f"Posted {days} days ago"
+    return "Posted 30+ days ago"
+
+
 def description_html(value: str) -> Markup:
     """Render a job description safely.
 
@@ -309,6 +335,7 @@ def description_html(value: str) -> Markup:
 
 templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
+templates.env.globals["posted_ago"] = posted_ago
 templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
@@ -322,7 +349,20 @@ def page_url(request: Request, page: int, param: str = "page") -> str:
     return f"{request.url.path}?{urlencode(params)}"
 
 
+def with_query(request: Request, **overrides: object) -> str:
+    """Current URL with the given params set (or dropped when the value is falsy)."""
+    params = dict(request.query_params)
+    for key, value in overrides.items():
+        if value in (None, "", False):
+            params.pop(key, None)
+        else:
+            params[key] = str(value)
+    query = urlencode(params)
+    return f"{request.url.path}?{query}" if query else request.url.path
+
+
 templates.env.globals["page_url"] = page_url
+templates.env.globals["with_query"] = with_query
 
 
 @asynccontextmanager
@@ -1645,8 +1685,12 @@ def logout(request: Request, _csrf: None = Depends(verify_csrf)):
 @app.get("/candidate", response_class=HTMLResponse)
 def candidate_dashboard(
     request: Request,
+    q: str = "",
+    location: str = "",
     work_mode: str = "",
     employment_type: str = "",
+    department: str = "",
+    sort: str = "match",
     page: int = 1,
     apps_page: int = 1,
     db: sqlite3.Connection = Depends(get_db),
@@ -1664,12 +1708,28 @@ def candidate_dashboard(
         "WHERE j.status = 'active' AND u.is_suspended = 0"
     )
     params: list = []
+    q = q.strip()
+    location = location.strip()
+    if q:
+        term = f"%{q}%"
+        sql += (
+            " AND (j.title LIKE ? COLLATE NOCASE OR j.description LIKE ? COLLATE NOCASE "
+            "OR j.required_skills LIKE ? COLLATE NOCASE OR j.location LIKE ? COLLATE NOCASE "
+            "OR u.company_name LIKE ? COLLATE NOCASE)"
+        )
+        params.extend([term] * 5)
+    if location:
+        sql += " AND j.location LIKE ? COLLATE NOCASE"
+        params.append(f"%{location}%")
     if work_mode:
         sql += " AND j.work_mode = ?"
         params.append(work_mode)
     if employment_type:
         sql += " AND j.employment_type = ?"
         params.append(employment_type)
+    if department:
+        sql += " AND j.department = ?"
+        params.append(department)
     sql += " ORDER BY j.created_at DESC, j.id DESC"
     jobs = db.execute(sql, params).fetchall()
 
@@ -1695,8 +1755,16 @@ def candidate_dashboard(
             }
         )
     # Ranking depends on every job's score, so the list is ordered in memory and
-    # then sliced. This bounds what is rendered, not what is scanned.
-    job_rows.sort(key=lambda r: r["pct"], reverse=True)
+    # then sliced. This bounds what is rendered, not what is scanned. The SQL
+    # already returns newest-first, so "new" just keeps that order.
+    sort = sort if sort in ("match", "new", "salary") else "match"
+    if sort == "match":
+        job_rows.sort(key=lambda r: r["pct"], reverse=True)
+    elif sort == "salary":
+        job_rows.sort(
+            key=lambda r: (r["job"]["salary_max"] or r["job"]["salary_min"] or 0),
+            reverse=True,
+        )
     jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
     job_rows = jobs_page.slice(job_rows)
 
@@ -1727,8 +1795,14 @@ def candidate_dashboard(
             "auto_min": AUTO_APPLY_MIN_MATCH,
             "work_modes": WORK_MODES,
             "employment_types": EMPLOYMENT_TYPES,
+            "india_locations": INDIA_LOCATIONS,
+            "departments": DEPARTMENTS,
+            "sel_q": q,
+            "sel_location": location,
             "sel_work_mode": work_mode,
             "sel_employment_type": employment_type,
+            "sel_department": department,
+            "sel_sort": sort,
         },
     )
 

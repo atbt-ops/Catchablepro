@@ -108,88 +108,178 @@
   </section>
 </div>
 
+{# ---- filter section: a labelled group of auto-submitting radio options ---- #}
+{% macro filter_group(name, title, options, selected, any_label='Any') %}
+  <details class="fgroup" open>
+    <summary>{{ title }}
+      {% if selected %}<span class="fgroup-on">1</span>{% endif %}
+      <span class="fgroup-chev">{{ icon('chevron-down', 15) }}</span>
+    </summary>
+    <div class="fgroup-body">
+      <label class="fopt">
+        <input type="radio" name="{{ name }}" value="" data-auto-submit
+               {{ 'checked' if not selected }}>
+        <span>{{ any_label }}</span>
+      </label>
+      {% for o in options %}
+        <label class="fopt">
+          <input type="radio" name="{{ name }}" value="{{ o }}" data-auto-submit
+                 {{ 'checked' if selected == o }}>
+          <span>{{ o }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  </details>
+{% endmacro %}
+
 <!-- Jobs ranked by match -->
-<section class="panel">
-  <h2>{{ icon('target', 18) }} Jobs ranked by your skill match
-    {% if jobs_page.total %}<span class="count-pill">{{ jobs_page.total }}</span>{% endif %}
-  </h2>
+<section class="panel marketplace-panel">
+  <div class="marketplace-intro">
+    <div>
+      <span class="eyebrow">{{ icon('target', 14) }} Jobs for your next move</span>
+      <h2>Find a role that fits</h2>
+      <p class="hint">Browse live openings across India, ranked by your skill match.</p>
+    </div>
+  </div>
+
+  <form method="get" action="/candidate" class="jobsearch-bar">
+    <div class="jobsearch-field">
+      <span class="jobsearch-ico">{{ icon('search', 18) }}</span>
+      <label class="sr-only" for="job-search">Skills, designations or companies</label>
+      <input id="job-search" type="search" name="q" value="{{ sel_q }}"
+             placeholder="Skills, designations, companies" autocomplete="off">
+    </div>
+    <div class="jobsearch-field jobsearch-loc">
+      <span class="jobsearch-ico">{{ icon('pin', 18) }}</span>
+      <label class="sr-only" for="job-loc">Location</label>
+      <select id="job-loc" name="location">
+        <option value="">All locations</option>
+        {% for city in india_locations %}
+          <option value="{{ city }}" {{ 'selected' if sel_location == city }}>{{ city }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if sel_work_mode %}<input type="hidden" name="work_mode" value="{{ sel_work_mode }}">{% endif %}
+    {% if sel_employment_type %}<input type="hidden" name="employment_type" value="{{ sel_employment_type }}">{% endif %}
+    {% if sel_department %}<input type="hidden" name="department" value="{{ sel_department }}">{% endif %}
+    {% if sel_sort and sel_sort != 'match' %}<input type="hidden" name="sort" value="{{ sel_sort }}">{% endif %}
+    <button class="btn jobsearch-go" type="submit">{{ icon('search', 16) }} Search</button>
+  </form>
+
   {% if not profile.skills %}
     <p class="hint">Add your skills above (or upload a resume) to see match percentages.</p>
   {% endif %}
 
-  <form method="get" action="/candidate" class="filterbar">
-    <label>Work mode
-      <select name="work_mode" data-auto-submit>
-        <option value="">Any</option>
-        {% for w in work_modes %}
-          <option value="{{ w }}" {{ 'selected' if sel_work_mode == w }}>{{ w }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Employment type
-      <select name="employment_type" data-auto-submit>
-        <option value="">Any</option>
-        {% for t in employment_types %}
-          <option value="{{ t }}" {{ 'selected' if sel_employment_type == t }}>{{ t }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% if sel_work_mode or sel_employment_type %}
-      <a class="btn ghost small" href="/candidate">Clear filters</a>
-    {% endif %}
-  </form>
-  {% if job_rows %}
-    <div class="rows">
-      {% for r in job_rows %}
-      <div class="row">
-        {{ match_ring(r.pct) }}
-        <div class="row-main">
-          <h3>{{ r.job.title }}</h3>
-          <p class="row-sub">
-            {{ icon('building', 13) }} {{ r.job.company_name }}
-            {% if r.job.location %}<span class="dot"></span>{{ r.job.location }}{% endif %}
-            <span class="dot"></span>{{ r.job.work_mode }}
-            <span class="dot"></span>{{ r.job.employment_type }}
-          </p>
-          <p class="row-sub">
-            <span class="meta">{{ icon('user', 12) }} {{ fmt_exp(r.job) }}</span>
-            <span class="meta">{{ fmt_salary(r.job) }}</span>
-            {% if r.job.department %}<span class="meta">{{ r.job.department }}</span>{% endif %}
-            {% if r.job.vacancies > 1 %}<span class="meta">{{ r.job.vacancies }} openings</span>{% endif %}
-          </p>
-          {% if r.job.description %}
-            <div class="row-desc jobdesc">{{ description_html(r.job.description) }}</div>
+  <div class="jobs-layout">
+    <aside class="job-filters">
+      <form method="get" action="/candidate" class="filter-form">
+        <div class="job-filters-head">
+          <h3>{{ icon('filter', 15) }} All filters</h3>
+          {% if sel_q or sel_location or sel_work_mode or sel_employment_type or sel_department %}
+            <a href="/candidate">Clear all</a>
           {% endif %}
-          <div class="chips">
-            {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
-            {% for p in r.partial %}
-              <span class="chip part" title="{{ p.pct }}% credit via {{ p.via }}">
-                {{ p.skill }} <em>≈ {{ p.via }}</em>
-              </span>
-            {% endfor %}
-            {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}
-          </div>
         </div>
-        <div class="row-action">
-          {% if r.applied %}
-            <span class="applied-pill">{{ icon('check', 15) }} Applied</span>
-          {% else %}
-            <form action="/candidate/apply/{{ r.job.id }}" method="post">
-              {{ csrf_field(request) }}
-              <button class="btn small" type="submit">Apply</button>
-            </form>
-          {% endif %}
+        {% if sel_q %}<input type="hidden" name="q" value="{{ sel_q }}">{% endif %}
+        {% if sel_location %}<input type="hidden" name="location" value="{{ sel_location }}">{% endif %}
+        {% if sel_sort and sel_sort != 'match' %}<input type="hidden" name="sort" value="{{ sel_sort }}">{% endif %}
+        {{ filter_group('department', 'Department', departments, sel_department, 'All departments') }}
+        {{ filter_group('work_mode', 'Work mode', work_modes, sel_work_mode, 'Any mode') }}
+        {{ filter_group('employment_type', 'Employment type', employment_types, sel_employment_type, 'Any type') }}
+      </form>
+      <div class="filter-note">
+        <strong>Built for India</strong>
+        <span>Salary is shown in LPA and locations follow local hiring hubs.</span>
+      </div>
+    </aside>
+
+    <div class="job-results">
+      <div class="results-bar">
+        <span class="results-count">
+          {% if jobs_page.total %}
+            <strong>{{ jobs_page.total }}</strong> job{{ 's' if jobs_page.total != 1 }} found
+          {% else %}No jobs found{% endif %}
+        </span>
+        <div class="sort-tabs" role="tablist" aria-label="Sort jobs">
+          <span class="sort-label">Sort by</span>
+          <a role="tab" aria-selected="{{ 'true' if sel_sort == 'match' else 'false' }}"
+             class="sort-tab {{ 'on' if sel_sort == 'match' }}"
+             href="{{ with_query(request, sort='', page='') }}">Match</a>
+          <a role="tab" aria-selected="{{ 'true' if sel_sort == 'new' else 'false' }}"
+             class="sort-tab {{ 'on' if sel_sort == 'new' }}"
+             href="{{ with_query(request, sort='new', page='') }}">Newest</a>
+          <a role="tab" aria-selected="{{ 'true' if sel_sort == 'salary' else 'false' }}"
+             class="sort-tab {{ 'on' if sel_sort == 'salary' }}"
+             href="{{ with_query(request, sort='salary', page='') }}">Salary</a>
         </div>
       </div>
-      {% endfor %}
+
+      {% if job_rows %}
+      <div class="jcards">
+        {% for r in job_rows %}
+        <article class="jcard">
+          <div class="jcard-logo" aria-hidden="true">{{ r.job.company_name[0] | upper }}</div>
+          <div class="jcard-body">
+            <div class="jcard-head">
+              <h3 class="jcard-title">{{ r.job.title }}</h3>
+              <span class="jcard-match ring-tier-{{ 'high' if r.pct >= 70 else 'mid' if r.pct >= 40 else 'low' }}">
+                {{ r.pct }}% match
+              </span>
+            </div>
+            <p class="jcard-company">
+              {{ icon('building', 13) }} {{ r.job.company_name }}
+              {% if r.job.location %}<span class="dot"></span>{{ icon('pin', 12) }} {{ r.job.location }}{% endif %}
+            </p>
+            <p class="jcard-meta">
+              <span>{{ icon('clock', 13) }} {{ fmt_exp(r.job) }}</span>
+              <span class="jcard-sep"></span>
+              <span>{{ icon('rupee', 13) }} {{ fmt_salary(r.job) }}</span>
+              <span class="jcard-sep"></span>
+              <span>{{ r.job.work_mode }}</span>
+              <span class="jcard-sep"></span>
+              <span>{{ r.job.employment_type }}</span>
+              {% if r.job.vacancies > 1 %}
+                <span class="jcard-sep"></span><span>{{ r.job.vacancies }} openings</span>
+              {% endif %}
+            </p>
+            {% if r.job.description %}
+              <div class="jcard-desc jobdesc">{{ description_html(r.job.description) }}</div>
+            {% endif %}
+            {% if r.matched or r.partial or r.missing %}
+            <div class="chips jcard-chips">
+              {% for s in r.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
+              {% for p in r.partial %}
+                <span class="chip part" title="{{ p.pct }}% credit via {{ p.via }}">
+                  {{ p.skill }} <em>≈ {{ p.via }}</em>
+                </span>
+              {% endfor %}
+              {% for s in r.missing %}<span class="chip">{{ s }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            <div class="jcard-foot">
+              <span class="jcard-posted">{{ icon('clock', 12) }} {{ posted_ago(r.job.created_at) }}</span>
+              {% if r.applied %}
+                <span class="applied-pill">{{ icon('check', 15) }} Applied</span>
+              {% else %}
+                <form action="/candidate/apply/{{ r.job.id }}" method="post">
+                  {{ csrf_field(request) }}
+                  <button class="btn small" type="submit">Apply now</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {{ pager(request, jobs_page, 'page', 'jobs') }}
+      {% else %}
+        <div class="empty">
+          <span class="eico">{{ icon('briefcase', 24) }}</span>
+          <p>No jobs match these filters.</p>
+          <p class="muted">Try another city, skill, or work mode.</p>
+        </div>
+      {% endif %}
     </div>
-    {{ pager(request, jobs_page, 'page', 'jobs') }}
-  {% else %}
-    <div class="empty">
-      <span class="eico">{{ icon('briefcase', 24) }}</span>
-      <p>No jobs posted yet. Check back soon.</p>
-    </div>
-  {% endif %}
+  </div>
 </section>
 
 <!-- My applications -->
