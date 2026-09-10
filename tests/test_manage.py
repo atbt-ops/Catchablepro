@@ -124,3 +124,62 @@ def test_rejects_something_that_is_not_an_address(db_at, monkeypatch):
     import manage
 
     assert manage.main(["manage.py", "create-admin", "not-an-email"]) == 1
+
+
+# --------------------------------------------------------------------------- #
+# send-test-email: proving the provider works before trusting it with resets
+# --------------------------------------------------------------------------- #
+def test_test_email_refuses_the_console_backend(db_at, monkeypatch, capsys):
+    """Sending to a console backend proves nothing and must not look like proof."""
+    import manage
+
+    monkeypatch.setenv("EMAIL_BACKEND", "console")
+
+    assert manage.main(["manage.py", "send-test-email", "you@example.com"]) == 1
+    assert "console" in capsys.readouterr().out
+
+
+def test_test_email_reports_a_backend_that_is_not_finished(db_at, monkeypatch, capsys):
+    """EMAIL_BACKEND=smtp with no host is a half-done config, not a working one."""
+    import manage
+
+    monkeypatch.setenv("EMAIL_BACKEND", "smtp")
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+
+    assert manage.main(["manage.py", "send-test-email", "you@example.com"]) == 1
+    assert "SMTP_HOST" in capsys.readouterr().out
+
+
+def test_test_email_surfaces_a_provider_rejection(db_at, monkeypatch, capsys):
+    """A rejected message must exit non-zero: the caller removes a safety flag
+    on the strength of this result."""
+    import manage
+    from app import mailer
+
+    monkeypatch.setenv("EMAIL_BACKEND", "smtp")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setattr(mailer, "send_email", lambda **kw: (False, "535 auth failed"))
+
+    assert manage.main(["manage.py", "send-test-email", "you@example.com"]) == 1
+    assert "535 auth failed" in capsys.readouterr().out
+
+
+def test_test_email_sends_through_the_configured_backend(db_at, monkeypatch, capsys):
+    import manage
+    from app import mailer
+
+    monkeypatch.setenv("EMAIL_BACKEND", "smtp")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    captured = {}
+
+    def _fake(**kwargs):
+        captured.update(kwargs)
+        return True, None
+
+    monkeypatch.setattr(mailer, "send_email", _fake)
+
+    assert manage.main(["manage.py", "send-test-email", "boss@example.com"]) == 0
+    assert captured["to"] == "boss@example.com"
+    # Accepted is not delivered, and the output has to say so or someone will
+    # read a green result as proof the inbox received it.
+    assert "spam" in capsys.readouterr().out.lower()
