@@ -1,4 +1,5 @@
-"""'Post this role', the JD writer, bulk resume download, and job-match alerts."""
+"""'Post this role', the JD writer, bulk resume download, job-match alerts,
+and the job-board homepage."""
 import io
 import sqlite3
 import zipfile
@@ -7,6 +8,56 @@ from app import ai, alerts
 from app import db as dbmod
 from app import mailer
 from tests.test_ai_feedback import stub_ai
+
+
+# --------------------------------------------------------------------------- #
+# Job-board homepage
+# --------------------------------------------------------------------------- #
+def test_homepage_is_the_job_board_for_everyone(client, register, post, post_job):
+    register("home-emp@x.io", "employer", company_name="HomeCo")
+    post_job(title="Homepage Role", required_skills="python", department="Engineering")
+    post("/logout")
+
+    # Guest: sees the board, not a redirect, not a marketing hero.
+    guest = client.get("/")
+    assert guest.status_code == 200
+    body = guest.text
+    assert "home-shell" in body and "Homepage Role" in body
+    assert "Advertisement" in body and "Browse by department" in body
+    assert "% match" not in body
+
+    # Employer stays on the board (no redirect to /employer) but no match %.
+    post("/employer/login", data={"email": "home-emp@x.io", "password": "password123"})
+    emp = client.get("/", follow_redirects=False)
+    assert emp.status_code == 200 and "Your dashboard" in emp.text
+
+
+def test_homepage_shows_match_percent_for_a_signed_in_candidate(
+    client, register, post, post_job
+):
+    register("hc-emp@x.io", "employer", company_name="HCco")
+    post_job(title="Match Home Role", required_skills="python,sql")
+    post("/logout")
+    register("hc-cand@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python,sql,docker"})
+
+    body = client.get("/").text
+    assert "Match Home Role" in body and "% match" in body
+    assert "Your job matches" in body
+
+
+def test_homepage_filters_narrow_the_list(client, register, post, post_job):
+    register("hf-emp@x.io", "employer", company_name="HFco")
+    post_job(title="Eng Home Role", required_skills="python", department="Engineering")
+    post_job(title="Sales Home Role", required_skills="crm", department="Sales")
+
+    filtered = client.get("/?department=Engineering").text
+    assert "Eng Home Role" in filtered
+    assert "Sales Home Role" not in filtered
+
+
+def test_about_page_keeps_the_marketing_content(client):
+    assert "real skills" in client.get("/about").text
 
 
 def _latest_job_id() -> int:

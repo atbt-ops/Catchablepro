@@ -6,12 +6,13 @@
 {% from "macros.html" import icon, pager, filter_group %}
 {% set has_filters = sel_q or sel_location or sel_work_mode or sel_employment_type
                      or sel_department or sel_experience or sel_salary or sel_posted %}
+{% set bar = filters_layout is defined and filters_layout == 'bar' %}
 
-<div class="jobs-layout">
+<div class="jobs-layout {{ 'filters-top' if bar }}">
   <aside class="job-filters">
     <form method="get" action="{{ results_action }}" class="filter-form">
       <div class="job-filters-head">
-        <h3>{{ icon('filter', 15) }} All filters</h3>
+        <h3>{{ icon('filter', 15) }} {{ 'Filter' if bar else 'All filters' }}</h3>
         {% if has_filters %}<a href="{{ results_action }}">Clear all</a>{% endif %}
       </div>
       {% if sel_q %}<input type="hidden" name="q" value="{{ sel_q }}">{% endif %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Jobs{% if sel_q %} · {{ sel_q }}{% endif %} · Catchablepro{% endblock %}
+{% block container_class %}wide{% endblock %}
+
+{% block content %}
+<div class="home-shell">
+
+  <aside class="home-rail home-rail-left">
+    {% if show_match %}
+      <a class="railcta" href="/candidate">
+        {{ icon('target', 16) }}
+        <span><strong>Your job matches</strong><small>ranked by your skills</small></span>
+      </a>
+    {% elif user and user.role == 'employer' %}
+      <a class="railcta" href="/employer">
+        {{ icon('briefcase', 16) }}
+        <span><strong>Your dashboard</strong><small>jobs &amp; applicants</small></span>
+      </a>
+    {% endif %}
+
+    <div class="railcard">
+      <h4>{{ icon('sparkle', 13) }} How matching works</h4>
+      <p class="tip">Every job shows the skills you already have, related ones, and
+        the gaps — a score you can see the reasons for, not a black box.</p>
+      <a class="tip-link" href="/about">Read more {{ icon('arrow-right', 12) }}</a>
+    </div>
+
+    <div class="ad-slot ad-300x250" aria-label="Advertisement">
+      <span>Advertisement</span><small>300 &times; 250</small>
+    </div>
+
+    <div class="railcard">
+      <h4>{{ icon('mail', 13) }} Get job alerts</h4>
+      {% if show_match %}
+        <p class="tip">Turn on match alerts to be emailed when new roles fit your skills.</p>
+        <a class="btn small block" href="/candidate#alerts">Set up alerts</a>
+      {% else %}
+        <p class="tip">Create a free profile and we'll email you when matching jobs are posted.</p>
+        <a class="btn small block" href="/register">Sign up free</a>
+      {% endif %}
+    </div>
+
+    <div class="ad-slot ad-tall" aria-label="Advertisement">
+      <span>Advertisement</span><small>160 &times; 600</small>
+    </div>
+  </aside>
+
+  <main class="home-main">
+    <div class="home-head">
+      <h1>Jobs on Catch Able Pro</h1>
+      <p class="sub">
+        {{ jobs_page.total }} live opening{{ 's' if jobs_page.total != 1 }} across India{% if show_match %},
+        ranked by your skill match{% endif %}.
+      </p>
+    </div>
+    {% include "_job_results.html" %}
+  </main>
+
+  <aside class="home-rail home-rail-right">
+    <div class="ad-slot ad-300x250" aria-label="Advertisement">
+      <span>Advertisement</span><small>300 &times; 250</small>
+    </div>
+
+    {% if not user %}
+      <div class="railcard">
+        <h4>{{ icon('building', 13) }} Hiring?</h4>
+        <p class="tip">Post a role once and review candidates in skill-match order.</p>
+        <a class="btn small block" href="/employer/register">Post a job</a>
+      </div>
+    {% endif %}
+
+    {% if dept_counts %}
+    <div class="railcard">
+      <h4>{{ icon('briefcase', 13) }} Browse by department</h4>
+      <ul class="rail-links">
+        {% for d in dept_counts %}
+          <li><a href="/?department={{ d.d | urlencode }}">{{ d.d }} <span>{{ d.n }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if top_companies %}
+    <div class="railcard">
+      <h4>{{ icon('sparkle', 13) }} Companies hiring now</h4>
+      <ul class="rail-links">
+        {% for c in top_companies %}
+          <li><a href="/?q={{ c.c | urlencode }}">{{ c.c }} <span>{{ c.n }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="railcard">
+      <h4>{{ icon('doc', 13) }} About</h4>
+      <ul class="rail-links plain">
+        <li><a href="/about">How it works</a></li>
+        <li><a href="/employer/register">For employers</a></li>
+        <li><a href="/feedback">Send feedback</a></li>
+      </ul>
+    </div>
+
+    <div class="ad-slot ad-300x250" aria-label="Advertisement">
+      <span>Advertisement</span><small>300 &times; 250</small>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}
