@@ -60,6 +60,97 @@ def test_about_page_keeps_the_marketing_content(client):
     assert "real skills" in client.get("/about").text
 
 
+# --------------------------------------------------------------------------- #
+# Edit / duplicate a job, withdraw an application
+# --------------------------------------------------------------------------- #
+def _job_row(job_id: int):
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def test_employer_edits_a_job_without_touching_the_pricing_meter(
+    client, register, post, post_job
+):
+    register("edit-emp@x.io", "employer", company_name="EditCo")
+    post_job(title="Old Title", required_skills="python", salary_min=8, salary_max=14)
+    job_id = _latest_job_id()
+    before = _job_row(job_id)["active_since"]
+    assert before  # it's live, meter running
+
+    r = post(f"/employer/jobs/{job_id}/edit", data={
+        "title": "New Title", "required_skills": "python,go", "location": "Pune",
+        "employment_type": "Full-time", "work_mode": "Hybrid",
+        "exp_min": 2, "exp_max": 5, "salary_min": 15, "salary_max": 25,
+        "vacancies": 3, "education": "Graduate", "department": "Engineering",
+        "description": "<p>Updated.</p>",
+    })
+    assert r.status_code == 303 and "flash=edited" in r.headers["location"]
+
+    after = _job_row(job_id)
+    assert after["title"] == "New Title"
+    assert after["required_skills"] == "python,go"
+    assert after["salary_min"] == 15
+    assert after["active_since"] == before  # meter untouched
+
+
+def test_employer_cannot_edit_another_employers_job(client, register, post, post_job):
+    register("own@x.io", "employer", company_name="OwnCo")
+    post_job(title="Theirs", required_skills="python")
+    job_id = _latest_job_id()
+    post("/logout")
+    register("other@x.io", "employer", company_name="OtherCo")
+
+    assert client.get(f"/employer/jobs/{job_id}/edit", follow_redirects=False
+                      ).headers["location"] == "/employer"
+    r = post(f"/employer/jobs/{job_id}/edit", data={
+        "title": "Hijacked", "salary_min": 5, "salary_max": 9,
+        "required_skills": "x", "description": "x",
+    })
+    assert r.headers["location"] == "/employer"
+    assert _job_row(job_id)["title"] == "Theirs"
+
+
+def test_post_similar_prefills_the_form_from_an_existing_job(
+    client, register, post, post_job
+):
+    register("dup-emp@x.io", "employer", company_name="DupCo")
+    post_job(title="Backend Role", required_skills="python,fastapi",
+             location="Chennai", department="Engineering")
+    job_id = _latest_job_id()
+
+    assert post(f"/employer/jobs/{job_id}/duplicate", data={}).status_code == 303
+    form = client.get("/employer/jobs/new").text
+    assert "Backend Role (copy)" in form
+    assert "python,fastapi" in form and "Chennai" in form
+
+
+def test_candidate_withdraws_an_application(client, register, post, post_job):
+    register("wd-emp@x.io", "employer", company_name="WDco")
+    post_job(title="Withdrawable", required_skills="python")
+    job_id = _latest_job_id()
+    post("/logout")
+    register("wd-cand@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+    post(f"/candidate/apply/{job_id}", data={"next": "/candidate"})
+
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    app_id = conn.execute(
+        "SELECT id FROM applications WHERE job_id = ?", (job_id,)
+    ).fetchone()[0]
+    conn.close()
+
+    r = post(f"/candidate/applications/{app_id}/withdraw", data={})
+    assert r.status_code == 303 and "flash=withdrawn" in r.headers["location"]
+
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    n = conn.execute("SELECT COUNT(*) FROM applications WHERE id = ?", (app_id,)).fetchone()[0]
+    conn.close()
+    assert n == 0
+
+
 def _latest_job_id() -> int:
     conn = sqlite3.connect(dbmod.DB_PATH)
     row = conn.execute("SELECT MAX(id) FROM jobs").fetchone()
@@ -88,7 +179,7 @@ def test_assistant_match_offers_a_prefilled_post(client, register, post, monkeyp
     })
     assert r2.status_code == 303 and r2.headers["location"] == "/employer/jobs/new"
     form = client.get("/employer/jobs/new").text
-    assert "Prefilled from the AI assistant" in form
+    assert "Prefilled" in form and "review everything" in form
     assert 'value="Platform Engineer"' in form
     assert "python, terraform, aws" in form
 
