@@ -28,6 +28,24 @@ tunnel, and published-hostname requirements. See [Set up Cloudflare Tunnel](http
 
 ## Configure the app
 
+Run the setup script rather than editing by hand — it generates a strong
+`SECRET_KEY`, puts the hostname in the two places that must agree, writes the
+tunnel token where Compose expects it, and then reports what is still missing:
+
+```powershell
+.\scripts\setup-production.ps1
+```
+
+It is safe to re-run; an existing `.env.production` is left alone unless you
+pass `-Force`, which rotates `SECRET_KEY` and therefore signs out every user.
+
+What it cannot do, because each needs your own login: register the domain on
+Cloudflare, create the tunnel, or open an email account. Those are steps 2 and
+3 below and the rest of this section.
+
+<details>
+<summary>Doing it by hand instead</summary>
+
 1. Copy `.env.production.example` to `.env.production` and replace every
    placeholder. `PUBLIC_URL` and `TRUSTED_HOSTS` must exactly match the public
    HTTPS hostname. Generate a fresh `SECRET_KEY`; rotating it later signs every
@@ -42,11 +60,23 @@ tunnel, and published-hostname requirements. See [Set up Cloudflare Tunnel](http
 
    `app` is the Compose service name. Do not use `localhost:8000` here: inside
    the connector container, `localhost` is the connector, not the web app.
-4. Start the stack from the project directory:
+</details>
+
+4. Start it, and prove the public URL actually serves:
 
    ```powershell
-   docker compose -f compose.production.yaml up -d --build
+   .\scripts\go-live.ps1
    ```
+
+   It checks the config, builds, starts, waits for `/readyz` on loopback, and
+   then fetches the public HTTPS URL from the outside. That last step is the
+   one worth having: a container can be running and healthy on `127.0.0.1`
+   while the public hostname returns nothing, because the tunnel route points
+   at the wrong service or the hostname does not match `TRUSTED_HOSTS`. On
+   failure it prints both services' logs and the likely causes in order.
+
+   Use it for the first launch and after any hostname or tunnel change. Use
+   `day-start.ps1` every day after that.
 
 5. Check the local health endpoint at `http://127.0.0.1:8000/readyz`, then open
    `https://<your-public-host>/readyz` in a private browser window. It should
