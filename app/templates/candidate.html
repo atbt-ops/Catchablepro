@@ -1,10 +1,11 @@
 {% extends "shell.html" %}
-{% from "macros.html" import icon, match_ring, navitem, pager, application_progress %}
+{% from "macros.html" import icon, match_ring, navitem, pager, application_progress, job_mini %}
 {% block title %}Candidate dashboard · Catchablepro{% endblock %}
 
 {% block sidebar %}
   <div class="nav-heading">Candidate</div>
   {{ navitem('/candidate', 'target', 'Job matches', true) }}
+  {{ navitem('#saved', 'bookmark', 'Saved jobs') }}
   {{ navitem('#profile', 'user', 'My profile') }}
   {{ navitem('#applications', 'doc', 'Applications') }}
   <div class="nav-heading">Account</div>
@@ -76,6 +77,17 @@
 
   {% include "_job_results.html" %}
 </section>
+
+{% if saved_rows %}
+<section class="panel" id="saved">
+  <h2>{{ icon('bookmark', 18) }} Saved jobs
+    <span class="count-pill">{{ saved_rows | length }}</span>
+  </h2>
+  <div class="jmini-grid">
+    {% for r in saved_rows %}{{ job_mini(r.job, r.pct) }}{% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <div class="grid2">
   <!-- Profile -->

@@ -1,22 +1,25 @@
 {# Shared job-search body: filter rail + results + cards.
-   Expects in context: request, job_rows, jobs_page, results_action, show_match,
-   the filter option lists (work_modes / employment_types / departments) and the
-   sel_* selections. When show_match is true each row carries pct / matched /
-   partial / missing / applied; otherwise each row carries a `skills` list. #}
+   Expects in context: request, user, job_rows, jobs_page, results_action,
+   show_match, saved_ids, the filter option lists and the sel_* selections.
+   When show_match is true each row carries pct / matched / partial / missing /
+   applied; otherwise each row carries a `skills` list. #}
 {% from "macros.html" import icon, pager, filter_group %}
+{% set has_filters = sel_q or sel_location or sel_work_mode or sel_employment_type
+                     or sel_department or sel_experience or sel_salary or sel_posted %}
 
 <div class="jobs-layout">
   <aside class="job-filters">
     <form method="get" action="{{ results_action }}" class="filter-form">
       <div class="job-filters-head">
         <h3>{{ icon('filter', 15) }} All filters</h3>
-        {% if sel_q or sel_location or sel_work_mode or sel_employment_type or sel_department %}
-          <a href="{{ results_action }}">Clear all</a>
-        {% endif %}
+        {% if has_filters %}<a href="{{ results_action }}">Clear all</a>{% endif %}
       </div>
       {% if sel_q %}<input type="hidden" name="q" value="{{ sel_q }}">{% endif %}
       {% if sel_location %}<input type="hidden" name="location" value="{{ sel_location }}">{% endif %}
       {% if sel_sort and sel_sort != 'match' %}<input type="hidden" name="sort" value="{{ sel_sort }}">{% endif %}
+      {{ filter_group('posted', 'Date posted', date_posted, sel_posted, 'Any time') }}
+      {{ filter_group('experience', 'Experience', experience_buckets, sel_experience, 'Any experience') }}
+      {{ filter_group('salary', 'Salary', salary_buckets, sel_salary, 'Any salary') }}
       {{ filter_group('department', 'Department', departments, sel_department, 'All departments') }}
       {{ filter_group('work_mode', 'Work mode', work_modes, sel_work_mode, 'Any mode') }}
       {{ filter_group('employment_type', 'Employment type', employment_types, sel_employment_type, 'Any type') }}
@@ -57,12 +60,30 @@
         <div class="jcard-logo" aria-hidden="true">{{ r.job.company_name[0] | upper }}</div>
         <div class="jcard-body">
           <div class="jcard-head">
-            <h3 class="jcard-title">{{ r.job.title }}</h3>
-            {% if show_match %}
-              <span class="jcard-match ring-tier-{{ 'high' if r.pct >= 70 else 'mid' if r.pct >= 40 else 'low' }}">
-                {{ r.pct }}% match
-              </span>
-            {% endif %}
+            <h3 class="jcard-title">
+              <a href="/jobs/{{ r.job.id }}">{{ r.job.title }}</a>
+            </h3>
+            <div class="jcard-actions">
+              {% if show_match %}
+                <span class="jcard-match ring-tier-{{ 'high' if r.pct >= 70 else 'mid' if r.pct >= 40 else 'low' }}">
+                  {{ r.pct }}% match
+                </span>
+              {% endif %}
+              {% if user and user.role == 'candidate' %}
+                {% set is_saved = r.job.id in saved_ids %}
+                <form method="post" action="/candidate/save/{{ r.job.id }}" class="savebtn-form">
+                  {{ csrf_field(request) }}
+                  <input type="hidden" name="next"
+                         value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
+                  <button type="submit" class="savebtn {{ 'on' if is_saved }}"
+                          aria-pressed="{{ 'true' if is_saved else 'false' }}"
+                          title="{{ 'Saved — click to remove' if is_saved else 'Save this job' }}"
+                          aria-label="{{ 'Saved' if is_saved else 'Save job' }}">
+                    {{ icon('bookmark', 16) }}
+                  </button>
+                </form>
+              {% endif %}
+            </div>
           </div>
           <p class="jcard-company">
             {{ icon('building', 13) }} {{ r.job.company_name }}
@@ -108,11 +129,13 @@
               {% else %}
                 <form action="/candidate/apply/{{ r.job.id }}" method="post">
                   {{ csrf_field(request) }}
+                  <input type="hidden" name="next"
+                         value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
                   <button class="btn small" type="submit">Apply now</button>
                 </form>
               {% endif %}
             {% else %}
-              <a class="btn small" href="/register">Sign up to apply</a>
+              <a class="btn small" href="/jobs/{{ r.job.id }}">View &amp; apply</a>
             {% endif %}
           </div>
         </div>
@@ -124,7 +147,8 @@
       <div class="empty">
         <span class="eico">{{ icon('briefcase', 24) }}</span>
         <p>No jobs match these filters.</p>
-        <p class="muted">Try another city, skill, or work mode.</p>
+        <p class="muted">Try a wider salary band, more experience levels, or another city.</p>
+        {% if has_filters %}<a class="btn small ghost" href="{{ results_action }}">Clear all filters</a>{% endif %}
       </div>
     {% endif %}
   </div>

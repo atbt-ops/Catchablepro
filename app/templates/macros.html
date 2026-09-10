@@ -62,6 +62,21 @@
   </form>
 {% endmacro %}
 
+{# Compact clickable job card for side rails and "more jobs" strips. #}
+{% macro job_mini(job, pct=none) %}
+  <a class="jmini" href="/jobs/{{ job.id }}">
+    <span class="jmini-logo" aria-hidden="true">{{ job.company_name[0] | upper }}</span>
+    <span class="jmini-body">
+      <span class="jmini-title">{{ job.title }}</span>
+      <span class="jmini-sub">{{ job.company_name }}{% if job.location %} · {{ job.location }}{% endif %}</span>
+      <span class="jmini-meta">
+        {{ fmt_exp(job) }} · {{ fmt_salary(job) }}
+        {% if pct is not none %}<span class="jmini-pct">{{ pct }}% match</span>{% endif %}
+      </span>
+    </span>
+  </a>
+{% endmacro %}
+
 {# One labelled group of auto-submitting radio filters in the job-search rail. #}
 {% macro filter_group(name, title, options, selected, any_label='Any') %}
   <details class="fgroup" open>

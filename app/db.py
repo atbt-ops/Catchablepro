@@ -146,6 +146,13 @@ CREATE TABLE IF NOT EXISTS applications (
     created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE (job_id, candidate_id)
 );
+
+CREATE TABLE IF NOT EXISTS saved_jobs (
+    candidate_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id       INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (candidate_id, job_id)
+);
 """
 
 

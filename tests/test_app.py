@@ -209,6 +209,77 @@ def test_candidate_can_search_and_filter_by_indian_location(
     assert "Java Platform" not in located
 
 
+def test_public_jobs_page_lists_active_jobs_without_login(client, register, post, post_job):
+    register("pub-emp@x.io", "employer", company_name="OpenCo")
+    post_job(title="Public Backend Role", required_skills="python,fastapi")
+    post("/logout")
+
+    listing = client.get("/jobs").text
+    assert "Public Backend Role" in listing
+    assert "Sign up to apply" not in listing  # list uses "View & apply"
+    assert "View &amp; apply" in listing
+
+
+def test_job_detail_page_shows_full_posting(client, register, post, post_job):
+    register("jd-emp@x.io", "employer", company_name="DetailCo")
+    post_job(
+        title="Staff Engineer", required_skills="go,kubernetes",
+        description="Own the platform end to end.",
+    )
+    job_id = _latest_job_id(client)
+
+    page = client.get(f"/jobs/{job_id}").text
+    assert "Staff Engineer" in page
+    assert "Own the platform end to end." in page
+    assert "About DetailCo" in page
+
+    assert client.get("/jobs/99999").status_code == 404
+
+
+def test_candidate_can_save_and_unsave_a_job(client, register, post, post_job):
+    register("save-emp@x.io", "employer", company_name="SaveCo")
+    post_job(title="Bookmarkable Role", required_skills="python")
+    job_id = _latest_job_id(client)
+    post("/logout")
+    register("save-cand@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+
+    assert 'id="saved"' not in client.get("/candidate").text
+    post(f"/candidate/save/{job_id}", data={"next": "/candidate"})
+    saved = client.get("/candidate").text
+    assert 'id="saved"' in saved and "Bookmarkable Role" in saved
+
+    post(f"/candidate/save/{job_id}", data={"next": "/candidate"})
+    assert 'id="saved"' not in client.get("/candidate").text
+
+
+def test_candidate_can_filter_jobs_by_experience_and_recency(
+    client, register, post, post_job
+):
+    register("exp-emp@x.io", "employer", company_name="ExpCo")
+    post_job(title="Fresher Role", required_skills="python", exp_min=0, exp_max=1)
+    post_job(title="Senior Role", required_skills="python", exp_min=8, exp_max=12)
+    post("/logout")
+    register("exp-cand@x.io", "candidate")
+    post("/candidate/profile", data={"headline": "", "skills": "python"})
+
+    junior = client.get("/candidate?experience=0-1 yrs").text
+    assert "Fresher Role" in junior
+    assert "Senior Role" not in junior
+
+    recent = client.get("/candidate?posted=Last 24 hours").text
+    assert "Fresher Role" in recent and "Senior Role" in recent
+
+
+def _latest_job_id(client) -> int:
+    import re
+
+    page = client.get("/jobs").text
+    ids = [int(m) for m in re.findall(r"/jobs/(\d+)", page)]
+    assert ids, "no job links on /jobs"
+    return max(ids)
+
+
 def test_auto_apply_backfills_and_covers_new_jobs(client, register, post, post_job):
     # Employer posts one job.
     register("e2@x.io", "employer", company_name="E2")

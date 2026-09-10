@@ -71,9 +71,11 @@
       {% set j = item.job %}
       {% set cost = item.cost %}
       <div class="jobcard is-{{ j.status }}">
-        <div>
+        <div class="jobcard-main">
+          <span class="jcard-logo jobcard-logo" aria-hidden="true">{{ (user.company_name or 'J')[0] | upper }}</span>
+          <div style="min-width:0">
           <h3>
-            {{ j.title }}
+            <a href="/employer/jobs/{{ j.id }}/applicants">{{ j.title }}</a>
             <span class="tag status-{{ j.status }}">{{ j.status | capitalize }}</span>
           </h3>
           <p class="row-sub">
@@ -82,8 +84,8 @@
             {% if j.department %}<span class="dot"></span>{{ j.department }}{% endif %}
           </p>
           <div class="jobcard-meta">
-            <span class="m">{{ icon('user', 12) }} <b>{{ fmt_exp(j) }}</b></span>
-            <span class="m">{{ icon('sparkle', 12) }} <b>{{ fmt_salary(j) }}</b></span>
+            <span class="m">{{ icon('clock', 12) }} <b>{{ fmt_exp(j) }}</b></span>
+            <span class="m">{{ icon('rupee', 12) }} <b>{{ fmt_salary(j) }}</b></span>
             {% if j.vacancies > 1 %}
               <span class="m">{{ icon('briefcase', 12) }} <b>{{ j.vacancies }}</b> openings</span>
             {% endif %}
@@ -119,6 +121,7 @@
               {% endif %}
             </div>
           {% endif %}
+          </div>
         </div>
 
         <div class="jobcard-side">
