@@ -1,11 +1,11 @@
 """Production refuses to start on config that would fail silently.
 
-Both guards live at import time in app.main, so each case reloads the module
-with the environment it is testing.
+Both guards live at import time in app.web, so each case reloads it (and the
+app on top) with the environment it is testing.
 """
-import importlib
-
 import pytest
+
+from tests.conftest import reload_app
 
 
 def _boot(monkeypatch, **env):
@@ -18,18 +18,14 @@ def _boot(monkeypatch, **env):
     for key, value in env.items():
         monkeypatch.setenv(key, value)
 
-    from app import main as mainmod
-
-    return importlib.reload(mainmod)
+    return reload_app()
 
 
 @pytest.fixture(autouse=True)
 def _restore_module():
     """Leave app.main loaded under the ambient environment for other tests."""
     yield
-    from app import main as mainmod
-
-    importlib.reload(mainmod)
+    reload_app()
 
 
 # --------------------------------------------------------------------------- #

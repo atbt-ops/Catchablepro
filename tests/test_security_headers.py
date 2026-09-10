@@ -39,21 +39,19 @@ def test_loopback_stays_allowed_without_a_public_url(monkeypatch):
     The Docker HEALTHCHECK calls localhost. If the allow-list omits it the probe
     gets a 400, the container is marked unhealthy, and it restarts forever.
     """
-    import importlib
+    from tests.conftest import reload_app
 
     monkeypatch.setenv("TRUSTED_HOSTS", "jobs.example.com")
     monkeypatch.delenv("PUBLIC_URL", raising=False)
 
-    from app import main as mainmod
-
-    importlib.reload(mainmod)
+    mainmod = reload_app()
     try:
         assert "jobs.example.com" in mainmod.TRUSTED_HOSTS
         assert "localhost" in mainmod.TRUSTED_HOSTS
         assert "127.0.0.1" in mainmod.TRUSTED_HOSTS
     finally:
         monkeypatch.undo()
-        importlib.reload(mainmod)
+        reload_app()
 
 
 def test_script_src_forbids_inline_script(client):

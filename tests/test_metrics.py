@@ -1,8 +1,9 @@
 """The /metrics endpoint: what it measures, and who may read it."""
-import importlib
 import re
 
 import pytest
+
+from tests.conftest import reload_app
 
 
 @pytest.fixture()
@@ -22,16 +23,12 @@ def prod_client(monkeypatch, tmp_path):
             monkeypatch.setenv(key, value)
 
         from fastapi.testclient import TestClient
-        from app import main as mainmod
 
-        importlib.reload(mainmod)
-        return TestClient(mainmod.app)
+        return TestClient(reload_app().app)
 
     yield _build
 
-    from app import main as mainmod
-
-    importlib.reload(mainmod)
+    reload_app()
 
 
 # --------------------------------------------------------------------------- #
