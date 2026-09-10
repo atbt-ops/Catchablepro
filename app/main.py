@@ -8,6 +8,7 @@ Server-rendered (Jinja) with an in-process SQLite database. Two roles:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -40,6 +41,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from html import escape
 
 from . import (
+    ai,
     audit,
     auth,
     db as dbmod,
@@ -2288,6 +2290,216 @@ def download_resume(
 
 
 # --------------------------------------------------------------------------- #
+# Feedback (both roles) + the admin AI digest
+# --------------------------------------------------------------------------- #
+FEEDBACK_CATEGORIES = [
+    "General", "Bug / something broke", "Matching quality",
+    "Feature request", "Design / usability", "Performance",
+]
+FEEDBACK_LIMIT = (6, 60 * 60)  # per user per hour
+FEEDBACK_MAX_CHARS = 4000
+
+
+@app.get("/feedback", response_class=HTMLResponse)
+def feedback_form(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db)  # any signed-in user
+    if redirect:
+        return redirect
+    mine = db.execute(
+        "SELECT category, rating, message, status, created_at FROM feedback "
+        "WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 10",
+        (user["id"],),
+    ).fetchall()
+    return templates.TemplateResponse(
+        request,
+        "feedback.html",
+        {
+            "request": request, "user": user, "categories": FEEDBACK_CATEGORIES,
+            "mine": mine, "sent": request.query_params.get("sent") == "1",
+            "error": None, "form": {},
+        },
+    )
+
+
+@app.post("/feedback", response_class=HTMLResponse)
+def feedback_submit(
+    request: Request,
+    category: str = Form("General"),
+    rating: str = Form(""),
+    message: str = Form(""),
+    page: str = Form(""),
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db)
+    if redirect:
+        return redirect
+
+    message = message.strip()[:FEEDBACK_MAX_CHARS]
+    category = category if category in FEEDBACK_CATEGORIES else "General"
+    try:
+        rating_val = int(rating) if rating.strip() else None
+        if rating_val is not None and not 1 <= rating_val <= 5:
+            rating_val = None
+    except ValueError:
+        rating_val = None
+
+    def _render(err: str):
+        mine = db.execute(
+            "SELECT category, rating, message, status, created_at FROM feedback "
+            "WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 10",
+            (user["id"],),
+        ).fetchall()
+        return templates.TemplateResponse(
+            request, "feedback.html",
+            {
+                "request": request, "user": user,
+                "categories": FEEDBACK_CATEGORIES, "mine": mine, "sent": False,
+                "error": err,
+                "form": {"category": category, "rating": rating, "message": message,
+                         "page": page},
+            },
+            status_code=400,
+        )
+
+    if len(message) < 5:
+        return _render("Please write a little more so we can act on it.")
+
+    allowed, retry = ratelimit.check(f"feedback:{user['id']}", *FEEDBACK_LIMIT)
+    if not allowed:
+        return _render(f"Thanks — you've sent a lot today. Try again in {retry // 60 + 1} min.")
+
+    db.execute(
+        "INSERT INTO feedback (user_id, role, email, category, rating, message, page) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user["id"], user["role"], user["email"], category, rating_val, message,
+         page.strip()[:200]),
+    )
+    db.commit()
+    return RedirectResponse("/feedback?sent=1", status_code=303)
+
+
+@app.get("/admin/feedback", response_class=HTMLResponse)
+def admin_feedback(
+    request: Request, status: str = "", role: str = "", page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+
+    where, params = "1=1", []
+    if status in ("new", "reviewed", "actioned", "dismissed"):
+        where += " AND status = ?"
+        params.append(status)
+    if role in ("employer", "candidate"):
+        where += " AND role = ?"
+        params.append(role)
+    total = db.execute(
+        f"SELECT COUNT(*) AS n FROM feedback WHERE {where}", params
+    ).fetchone()["n"]
+    pg = paginate(total, page, ADMIN_ROWS_PER_PAGE)
+    rows = db.execute(
+        f"SELECT * FROM feedback WHERE {where} ORDER BY created_at DESC, id DESC "
+        "LIMIT ? OFFSET ?",
+        params + [pg.per_page, pg.offset],
+    ).fetchall()
+    counts = {
+        r["status"]: r["n"]
+        for r in db.execute(
+            "SELECT status, COUNT(*) AS n FROM feedback GROUP BY status"
+        ).fetchall()
+    }
+    latest = db.execute(
+        "SELECT * FROM ai_digests WHERE kind = 'feedback' "
+        "ORDER BY created_at DESC, id DESC LIMIT 1"
+    ).fetchone()
+    digest = None
+    if latest is not None:
+        try:
+            digest = {
+                "created_at": latest["created_at"],
+                "covered_to": latest["covered_to"],
+                "generated_by": latest["generated_by"],
+                **json.loads(latest["content"]),
+            }
+        except (ValueError, KeyError):
+            digest = None
+    max_id = db.execute("SELECT COALESCE(MAX(id), 0) AS m FROM feedback").fetchone()["m"]
+
+    return templates.TemplateResponse(
+        request,
+        "admin_feedback.html",
+        {
+            "request": request, "user": user, "active_page": "feedback",
+            "rows": rows, "pg": pg, "counts": counts, "total": total,
+            "sel_status": status, "sel_role": role,
+            "digest": digest, "has_new_since_digest": max_id > (
+                digest["covered_to"] if digest else 0
+            ),
+            "ai_configured": ai.is_configured(), "ai_model": ai.model_name(),
+            "flash": request.query_params.get("flash", ""),
+        },
+    )
+
+
+@app.post("/admin/feedback/{feedback_id}/status")
+def admin_feedback_status(
+    request: Request, feedback_id: int, status: str = Form("reviewed"),
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    if status in ("new", "reviewed", "actioned", "dismissed"):
+        db.execute(
+            "UPDATE feedback SET status = ? WHERE id = ?", (status, feedback_id)
+        )
+        db.commit()
+    return RedirectResponse("/admin/feedback", status_code=303)
+
+
+@app.post("/admin/feedback/digest")
+def admin_feedback_digest(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Advisory only: cluster feedback into themes + suggested fixes for review."""
+    user, redirect = _require_admin(request, db)
+    if redirect:
+        return redirect
+    if not ai.is_configured():
+        return RedirectResponse("/admin/feedback?flash=not-configured", status_code=303)
+    allowed, _ = ratelimit.check(f"ai:{user['id']}", *AI_CALL_LIMIT)
+    if not allowed:
+        return RedirectResponse("/admin/feedback?flash=rate-limited", status_code=303)
+
+    items = db.execute(
+        "SELECT id, role, category, rating, message FROM feedback "
+        "ORDER BY created_at DESC, id DESC LIMIT 200"
+    ).fetchall()
+    try:
+        result = ai.summarize_feedback([dict(r) for r in items])
+    except ai.AIUnavailable:
+        return RedirectResponse("/admin/feedback?flash=ai-error", status_code=303)
+
+    covered_to = max((r["id"] for r in items), default=0)
+    db.execute(
+        "INSERT INTO ai_digests (kind, content, covered_to, generated_by) "
+        "VALUES ('feedback', ?, ?, ?)",
+        (json.dumps(result), covered_to, user["email"]),
+    )
+    db.commit()
+    audit.record(
+        db, "ai.feedback_digest", actor=user, target_type="feedback",
+        target_id=covered_to, detail=f"{result.get('n_items', 0)} items, {ai.model_name()}",
+    )
+    return RedirectResponse("/admin/feedback?flash=digest-ready", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
 # Employer
 # --------------------------------------------------------------------------- #
 @app.get("/employer/onboarding", response_class=HTMLResponse)
@@ -2696,6 +2908,89 @@ def employer_job_matches(
             "sent_to": request.query_params.get("sent", ""),
         },
     )
+
+
+AI_CALL_LIMIT = (20, 60 * 60)  # per user per hour — LLM calls cost money
+
+
+def _rank_candidates_by_skills(
+    db: sqlite3.Connection, required_skills: str, limit: int = 25
+) -> list:
+    """Every non-suspended candidate scored against a skill string, best first."""
+    candidates = db.execute(
+        "SELECT u.id, u.name, u.email, p.headline, p.skills, p.resume_filename "
+        "FROM candidate_profiles p JOIN users u ON u.id = p.user_id "
+        "WHERE u.is_suspended = 0 AND p.skills != '' ORDER BY u.id"
+    ).fetchall()
+    rows = []
+    for cand in candidates:
+        pct, matched, partial, missing = match_detail(cand["skills"], required_skills)
+        if pct < EMPLOYER_MATCH_THRESHOLD:
+            continue
+        rows.append(
+            {
+                "cand": cand, "pct": pct, "matched": matched,
+                "partial": partial, "missing": missing,
+            }
+        )
+    rows.sort(key=lambda r: r["pct"], reverse=True)
+    return rows[:limit]
+
+
+@app.get("/employer/assistant", response_class=HTMLResponse)
+def employer_assistant(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "employer_assistant.html",
+        {
+            "request": request, "user": user,
+            "ai_configured": ai.is_configured(), "ai_model": ai.model_name(),
+            "jd_text": "", "result": None, "error": None,
+        },
+    )
+
+
+@app.post("/employer/assistant", response_class=HTMLResponse)
+def employer_assistant_run(
+    request: Request,
+    job_description: str = Form(""),
+    _csrf: None = Depends(verify_csrf),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+
+    jd = job_description.strip()
+    ctx = {
+        "request": request, "user": user,
+        "ai_configured": ai.is_configured(), "ai_model": ai.model_name(),
+        "jd_text": jd, "result": None, "error": None,
+    }
+    if not ai.is_configured():
+        ctx["error"] = (
+            "The AI assistant isn't configured on this deployment. "
+            "Set ANTHROPIC_API_KEY to enable it."
+        )
+        return templates.TemplateResponse(request, "employer_assistant.html", ctx)
+
+    allowed, retry = ratelimit.check(f"ai:{user['id']}", *AI_CALL_LIMIT)
+    if not allowed:
+        ctx["error"] = f"You've run a lot of searches — try again in {retry // 60 + 1} min."
+        return templates.TemplateResponse(request, "employer_assistant.html", ctx)
+
+    try:
+        reqs = ai.extract_job_requirements(jd)
+    except ai.AIUnavailable as exc:
+        ctx["error"] = str(exc)
+        return templates.TemplateResponse(request, "employer_assistant.html", ctx)
+
+    ranked = _rank_candidates_by_skills(db, ", ".join(reqs["skills"]))
+    ctx["result"] = {"reqs": reqs, "rows": ranked}
+    return templates.TemplateResponse(request, "employer_assistant.html", ctx)
 
 
 @app.get("/employer/jobs/{job_id}/applicants", response_class=HTMLResponse)

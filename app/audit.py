@@ -21,6 +21,7 @@ ACTIONS = {
     "security.2fa_enable": "2FA enabled",
     "security.2fa_disable": "2FA disabled",
     "account.delete": "Account deleted by its owner",
+    "ai.feedback_digest": "AI feedback digest generated",
 }
 
 

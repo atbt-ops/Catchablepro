@@ -153,6 +153,32 @@ CREATE TABLE IF NOT EXISTS saved_jobs (
     created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (candidate_id, job_id)
 );
+
+CREATE TABLE IF NOT EXISTS feedback (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- actor_id snapshotted the same way audit_log does: keep the row if the
+    -- account is later deleted, but remember the role and email it came from.
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    role        TEXT    NOT NULL DEFAULT '',
+    email       TEXT    NOT NULL DEFAULT '',
+    category    TEXT    NOT NULL DEFAULT 'general',
+    rating      INTEGER,
+    message     TEXT    NOT NULL,
+    page        TEXT    NOT NULL DEFAULT '',
+    status      TEXT    NOT NULL DEFAULT 'new'
+                CHECK (status IN ('new', 'reviewed', 'actioned', 'dismissed')),
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS ai_digests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind         TEXT    NOT NULL,
+    content      TEXT    NOT NULL,           -- JSON payload from app/ai.py
+    covered_to   INTEGER NOT NULL DEFAULT 0, -- highest feedback id it saw
+    generated_by TEXT    NOT NULL DEFAULT '',
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
