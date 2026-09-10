@@ -340,6 +340,9 @@ templates.env.globals["description_html"] = description_html
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
 templates.env.globals["pipeline_stages"] = PIPELINE_STAGES
+#: The header job-search bar renders on every page, so its location list has to
+#: be reachable without every route passing it in.
+templates.env.globals["india_locations"] = INDIA_LOCATIONS
 
 
 def page_url(request: Request, page: int, param: str = "page") -> str:
@@ -1682,34 +1685,26 @@ def logout(request: Request, _csrf: None = Depends(verify_csrf)):
 # --------------------------------------------------------------------------- #
 # Candidate
 # --------------------------------------------------------------------------- #
-@app.get("/candidate", response_class=HTMLResponse)
-def candidate_dashboard(
-    request: Request,
+def _search_active_jobs(
+    db: sqlite3.Connection,
+    *,
     q: str = "",
     location: str = "",
     work_mode: str = "",
     employment_type: str = "",
     department: str = "",
-    sort: str = "match",
-    page: int = 1,
-    apps_page: int = 1,
-    db: sqlite3.Connection = Depends(get_db),
-):
-    user, redirect = _require(request, db, "candidate")
-    if redirect:
-        return redirect
-    sweep_expired_jobs(db)  # drop postings that hit the pricing cap from search
-    prof = _profile(db, user["id"])
+) -> list:
+    """Live postings from non-suspended employers, filtered, newest first.
 
-    # Only live postings are visible to candidates.
+    Shared by the candidate dashboard (which then scores each row against the
+    signed-in profile) and the public /jobs page (which does not).
+    """
     sql = (
         "SELECT j.*, u.company_name FROM jobs j "
         "JOIN users u ON u.id = j.employer_id "
         "WHERE j.status = 'active' AND u.is_suspended = 0"
     )
     params: list = []
-    q = q.strip()
-    location = location.strip()
     if q:
         term = f"%{q}%"
         sql += (
@@ -1731,7 +1726,117 @@ def candidate_dashboard(
         sql += " AND j.department = ?"
         params.append(department)
     sql += " ORDER BY j.created_at DESC, j.id DESC"
-    jobs = db.execute(sql, params).fetchall()
+    return db.execute(sql, params).fetchall()
+
+
+def _sort_by_salary(job_rows: list) -> None:
+    """Order rows (each carrying a ``job``) by the top of the salary band."""
+    job_rows.sort(
+        key=lambda r: (r["job"]["salary_max"] or r["job"]["salary_min"] or 0),
+        reverse=True,
+    )
+
+
+@app.get("/jobs", response_class=HTMLResponse)
+def public_jobs(
+    request: Request,
+    q: str = "",
+    location: str = "",
+    work_mode: str = "",
+    employment_type: str = "",
+    department: str = "",
+    sort: str = "new",
+    page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Public job search — no login. Candidates are sent to their ranked view."""
+    user = auth.current_user(request, db)
+    q, location = q.strip(), location.strip()
+    if user and user["role"] == "candidate":
+        qs = urlencode(
+            {k: v for k, v in request.query_params.items() if v}, doseq=True
+        )
+        return RedirectResponse(f"/candidate{'?' + qs if qs else ''}", status_code=303)
+
+    sweep_expired_jobs(db)
+    jobs = _search_active_jobs(
+        db,
+        q=q,
+        location=location,
+        work_mode=work_mode,
+        employment_type=employment_type,
+        department=department,
+    )
+    sort = sort if sort in ("new", "salary") else "new"
+    job_rows = [
+        {
+            "job": job,
+            "skills": [
+                s.strip()
+                for s in (job["required_skills"] or "").replace("\n", ",").split(",")
+                if s.strip()
+            ][:10],
+        }
+        for job in jobs
+    ]
+    if sort == "salary":
+        _sort_by_salary(job_rows)
+    jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
+    job_rows = jobs_page.slice(job_rows)
+
+    return templates.TemplateResponse(
+        request,
+        "jobs.html",
+        {
+            "request": request,
+            "user": user,
+            "job_rows": job_rows,
+            "jobs_page": jobs_page,
+            "work_modes": WORK_MODES,
+            "employment_types": EMPLOYMENT_TYPES,
+            "india_locations": INDIA_LOCATIONS,
+            "departments": DEPARTMENTS,
+            "sel_q": q,
+            "sel_location": location,
+            "sel_work_mode": work_mode,
+            "sel_employment_type": employment_type,
+            "sel_department": department,
+            "sel_sort": sort,
+            "show_match": False,
+            "results_action": "/jobs",
+        },
+    )
+
+
+@app.get("/candidate", response_class=HTMLResponse)
+def candidate_dashboard(
+    request: Request,
+    q: str = "",
+    location: str = "",
+    work_mode: str = "",
+    employment_type: str = "",
+    department: str = "",
+    sort: str = "match",
+    page: int = 1,
+    apps_page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    user, redirect = _require(request, db, "candidate")
+    if redirect:
+        return redirect
+    sweep_expired_jobs(db)  # drop postings that hit the pricing cap from search
+    prof = _profile(db, user["id"])
+
+    q = q.strip()
+    location = location.strip()
+    jobs = _search_active_jobs(
+        db,
+        q=q,
+        location=location,
+        work_mode=work_mode,
+        employment_type=employment_type,
+        department=department,
+    )
 
     applied_ids = {
         r["job_id"]
@@ -1761,10 +1866,7 @@ def candidate_dashboard(
     if sort == "match":
         job_rows.sort(key=lambda r: r["pct"], reverse=True)
     elif sort == "salary":
-        job_rows.sort(
-            key=lambda r: (r["job"]["salary_max"] or r["job"]["salary_min"] or 0),
-            reverse=True,
-        )
+        _sort_by_salary(job_rows)
     jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
     job_rows = jobs_page.slice(job_rows)
 
@@ -1803,6 +1905,8 @@ def candidate_dashboard(
             "sel_employment_type": employment_type,
             "sel_department": department,
             "sel_sort": sort,
+            "show_match": True,
+            "results_action": "/candidate",
         },
     )
 

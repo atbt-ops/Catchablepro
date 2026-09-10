@@ -64,13 +64,13 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; }
 .topbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; padding: 12px 24px;
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  gap: 16px; padding: 12px 24px; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-soft);
 }
 .brand {
-  display: inline-flex; align-items: center; gap: 9px;
+  display: inline-flex; align-items: center; gap: 9px; flex: none;
   font-weight: 800; font-size: 19px; color: var(--text);
 }
 .brand:hover { text-decoration: none; }
@@ -89,12 +89,32 @@ h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; }
    Keep every label on one line and buy the room back from the spacing, which
    nobody notices. "For employers" is already hidden at this width. */
 .navlink, .btn { white-space: nowrap; }
+
+/* header job-search bar: sits between the brand and the nav, grows to fill */
+.jobsearch-compact {
+  flex: 1 1 320px; min-width: 0; max-width: 620px; margin: 0;
+  padding: 4px; border-radius: 999px;
+  box-shadow: none; background: var(--surface); border: 1px solid var(--border);
+}
+.jobsearch-compact .jobsearch-field input,
+.jobsearch-compact .jobsearch-field select { height: 36px; padding-left: 38px; font-size: 13.5px; }
+.jobsearch-compact .jobsearch-field .jobsearch-ico { left: 13px; }
+.jobsearch-compact .jobsearch-field .jobsearch-ico .ico { width: 15px; height: 15px; }
+.jobsearch-compact .jobsearch-loc { flex: 0 1 150px; }
+.jobsearch-compact .jobsearch-go { padding: 0 16px; height: 36px; }
+.jobsearch-compact .jobsearch-go span { display: none; }
+
+@media (max-width: 900px) {
+  .jobsearch-compact { order: 3; flex-basis: 100%; max-width: none; }
+  .jobsearch-compact .jobsearch-go span { display: inline; }
+}
 @media (max-width: 560px) {
   .topbar { padding: 10px 14px; gap: 10px; }
   .topbar nav { gap: 8px; }
   .brand { font-size: 17px; gap: 7px; }
   .brand-mark { width: 28px; height: 28px; border-radius: 8px; }
   .btn.small { padding: 8px 11px; }
+  .jobsearch-compact .jobsearch-loc { display: none; }
 }
 
 .who { display: inline-flex; align-items: center; gap: 9px; }

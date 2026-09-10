@@ -8,13 +8,15 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/forms.js" defer></script>
 </head>
-{% from "macros.html" import icon %}
+{% from "macros.html" import icon, job_search_bar %}
 <body>
   <header class="topbar">
     <a class="brand" href="/">
       <span class="brand-mark">{{ icon('target', 22) }}</span>
       Catch <span class="brand-accent">Able Pro</span>
     </a>
+    {{ job_search_bar('/jobs', request.query_params.get('q', ''),
+                      request.query_params.get('location', ''), india_locations, compact=true) }}
     <nav>
       {% if user %}
         <span class="who">
