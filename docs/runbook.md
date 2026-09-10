@@ -229,6 +229,27 @@ Prometheus. Setup and the rest of the reasoning: `docs/monitoring.md`.
 
 ---
 
+## 9a. The AI features misbehave
+
+The employer assistant and the admin feedback digest are the only things that
+call an external API. They **never page** — a failure there shows the user a
+notice, not a 500, and the rest of the site is unaffected. So this is always a
+"morning" item.
+
+- "Not configured" everywhere → `ANTHROPIC_API_KEY` is missing from the
+  container. Add it to `.env.production`, `day-start.ps1 -Rebuild`.
+- `flash=ai-error` on the digest, or the assistant erroring → `docker compose
+  -f compose.production.yaml logs --tail=50 app | Select-String catchablepro.ai`
+  for the exception and request id. Usual causes: bad key, spending cap hit,
+  outbound HTTPS blocked.
+- Suspected runaway spend → the per-user limit is 20 calls/hour
+  (`AI_CALL_LIMIT` in `app/main.py`); to stop it entirely, remove
+  `ANTHROPIC_API_KEY` and rebuild.
+
+Full reference: `docs/ai-features.md`.
+
+---
+
 ## 10. Never, during an incident
 
 - **Never force-push `main`.** Revert instead.

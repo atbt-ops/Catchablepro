@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Send feedback · Catchablepro{% endblock %}
+
+{% block content %}
+<a class="backlink" href="{{ '/employer' if user.role == 'employer' else '/candidate' }}">
+  {{ icon('arrow-right', 14) }} Back to dashboard
+</a>
+
+<div class="page-head">
+  <div>
+    <h1>Tell us what's working — and what isn't</h1>
+    <p class="sub">Every note is read. Bugs, rough edges, missing features, matching quality — all useful.</p>
+  </div>
+</div>
+
+{% if sent %}
+  <div class="flash-ok">{{ icon('check', 15) }} Thanks — your feedback is in. We read everything.</div>
+{% endif %}
+
+<div class="grid2">
+  <section class="panel">
+    <h2>{{ icon('mail', 18) }} New feedback</h2>
+    {% if error %}<div class="errorlist">{{ error }}</div>{% endif %}
+    <form method="post" action="/feedback">
+      {{ csrf_field(request) }}
+      <label>Topic
+        <select name="category">
+          {% for c in categories %}
+            <option value="{{ c }}" {{ 'selected' if form.get('category') == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Overall, how's your experience? <span class="muted">(optional)</span>
+        <select name="rating">
+          <option value="">No rating</option>
+          {% for n in [5, 4, 3, 2, 1] %}
+            <option value="{{ n }}" {{ 'selected' if form.get('rating') == n|string }}>
+              {{ n }} — {{ ['Very poor','Poor','Okay','Good','Excellent'][n-1] }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>What happened / what would you change? <span class="req">*</span>
+        <textarea name="message" rows="6" required maxlength="4000"
+                  placeholder="Be specific: what you did, what you expected, what you saw.">{{ form.get('message', '') }}</textarea>
+      </label>
+      <label>Which page is this about? <span class="muted">(optional)</span>
+        <input type="text" name="page" value="{{ form.get('page', '') }}"
+               placeholder="e.g. /candidate or the job detail page">
+      </label>
+      <button class="btn" type="submit">{{ icon('check', 16) }} Send feedback</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('doc', 18) }} Your recent feedback</h2>
+    {% if mine %}
+      <div class="applist">
+        {% for f in mine %}
+        <div class="approw">
+          <div class="approw-top">
+            <div class="approw-title"><strong>{{ f.category }}</strong>
+              {% if f.rating %}<span class="muted">· {{ f.rating }}/5</span>{% endif %}
+            </div>
+            <span class="tag stage-{{ 'hired' if f.status == 'actioned' else 'shortlisted' if f.status == 'reviewed' else 'rejected' if f.status == 'dismissed' else 'applied' }}">
+              {{ f.status | capitalize }}
+            </span>
+          </div>
+          <p class="row-sub" style="white-space:pre-wrap">{{ f.message }}</p>
+          <div class="approw-foot muted">{{ f.created_at }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <span class="eico">{{ icon('mail', 24) }}</span>
+        <p>Nothing yet. Your notes will show here with their status.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

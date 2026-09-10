@@ -1,0 +1,120 @@
+{% extends "shell.html" %}
+{% from "macros.html" import icon, navitem, match_ring %}
+{% block title %}AI hiring assistant · Catchablepro{% endblock %}
+
+{% block sidebar %}
+  <div class="nav-heading">Employer</div>
+  {{ navitem('/employer', 'briefcase', 'Your jobs') }}
+  {{ navitem('/employer/jobs/new', 'plus', 'Post a job') }}
+  {{ navitem('/employer/assistant', 'sparkle', 'AI assistant', true) }}
+  {{ navitem('/feedback', 'mail', 'Send feedback') }}
+  <div class="nav-heading">Account</div>
+  {{ navitem('/account', 'user', 'Settings') }}
+{% endblock %}
+
+{% block rightrail %}
+  <div class="railcard">
+    <h4>{{ icon('sparkle', 13) }} How it works</h4>
+    <p class="tip">
+      Paste a job description. The assistant reads it, pulls out the required
+      skills, then ranks every candidate profile by how well their skills match —
+      the same score employers see on a posted job.
+    </p>
+    <p class="tip">It doesn't post the job or contact anyone. Nothing changes until you act.</p>
+  </div>
+  {% if ai_configured %}
+    <div class="railcard">
+      <h4>{{ icon('bolt', 13) }} Model</h4>
+      <p class="tip">{{ ai_model }}</p>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>AI hiring assistant</h1>
+    <p class="sub">Describe a role in plain language and get a ranked shortlist of matching candidates.</p>
+  </div>
+</div>
+
+{% if not ai_configured %}
+  <div class="notice">
+    {{ icon('bolt', 16) }}
+    <div>The AI assistant isn't configured on this deployment. An administrator needs to set
+      <code>ANTHROPIC_API_KEY</code>.</div>
+  </div>
+{% endif %}
+
+<section class="panel">
+  <h2>{{ icon('doc', 18) }} Job description</h2>
+  {% if error %}<div class="errorlist">{{ error }}</div>{% endif %}
+  <form method="post" action="/employer/assistant">
+    {{ csrf_field(request) }}
+    <label class="sr-only" for="jd">Job description</label>
+    <textarea id="jd" name="job_description" rows="9" required
+              placeholder="e.g. We're hiring a senior backend engineer to own our payments services. Strong Python and PostgreSQL, experience with FastAPI, Docker and AWS. You'll design APIs, mentor two engineers, and work closely with product.">{{ jd_text }}</textarea>
+    <button class="btn" type="submit" {{ 'disabled' if not ai_configured }}>
+      {{ icon('sparkle', 16) }} Find matching candidates
+    </button>
+  </form>
+</section>
+
+{% if result %}
+  {% set r = result %}
+  <section class="panel">
+    <h2>{{ icon('sparkle', 18) }} {{ r.reqs.title }}</h2>
+    <p class="hint">{{ r.reqs.summary }}</p>
+    <div class="jcard-meta" style="margin-bottom:10px">
+      {% if r.reqs.seniority %}<span>{{ icon('clock', 13) }} {{ r.reqs.seniority }}</span>{% endif %}
+      <span>{{ r.reqs.skills | length }} skills detected</span>
+    </div>
+    <div class="chips">
+      {% for s in r.reqs.skills %}<span class="chip">{{ s }}</span>{% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>{{ icon('user', 18) }} Candidates by skill match
+      {% if r.rows %}<span class="count-pill">{{ r.rows | length }}</span>{% endif %}
+    </h2>
+    {% if r.rows %}
+      <div class="rows">
+        {% for m in r.rows %}
+        <div class="row">
+          {{ match_ring(m.pct) }}
+          <div class="row-main">
+            <h3>{{ m.cand.name or m.cand.email }}</h3>
+            {% if m.cand.headline %}<p class="row-sub">{{ m.cand.headline }}</p>{% endif %}
+            <p class="row-sub">
+              <a class="candmail" href="mailto:{{ m.cand.email }}">{{ icon('mail', 12) }} {{ m.cand.email }}</a>
+            </p>
+            <div class="chips">
+              {% for s in m.matched %}<span class="chip on">{{ s }}</span>{% endfor %}
+              {% for p in m.partial %}<span class="chip part">{{ p.skill }} <em>≈ {{ p.via }}</em></span>{% endfor %}
+              {% for s in m.missing %}<span class="chip">{{ s }}</span>{% endfor %}
+            </div>
+          </div>
+          <div class="row-action">
+            {% if m.cand.resume_filename %}
+              <a class="btn ghost small" href="/resume/{{ m.cand.id }}">{{ icon('doc', 14) }} Resume</a>
+            {% else %}
+              <span class="muted" style="font-size:13px">No resume</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="hint" style="margin-top:14px">
+        To reach these candidates, <a href="/employer/jobs/new">post this role</a> — the match
+        list and contact tools live on the posted job.
+      </p>
+    {% else %}
+      <div class="empty">
+        <span class="eico">{{ icon('user', 24) }}</span>
+        <p>No candidate profiles match these skills yet.</p>
+      </div>
+    {% endif %}
+  </section>
+{% endif %}
+{% endblock %}

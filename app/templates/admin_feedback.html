@@ -1,0 +1,138 @@
+{% extends "admin_base.html" %}
+{% from "macros.html" import icon, pager %}
+{% set active_page = 'feedback' %}
+{% block title %}Feedback · Admin{% endblock %}
+
+{% block rightrail %}
+  <div class="railcard">
+    <h4>{{ icon('sparkle', 13) }} AI digest</h4>
+    <p class="tip">
+      Clusters all feedback into themes with a suggested fix for each. It only
+      reads and summarises — it never changes code or data. Treat the fixes as a
+      starting point for review, not instructions to run.
+    </p>
+  </div>
+  <div class="railcard">
+    <h4>{{ icon('doc', 13) }} Statuses</h4>
+    <p class="tip"><strong>New</strong> → <strong>Reviewed</strong> → <strong>Actioned</strong>,
+      or <strong>Dismissed</strong>. Only your team sees these.</p>
+  </div>
+{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Feedback</h1>
+    <p class="sub">{{ total }} entr{{ 'y' if total == 1 else 'ies' }} matching your filter ·
+      {{ counts.get('new', 0) }} new</p>
+  </div>
+</div>
+
+{% if flash == 'digest-ready' %}<div class="flash-ok">{{ icon('check', 15) }} Digest generated.</div>{% endif %}
+{% if flash == 'not-configured' %}<div class="notice">{{ icon('bolt', 16) }}<div>Set <code>ANTHROPIC_API_KEY</code> to enable the digest.</div></div>{% endif %}
+{% if flash == 'rate-limited' %}<div class="notice">{{ icon('bolt', 16) }}<div>Too many AI calls this hour — try again later.</div></div>{% endif %}
+{% if flash == 'ai-error' %}<div class="notice">{{ icon('bolt', 16) }}<div>The AI call failed. Check the logs and try again.</div></div>{% endif %}
+
+<section class="panel">
+  <div class="page-head" style="margin-bottom:8px">
+    <h2 style="margin:0">{{ icon('sparkle', 18) }} AI feedback digest</h2>
+    <form method="post" action="/admin/feedback/digest" class="inline">
+      {{ csrf_field(request) }}
+      <button class="btn small" type="submit" {{ 'disabled' if not ai_configured }}>
+        {{ icon('sparkle', 15) }} {{ 'Regenerate' if digest else 'Generate digest' }}
+      </button>
+    </form>
+  </div>
+
+  {% if not ai_configured %}
+    <p class="hint">Not configured — set <code>ANTHROPIC_API_KEY</code>.</p>
+  {% elif not digest %}
+    <p class="hint">No digest yet. Generate one once you have a handful of entries.</p>
+  {% else %}
+    <p class="hint">
+      {{ digest.model or ai_model }} · {{ digest.n_items or '—' }} items ·
+      {{ digest.created_at }} · by {{ digest.generated_by }}
+      {% if has_new_since_digest %}<span class="tag status-draft">new feedback since</span>{% endif %}
+    </p>
+    {% if digest.overview %}<p class="jd-about">{{ digest.overview }}</p>{% endif %}
+    <div class="rows">
+      {% for t in digest.themes %}
+      <div class="row" style="grid-template-columns: 1fr;">
+        <div class="row-main">
+          <h3>
+            {{ t.title }}
+            <span class="tag stage-{{ 'rejected' if t.severity == 'high' else 'on_hold' if t.severity == 'medium' else 'applied' }}">{{ t.severity }} severity</span>
+            <span class="tag">{{ t.confidence }} confidence</span>
+          </h3>
+          <p class="row-sub" style="white-space:pre-wrap">{{ t.summary }}</p>
+          <div class="pricing-box" style="margin-top:8px">
+            <h4>{{ icon('check', 13) }} Suggested fix</h4>
+            <p class="tip" style="white-space:pre-wrap">{{ t.suggested_fix }}</p>
+          </div>
+          {% if t.example_ids %}
+            <p class="row-sub muted">Examples: {% for i in t.example_ids %}#{{ i }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+<form method="get" action="/admin/feedback" class="filterbar">
+  <label>Status
+    <select name="status" data-auto-submit>
+      <option value="">All</option>
+      {% for s in ['new', 'reviewed', 'actioned', 'dismissed'] %}
+        <option value="{{ s }}" {{ 'selected' if sel_status == s }}>{{ s | capitalize }} ({{ counts.get(s, 0) }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>From
+    <select name="role" data-auto-submit>
+      <option value="">Everyone</option>
+      <option value="candidate" {{ 'selected' if sel_role == 'candidate' }}>Candidates</option>
+      <option value="employer" {{ 'selected' if sel_role == 'employer' }}>Employers</option>
+    </select>
+  </label>
+  {% if sel_status or sel_role %}<a class="btn ghost small" href="/admin/feedback">Clear</a>{% endif %}
+</form>
+
+<section class="panel">
+  {% if rows %}
+    <div class="applist">
+      {% for f in rows %}
+      <div class="approw">
+        <div class="approw-top">
+          <div class="approw-title">
+            <strong>#{{ f.id }} · {{ f.category }}</strong>
+            {% if f.rating %}<span class="muted">· {{ f.rating }}/5</span>{% endif %}
+            <span class="muted">· {{ f.role or 'user' }} · {{ f.email or 'unknown' }}</span>
+          </div>
+          <span class="tag stage-{{ 'hired' if f.status == 'actioned' else 'shortlisted' if f.status == 'reviewed' else 'rejected' if f.status == 'dismissed' else 'applied' }}">{{ f.status | capitalize }}</span>
+        </div>
+        <p class="row-sub" style="white-space:pre-wrap">{{ f.message }}</p>
+        <div class="approw-foot">
+          <span class="muted">{{ f.created_at }}{% if f.page %} · {{ f.page }}{% endif %}</span>
+          <form method="post" action="/admin/feedback/{{ f.id }}/status" class="inline" style="margin-top:6px">
+            {{ csrf_field(request) }}
+            <select name="status" style="width:auto;margin:0;padding:5px 8px;font-size:12px">
+              {% for s in ['new', 'reviewed', 'actioned', 'dismissed'] %}
+                <option value="{{ s }}" {{ 'selected' if f.status == s }}>{{ s | capitalize }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn ghost small" type="submit">Update</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {{ pager(request, pg, 'page', 'entries') }}
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('mail', 24) }}</span>
+      <p>No feedback matches that filter.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

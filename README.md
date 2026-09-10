@@ -201,6 +201,32 @@ keyword overlap, so previously-computed scores are unchanged.
 A candidate profile "is sent to the employer" by surfacing on that job's
 **Matches** page, ranked highest-first.
 
+### AI assistant & feedback digest (optional)
+
+Full write-up: [docs/ai-features.md](docs/ai-features.md).
+
+Two features use Claude, and only run when `ANTHROPIC_API_KEY` is set — without
+it the app is unchanged and both pages show a "not configured" notice.
+
+- **Employer AI assistant** (`/employer/assistant`) — paste a free-text job
+  description; Claude extracts the required skills, and the existing
+  deterministic matcher ranks every candidate profile against them. It never
+  posts the job or contacts anyone.
+- **Admin feedback digest** (`/admin/feedback`) — clusters all submitted
+  feedback into themes with a suggested fix per theme. **Advisory only**: it
+  reads and summarises, it does not write code, change data, or deploy.
+  Feedback text is treated as untrusted input — the model is instructed never
+  to act on instructions found inside it.
+
+`AI_MODEL` overrides the model (default `claude-opus-5`; `claude-sonnet-5` is
+~2× cheaper). Calls are rate-limited per user.
+
+### Feedback
+
+Any signed-in user can send feedback at `/feedback` (topic, optional 1–5
+rating, message). Entries move through `new → reviewed → actioned` (or
+`dismissed`) on the admin **Feedback** page.
+
 ### Auto-Apply
 
 When a candidate turns Auto-Apply **ON**:
@@ -692,6 +718,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 │  ├─ db.py          # SQLite schema, migration, thresholds
 │  ├─ auth.py        # PBKDF2 password hashing + session helper (stdlib only)
 │  ├─ matching.py    # keyword-overlap skill match + resume skill extraction
+│  ├─ ai.py          # optional Claude helpers (JD → skills, feedback digest)
 │  ├─ resume.py      # resume text extraction (.txt/.pdf/.docx)
 │  ├─ health.py     # liveness + readiness dependency probes
 │  ├─ logging_config.py       # JSON log records + request-id context
@@ -700,6 +727,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 │  └─ templates/     # Jinja pages + macros.html (SVG icons, match ring)
 ├─ tests/            # pytest: matching unit tests + app integration tests
 ├─ docs/runbook.md   # what to do when it breaks
+├─ docs/ai-features.md       # the optional Claude features, in full
 ├─ docs/performance.md       # measured baseline + how to reproduce
 ├─ docs/monitoring.md        # scraping, alerting, dashboard
 ├─ docs/architecture.md      # the mobile-client constraint, decided early
@@ -719,6 +747,7 @@ single-instance by design today (see the SQLite note above), so this matches.
 - `SECRET_KEY` — session-cookie signing key (defaults to a dev value; set in production).
 - `LOG_LEVEL` — logging floor, default `INFO`.
 - `METRICS_TOKEN` — bearer token a Prometheus scraper must present. **Required in production** or `/metrics` is not served at all.
+- `ANTHROPIC_API_KEY` — optional; enables the AI assistant and feedback digest ([docs/ai-features.md](docs/ai-features.md)). `AI_MODEL` overrides the model.
 - Thresholds live in `app/db.py`: `AUTO_APPLY_MIN_MATCH` (min % to auto-apply) and
   `EMPLOYER_MATCH_THRESHOLD` (min % for a candidate to appear on a job's Matches page).
 
