@@ -21,8 +21,13 @@ Employers get their own entry points, like a dedicated recruiter site:
 | `/employer/login` | Employer login (rejects candidate accounts with a clear message) |
 | `/employer/onboarding` | Multi-step setup wizard |
 
-`/register` and `/login` are the **candidate** side. The landing page offers both
-paths ("Find a job" vs "Hire talent").
+`/register` and `/login` are the **candidate** side.
+
+**The homepage (`/`) is the job board.** Jobs fill the centre column with a
+filter bar on top; the side rails carry ad slots, "browse by department",
+"companies hiring now", and sign-up / post-a-job CTAs. Everyone sees it —
+signed-in candidates get their skill-match %, and a header link back to their
+dashboard. The old marketing page lives at `/about`.
 
 **Onboarding wizard** — new employers are routed through it and the dashboard stays
 gated until it's finished:

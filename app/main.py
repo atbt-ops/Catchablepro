@@ -811,11 +811,99 @@ def metrics_endpoint(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-def landing(request: Request, db: sqlite3.Connection = Depends(get_db)):
+def home(
+    request: Request,
+    q: str = "",
+    location: str = "",
+    work_mode: str = "",
+    employment_type: str = "",
+    department: str = "",
+    experience: str = "",
+    salary: str = "",
+    posted: str = "",
+    sort: str = "new",
+    page: int = 1,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """The homepage is the job board — jobs in the centre, everything else in the rails."""
     user = auth.current_user(request, db)
-    if user:
-        return RedirectResponse(_dashboard_url(user["role"]), status_code=303)
-    return templates.TemplateResponse(request, "landing.html", {"request": request})
+    q, location = q.strip(), location.strip()
+    sweep_expired_jobs(db)
+    jobs = _search_active_jobs(
+        db, q=q, location=location, work_mode=work_mode,
+        employment_type=employment_type, department=department,
+        experience=experience, salary=salary, posted=posted,
+    )
+
+    show_match = bool(user and user["role"] == "candidate")
+    if show_match:
+        prof = _profile(db, user["id"])
+        applied = {
+            r["job_id"] for r in db.execute(
+                "SELECT job_id FROM applications WHERE candidate_id = ?", (user["id"],)
+            )
+        }
+        saved_ids = _saved_job_ids(db, user["id"])
+        job_rows = []
+        for job in jobs:
+            pct, m, p, mi = match_detail(prof["skills"], job["required_skills"])
+            job_rows.append({
+                "job": job, "pct": pct, "matched": m, "partial": p, "missing": mi,
+                "applied": job["id"] in applied,
+            })
+        sort = sort if sort in ("match", "new", "salary") else "new"
+        if sort == "match":
+            job_rows.sort(key=lambda r: r["pct"], reverse=True)
+        elif sort == "salary":
+            _sort_by_salary(job_rows)
+    else:
+        saved_ids = set()
+        sort = sort if sort in ("new", "salary") else "new"
+        job_rows = [
+            {"job": j, "skills": _skill_list(j["required_skills"])} for j in jobs
+        ]
+        if sort == "salary":
+            _sort_by_salary(job_rows)
+
+    jobs_page = paginate(len(job_rows), page, JOBS_PER_PAGE)
+    job_rows = jobs_page.slice(job_rows)
+
+    live = (
+        "SELECT j.department AS d, j.id, u.company_name AS c FROM jobs j "
+        "JOIN users u ON u.id = j.employer_id "
+        "WHERE j.status = 'active' AND u.is_suspended = 0"
+    )
+    dept_counts = db.execute(
+        f"SELECT d, COUNT(*) AS n FROM ({live}) WHERE d != '' GROUP BY d "
+        "ORDER BY n DESC, d LIMIT 8"
+    ).fetchall()
+    top_companies = db.execute(
+        f"SELECT c, COUNT(*) AS n FROM ({live}) WHERE c != '' GROUP BY c "
+        "ORDER BY n DESC, c LIMIT 6"
+    ).fetchall()
+
+    ctx = {
+        "request": request, "user": user,
+        "job_rows": job_rows, "jobs_page": jobs_page,
+        "show_match": show_match, "saved_ids": saved_ids,
+        "results_action": "/", "filters_layout": "bar",
+        "dept_counts": dept_counts, "top_companies": top_companies,
+        "total_active": jobs_page.total,
+    }
+    ctx.update(_search_context(dict(
+        q=q, location=location, work_mode=work_mode,
+        employment_type=employment_type, department=department,
+        experience=experience, salary=salary, posted=posted, sort=sort,
+    )))
+    return templates.TemplateResponse(request, "home.html", ctx)
+
+
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    """The old marketing page, kept for the 'how it works' links."""
+    return templates.TemplateResponse(
+        request, "landing.html", {"request": request, "user": auth.current_user(request, db)}
+    )
 
 
 @app.get("/register", response_class=HTMLResponse)

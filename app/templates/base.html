@@ -17,7 +17,7 @@
       Catch <span class="brand-accent">Able Pro</span>
     </a>
     {% if not employer_area %}
-      {{ job_search_bar('/jobs', request.query_params.get('q', ''),
+      {{ job_search_bar('/', request.query_params.get('q', ''),
                         request.query_params.get('location', ''), india_locations, compact=true) }}
     {% endif %}
     <nav>
