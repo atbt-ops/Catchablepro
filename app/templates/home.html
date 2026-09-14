@@ -2,6 +2,8 @@
 {% from "macros.html" import icon %}
 {% block title %}Jobs{% if sel_q %} · {{ sel_q }}{% endif %} · Catchablepro{% endblock %}
 {% block container_class %}wide{% endblock %}
+{% block robots %}index, follow{% endblock %}
+{% block meta_description %}{% if sel_q %}{{ sel_q }} jobs{% if sel_location %} in {{ sel_location }}{% endif %} — see your skill match and apply on Catch Able Pro.{% else %}Search verified jobs across India on Catch Able Pro. See exactly which skills match, apply directly, and track your application.{% endif %}{% endblock %}
 
 {% block content %}
 <div class="home-shell">

@@ -3,6 +3,9 @@
 {% block title %}
   {% if job %}{{ job.title }} at {{ job.company_name }}{% else %}Job not found{% endif %} · Catchablepro
 {% endblock %}
+{% block robots %}{% if job %}index, follow{% else %}noindex, nofollow{% endif %}{% endblock %}
+{% block meta_description %}{% if job %}{{ job.title }} at {{ job.company_name }}{% if job.location %}, {{ job.location }}{% endif %} — {{ fmt_exp(job) }}, {{ fmt_salary(job) }}. See your skill match and apply on Catch Able Pro.{% else %}This job posting is no longer available on Catch Able Pro.{% endif %}{% endblock %}
+{% block extra_head %}{% if job %}{{ job_posting_jsonld(job, company) }}{% endif %}{% endblock %}
 
 {% block content %}
 {% if not job %}
