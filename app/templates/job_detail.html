@@ -5,7 +5,7 @@
 {% endblock %}
 {% block robots %}{% if job %}index, follow{% else %}noindex, nofollow{% endif %}{% endblock %}
 {% block meta_description %}{% if job %}{{ job.title }} at {{ job.company_name }}{% if job.location %}, {{ job.location }}{% endif %} — {{ fmt_exp(job) }}, {{ fmt_salary(job) }}. See your skill match and apply on Catch Able Pro.{% else %}This job posting is no longer available on Catch Able Pro.{% endif %}{% endblock %}
-{% block extra_head %}{% if job %}{{ job_posting_jsonld(job, company) }}{% endif %}{% endblock %}
+{% block extra_head %}{% if job %}{{ job_posting_jsonld(job, request, company) }}{% endif %}{% endblock %}
 
 {% block content %}
 {% if not job %}
@@ -23,7 +23,10 @@
   <div class="jd-main">
     <article class="panel jd-head">
       <div class="jd-headrow">
-        <div class="jcard-logo jd-logo" aria-hidden="true">{{ job.company_name[0] | upper }}</div>
+        {% set logo = logo_url(job.employer_id, company.logo_filename if company else '', company.updated_at if company else '') %}
+        <div class="jcard-logo jd-logo" aria-hidden="true">
+          {% if logo %}<img src="{{ logo }}" alt="">{% else %}{{ job.company_name[0] | upper }}{% endif %}
+        </div>
         <div style="min-width:0">
           <h1 class="jd-title">{{ job.title }}</h1>
           <p class="jd-company">

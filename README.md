@@ -51,6 +51,14 @@ Employers post from a dedicated page (`/employer/jobs/new`) with:
   shows candidates "Not disclosed"
 - **Description** — free-text role details
 
+**Company logo:** employers upload one from the dashboard's Company profile panel
+(`/employer/company`, PNG/JPG/WEBP, up to 2 MB — SVG is rejected, since a logo is
+served under the app's own origin and an SVG can carry a `<script>`). It shows on
+every job card, the job detail page, and the site's own job cards, falling back to
+an initials avatar when none is set. Stored under the data volume and served from
+`GET /company/{employer_id}/logo`, which is public — logos need to render for
+signed-out visitors too.
+
 **Job lifecycle:** `Draft → Active → Closed` (reopenable). Only **Active** jobs are
 visible to candidates or eligible for Auto-Apply, so drafts stay private. A
 posting can be **edited** in place (editing never restarts the pricing meter)
@@ -261,10 +269,15 @@ configured; with `console` the digests are logged, not sent.
 Server-rendered with a self-contained design system (no external CSS/JS/CDN — keeps
 payloads tiny and the app offline-friendly):
 
-- **Light theme**, warm-neutral, one committed look — no toggle, no flash.
+- **Light theme**, cool-neutral (slate), one committed look — no toggle, no flash.
+- **Indigo/fuchsia brand ramp** — every color token in `:root` is chosen to clear
+  ~4.5:1 contrast on white, since `--brand` and the status colors (`--green`,
+  `--amber`, `--red`, `--accent`) are used as literal text color throughout
+  (links, prices, active nav, status tags), not just as fills.
 - **Animated circular match-score rings** (inline SVG) — the match % is the visual centerpiece.
-- Inline SVG icon set, avatar initials, skill chips (matched vs missing), status pills,
-  a real toggle switch for Auto-Apply, friendly empty states, and a responsive layout.
+- Inline SVG icon set, employer logos with an avatar-initial fallback, skill chips
+  (matched vs missing), status pills, a real toggle switch for Auto-Apply,
+  friendly empty states, and a responsive layout.
 - Components live in `app/templates/macros.html`; tokens/themes in `app/static/style.css`.
 
 **Three-column app shell** (`app/templates/shell.html`) for signed-in dashboards,

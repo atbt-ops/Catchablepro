@@ -78,7 +78,10 @@
       {% set cost = item.cost %}
       <div class="jobcard is-{{ j.status }}">
         <div class="jobcard-main">
-          <span class="jcard-logo jobcard-logo" aria-hidden="true">{{ (user.company_name or 'J')[0] | upper }}</span>
+          {% set logo = logo_url(user.id, company.logo_filename if company else '', company.updated_at if company else '') %}
+          <span class="jcard-logo jobcard-logo" aria-hidden="true">
+            {% if logo %}<img src="{{ logo }}" alt="">{% else %}{{ (user.company_name or 'J')[0] | upper }}{% endif %}
+          </span>
           <div style="min-width:0">
           <h3>
             <a href="/employer/jobs/{{ j.id }}/applicants">{{ j.title }}</a>
@@ -183,8 +186,40 @@
     <span class="chev">Edit ▾</span>
   </summary>
   <p class="hint">Candidates see this on your job postings.</p>
-  <form action="/employer/company" method="post">
+  {% set logo_error = request.query_params.get('logo_error') %}
+  {% if logo_error %}
+    <div class="notice">
+      {{ icon('bolt', 16) }}
+      <div>
+        {% if logo_error == 'size' %}
+          That logo is over 2&nbsp;MB. Try a smaller file — your previous logo is untouched.
+        {% else %}
+          Logos must be a PNG, JPG or WEBP image.
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+  <form action="/employer/company" method="post" enctype="multipart/form-data">
     {{ csrf_field(request) }}
+    {% set logo = logo_url(user.id, company.logo_filename if company else '', company.updated_at if company else '') %}
+    <label>Company logo
+      <span class="logo-field">
+        <span class="jcard-logo jobcard-logo" aria-hidden="true">
+          {% if logo %}<img src="{{ logo }}" alt="">{% else %}{{ (user.company_name or 'J')[0] | upper }}{% endif %}
+        </span>
+        <span style="flex:1;min-width:0">
+          <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp">
+          <span class="muted" style="display:block;margin-top:4px;font-size:12.5px;">
+            PNG, JPG or WEBP, up to 2&nbsp;MB. Shown on your job listings.
+            {% if logo %}
+              <label style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;">
+                <input type="checkbox" name="remove_logo" value="1" style="width:auto;"> Remove
+              </label>
+            {% endif %}
+          </span>
+        </span>
+      </span>
+    </label>
     <div class="grid2">
       <label>Company name
         <input type="text" name="company_name" value="{{ user.company_name }}" placeholder="Acme Inc.">
