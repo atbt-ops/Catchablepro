@@ -1951,7 +1951,7 @@ def employer_onboarding(request: Request, db: sqlite3.Connection = Depends(get_d
 
 
 @app.post("/employer/onboarding/company")
-def employer_onboarding_company(
+async def employer_onboarding_company(
     request: Request,
     _csrf: None = Depends(verify_csrf),
     company_name: str = Form(""),
@@ -1960,25 +1960,44 @@ def employer_onboarding_company(
     website: str = Form(""),
     hq_location: str = Form(""),
     about: str = Form(""),
+    logo: Optional[UploadFile] = None,
     db: sqlite3.Connection = Depends(get_db),
 ):
-    """Step 1 -> 2: save company details."""
+    """Step 1 -> 2: save company details. A logo is required to advance —
+    candidates should be able to recognize who's hiring before it's posted."""
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
-    _company(db, user["id"])
+    existing = _company(db, user["id"])
+
+    logo_filename = existing["logo_filename"]
+    logo_error = ""
+    if logo is not None and logo.filename:
+        safe_name, refused = await _save_logo(logo, user["id"])
+        if refused:
+            logo_error = refused
+        else:
+            if logo_filename and logo_filename != safe_name:
+                (UPLOAD_DIR / logo_filename).unlink(missing_ok=True)
+            logo_filename = safe_name
+
     db.execute(
         "UPDATE users SET company_name = ? WHERE id = ?",
         (company_name.strip(), user["id"]),
     )
+    advance = bool(logo_filename) and not logo_error
     db.execute(
         "UPDATE company_profiles SET industry = ?, size = ?, website = ?, "
-        "hq_location = ?, about = ?, onboarding_step = 2, "
+        "hq_location = ?, about = ?, logo_filename = ?, onboarding_step = ?, "
         "updated_at = datetime('now') WHERE user_id = ?",
         (industry.strip(), size.strip(), website.strip(), hq_location.strip(),
-         about.strip(), user["id"]),
+         about.strip(), logo_filename, 2 if advance else 1, user["id"]),
     )
     db.commit()
+    if not advance:
+        return RedirectResponse(
+            f"/employer/onboarding?logo_error={logo_error or 'required'}", status_code=303
+        )
     return RedirectResponse("/employer/onboarding", status_code=303)
 
 

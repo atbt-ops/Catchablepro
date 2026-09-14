@@ -43,7 +43,7 @@ def test_onboarding_wizard_completes(client, register, post):
         "company_name": "Wizard Corp", "industry": "Fintech",
         "size": "51-200 employees", "website": "https://wiz.co",
         "hq_location": "Bengaluru", "about": "We wiz.",
-    })
+    }, files={"logo": ("mark.png", b"pngbytes", "image/png")})
     step2 = client.get("/employer/onboarding").text
     assert "Post your first job" in step2
 
@@ -57,10 +57,32 @@ def test_onboarding_wizard_completes(client, register, post):
 
 def test_posting_first_job_completes_onboarding(client, register, post, post_job):
     register("job1@acme.io", "employer", company_name="J1", onboard=False)
-    post("/employer/onboarding/company", data={"company_name": "J1 Corp"})
+    post("/employer/onboarding/company", data={"company_name": "J1 Corp"},
+         files={"logo": ("mark.png", b"pngbytes", "image/png")})
     post_job(**{"title": "First Role", "required_skills": "python"})
     # Onboarding is done, so /employer renders instead of redirecting.
     assert client.get("/employer").status_code == 200
+
+
+def test_onboarding_step1_requires_a_logo_to_advance(client, register, post):
+    register("nologo@acme.io", "employer", company_name="NoLogo", onboard=False)
+
+    resp = post("/employer/onboarding/company", data={"company_name": "NoLogo Inc"})
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/employer/onboarding?logo_error=required"
+
+    # Still on step 1 — the company name was saved, but the wizard didn't advance.
+    page = client.get(resp.headers["location"]).text
+    assert "Tell us about your company" in page
+    assert "logo is required" in page
+
+    # A disallowed type is refused the same way, without advancing either.
+    resp = post(
+        "/employer/onboarding/company", data={"company_name": "NoLogo Inc"},
+        files={"logo": ("mark.svg", b"<svg onload=alert(1)>", "image/svg+xml")},
+    )
+    assert resp.headers["location"] == "/employer/onboarding?logo_error=type"
+    assert "Tell us about your company" in client.get("/employer/onboarding").text
 
 
 def test_employer_login_rejects_candidate_account(client, register, post):

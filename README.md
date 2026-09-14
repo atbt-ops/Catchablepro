@@ -51,12 +51,16 @@ Employers post from a dedicated page (`/employer/jobs/new`) with:
   shows candidates "Not disclosed"
 - **Description** — free-text role details
 
-**Company logo:** employers upload one from the dashboard's Company profile panel
-(`/employer/company`, PNG/JPG/WEBP, up to 2 MB — SVG is rejected, since a logo is
-served under the app's own origin and an SVG can carry a `<script>`). It shows on
-every job card, the job detail page, and the site's own job cards, falling back to
-an initials avatar when none is set. Stored under the data volume and served from
-`GET /company/{employer_id}/logo`, which is public — logos need to render for
+**Company logo:** required during onboarding — step 1 of the employer wizard
+(`/employer/onboarding`) won't advance to "post your first job" without one, since
+that's before any job of theirs is visible to a candidate. Existing employers from
+before this requirement aren't retroactively blocked (only that wizard step checks
+it); everyone can also change it later from the dashboard's Company profile panel
+(`/employer/company`). PNG/JPG/WEBP, up to 2 MB — SVG is rejected, since a logo is
+served under the app's own origin and an SVG can carry a `<script>`. It shows on
+every job card, the job detail page, and the employer's own dashboard, falling back
+to an initials avatar when none is set. Stored under the data volume and served
+from `GET /company/{employer_id}/logo`, which is public — logos need to render for
 signed-out visitors too.
 
 **Job lifecycle:** `Draft → Active → Closed` (reopenable). Only **Active** jobs are

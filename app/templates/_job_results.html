@@ -91,7 +91,7 @@
             </div>
           </div>
           <p class="jcard-company">
-            {{ icon('building', 13) }} {{ r.job.company_name }}
+            {{ icon('building', 13) }} <strong>{{ r.job.company_name }}</strong>
             {% if r.job.location %}<span class="dot"></span>{{ icon('pin', 12) }} {{ r.job.location }}{% endif %}
           </p>
           <p class="jcard-meta">

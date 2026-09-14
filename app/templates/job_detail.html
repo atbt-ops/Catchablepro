@@ -30,7 +30,7 @@
         <div style="min-width:0">
           <h1 class="jd-title">{{ job.title }}</h1>
           <p class="jd-company">
-            {{ icon('building', 14) }} {{ job.company_name }}
+            {{ icon('building', 14) }} <strong>{{ job.company_name }}</strong>
             {% if job.location %}<span class="dot"></span>{{ icon('pin', 13) }} {{ job.location }}{% endif %}
           </p>
         </div>
