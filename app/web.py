@@ -41,6 +41,19 @@ MAX_RESUME_BYTES = 5 * 1024 * 1024   # 5 MB
 RESUME_CHUNK_BYTES = 64 * 1024       # streamed, so peak memory is one chunk
 ALLOWED_RESUME_SUFFIXES = {".pdf", ".docx", ".txt", ".md", ".text"}
 
+# --- Company logo uploads ---------------------------------------------------- #
+# Logos are public (they render on job cards for anonymous visitors), so the
+# format list is deliberately raster-only: an uploaded .svg is served back
+# under our own origin, and a browser will run <script> inside one if it's
+# ever opened as a document rather than an <img> — not worth the risk here.
+MAX_LOGO_BYTES = 2 * 1024 * 1024     # 2 MB
+LOGO_CHUNK_BYTES = 64 * 1024
+ALLOWED_LOGO_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+_LOGO_CONTENT_TYPES = {
+    ".png": "image/png", ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg", ".webp": "image/webp",
+}
+
 # --- Page sizes ------------------------------------------------------------- #
 JOBS_PER_PAGE = 10        # candidate's ranked job list
 MY_APPS_PER_PAGE = 10     # candidate's own applications
@@ -330,7 +343,7 @@ _SCHEMA_EMPLOYMENT_TYPE = {
 }
 
 
-def job_posting_jsonld(job, company=None) -> Markup:
+def job_posting_jsonld(job, request: Request, company=None) -> Markup:
     """schema.org JobPosting structured data, for Google for Jobs.
 
     ``job`` is the sqlite3.Row a job_detail page renders around; returns an
@@ -361,6 +374,9 @@ def job_posting_jsonld(job, company=None) -> Markup:
         data["jobLocationType"] = "TELECOMMUTE"
     if company and company["website"]:
         data["hiringOrganization"]["sameAs"] = company["website"]
+    if company and company["logo_filename"]:
+        rel = logo_url(job["employer_id"], company["logo_filename"], company["updated_at"])
+        data["hiringOrganization"]["logo"] = public_base_url(request) + rel
     lo, hi = job["salary_min"] or 0, job["salary_max"] or 0
     if not job["hide_salary"] and (lo or hi):
         data["baseSalary"] = {
@@ -400,6 +416,18 @@ def static_url(name: str) -> str:
     return f"/static/{name}?v={fp}" if fp else f"/static/{name}"
 
 
+def logo_url(employer_id, logo_filename: str, version: str = "") -> str:
+    """Public URL for a company logo, or '' if the employer hasn't uploaded one.
+
+    ``version`` (the company profile's ``updated_at``) is folded into the
+    query string so a re-uploaded logo isn't served stale from cache.
+    """
+    if not logo_filename:
+        return ""
+    v = re.sub(r"[^0-9]", "", str(version or ""))
+    return f"/company/{employer_id}/logo?v={v}" if v else f"/company/{employer_id}/logo"
+
+
 templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["posted_ago"] = posted_ago
@@ -409,6 +437,7 @@ templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
 templates.env.globals["pipeline_stages"] = PIPELINE_STAGES
 templates.env.globals["static_url"] = static_url
+templates.env.globals["logo_url"] = logo_url
 templates.env.globals["public_base_url"] = public_base_url
 #: The header job-search bar renders on every page, so its location list has to
 #: be reachable without every route passing it in.
@@ -814,8 +843,10 @@ def _search_active_jobs(
     signed-in profile) and the public /jobs page (which does not).
     """
     sql = (
-        "SELECT j.*, u.company_name FROM jobs j "
+        "SELECT j.*, u.company_name, c.logo_filename, c.updated_at AS company_updated_at "
+        "FROM jobs j "
         "JOIN users u ON u.id = j.employer_id "
+        "LEFT JOIN company_profiles c ON c.user_id = j.employer_id "
         "WHERE j.status = 'active' AND u.is_suspended = 0"
     )
     params: list = []
@@ -977,6 +1008,35 @@ async def _save_resume(upload: UploadFile, user_id: int) -> tuple[str, str]:
                     break
                 written += len(chunk)
                 if written > MAX_RESUME_BYTES:
+                    too_large = True
+                    break
+                fh.write(chunk)
+        if too_large:
+            return "", "size"
+        os.replace(part, dest)
+    finally:
+        part.unlink(missing_ok=True)
+    return dest.name, ""
+
+
+async def _save_logo(upload: UploadFile, user_id: int) -> tuple[str, str]:
+    """Stream an uploaded company logo to disk, bounded. Mirrors ``_save_resume``."""
+    suffix = Path(upload.filename or "").suffix.lower()
+    if suffix not in ALLOWED_LOGO_SUFFIXES:
+        return "", "type"
+
+    dest = UPLOAD_DIR / f"logo_{user_id}{suffix}"
+    part = dest.with_name(dest.name + ".part")
+    written = 0
+    too_large = False
+    try:
+        with open(part, "wb") as fh:
+            while True:
+                chunk = await upload.read(LOGO_CHUNK_BYTES)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > MAX_LOGO_BYTES:
                     too_large = True
                     break
                 fh.write(chunk)

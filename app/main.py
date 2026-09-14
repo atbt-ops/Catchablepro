@@ -82,6 +82,7 @@ from .web import (  # noqa: F401  (re-exported for the route bodies)
     JOBS_PER_PAGE,
     LOGIN_LIMIT,
     MATCHES_PER_PAGE,
+    MAX_LOGO_BYTES,
     MAX_RESUME_BYTES,
     MY_APPS_PER_PAGE,
     ONBOARDING_DONE,
@@ -102,6 +103,7 @@ from .web import (  # noqa: F401  (re-exported for the route bodies)
     WORK_MODES,
     _DEV_SECRET,
     _JOB_COLS,
+    _LOGO_CONTENT_TYPES,
     _POSTED_DAYS,
     _asset_fingerprint,
     _assistant_ctx,
@@ -128,6 +130,7 @@ from .web import (  # noqa: F401  (re-exported for the route bodies)
     _require,
     _require_admin,
     _safe_next,
+    _save_logo,
     _save_resume,
     _saved_job_ids,
     _search_active_jobs,
@@ -1341,8 +1344,10 @@ def job_detail(
         "SELECT * FROM company_profiles WHERE user_id = ?", (job["employer_id"],)
     ).fetchone()
     more_jobs = db.execute(
-        "SELECT j.*, u.company_name FROM jobs j "
+        "SELECT j.*, u.company_name, c.logo_filename, c.updated_at AS company_updated_at "
+        "FROM jobs j "
         "JOIN users u ON u.id = j.employer_id "
+        "LEFT JOIN company_profiles c ON c.user_id = j.employer_id "
         "WHERE j.status = 'active' AND u.is_suspended = 0 AND j.id != ? "
         "AND (j.department = ? OR j.employer_id = ?) "
         "ORDER BY j.created_at DESC, j.id DESC LIMIT 4",
@@ -1456,9 +1461,11 @@ def candidate_dashboard(
 
     # Saved jobs — a small ranked strip, independent of the search filters.
     saved_jobs = db.execute(
-        "SELECT j.*, u.company_name FROM saved_jobs s "
+        "SELECT j.*, u.company_name, c.logo_filename, c.updated_at AS company_updated_at "
+        "FROM saved_jobs s "
         "JOIN jobs j ON j.id = s.job_id "
         "JOIN users u ON u.id = j.employer_id "
+        "LEFT JOIN company_profiles c ON c.user_id = j.employer_id "
         "WHERE s.candidate_id = ? AND j.status = 'active' AND u.is_suspended = 0 "
         "ORDER BY s.created_at DESC LIMIT 6",
         (user["id"],),
@@ -1699,6 +1706,24 @@ def download_resume(
     if not path.exists():
         return HTMLResponse("Resume file missing.", status_code=404)
     return FileResponse(path, filename=prof["resume_filename"])
+
+
+@app.get("/company/{employer_id}/logo")
+def company_logo(employer_id: int, db: sqlite3.Connection = Depends(get_db)):
+    """A company's logo. Public — it renders on job cards for every visitor."""
+    row = db.execute(
+        "SELECT logo_filename FROM company_profiles WHERE user_id = ?", (employer_id,)
+    ).fetchone()
+    if not row or not row["logo_filename"]:
+        return HTMLResponse("No logo on file.", status_code=404)
+    path = UPLOAD_DIR / row["logo_filename"]
+    if not path.exists():
+        return HTMLResponse("Logo file missing.", status_code=404)
+    media_type = _LOGO_CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(
+        path, media_type=media_type,
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
 
 
 @app.get("/feedback", response_class=HTMLResponse)
@@ -2044,7 +2069,7 @@ def employer_dashboard(
 
 
 @app.post("/employer/company")
-def employer_update_company(
+async def employer_update_company(
     request: Request,
     _csrf: None = Depends(verify_csrf),
     company_name: str = Form(""),
@@ -2053,21 +2078,37 @@ def employer_update_company(
     website: str = Form(""),
     hq_location: str = Form(""),
     about: str = Form(""),
+    logo: Optional[UploadFile] = None,
+    remove_logo: Optional[str] = Form(None),
     db: sqlite3.Connection = Depends(get_db),
 ):
     user, redirect = _require(request, db, "employer")
     if redirect:
         return redirect
-    _company(db, user["id"])  # ensure the row exists
+    existing = _company(db, user["id"])  # ensure the row exists
     db.execute(
         "UPDATE users SET company_name = ? WHERE id = ?",
         (company_name.strip(), user["id"]),
     )
+
+    logo_filename = existing["logo_filename"]
+    if logo is not None and logo.filename:
+        safe_name, refused = await _save_logo(logo, user["id"])
+        if refused:
+            return RedirectResponse(f"/employer?logo_error={refused}#company", status_code=303)
+        if logo_filename and logo_filename != safe_name:
+            (UPLOAD_DIR / logo_filename).unlink(missing_ok=True)
+        logo_filename = safe_name
+    elif remove_logo and logo_filename:
+        (UPLOAD_DIR / logo_filename).unlink(missing_ok=True)
+        logo_filename = ""
+
     db.execute(
         "UPDATE company_profiles SET industry = ?, size = ?, website = ?, "
-        "hq_location = ?, about = ?, updated_at = datetime('now') WHERE user_id = ?",
+        "hq_location = ?, about = ?, logo_filename = ?, updated_at = datetime('now') "
+        "WHERE user_id = ?",
         (industry.strip(), size.strip(), website.strip(), hq_location.strip(),
-         about.strip(), user["id"]),
+         about.strip(), logo_filename, user["id"]),
     )
     db.commit()
     return RedirectResponse("/employer", status_code=303)

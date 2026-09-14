@@ -59,7 +59,10 @@
     <div class="jcards">
       {% for r in job_rows %}
       <article class="jcard">
-        <div class="jcard-logo" aria-hidden="true">{{ r.job.company_name[0] | upper }}</div>
+        {% set logo = logo_url(r.job.employer_id, r.job.logo_filename, r.job.company_updated_at) %}
+        <div class="jcard-logo" aria-hidden="true">
+          {% if logo %}<img src="{{ logo }}" alt="">{% else %}{{ r.job.company_name[0] | upper }}{% endif %}
+        </div>
         <div class="jcard-body">
           <div class="jcard-head">
             <h3 class="jcard-title">

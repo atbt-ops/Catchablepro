@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS company_profiles (
     website         TEXT NOT NULL DEFAULT '',
     about           TEXT NOT NULL DEFAULT '',
     hq_location     TEXT NOT NULL DEFAULT '',
+    logo_filename   TEXT NOT NULL DEFAULT '',
     -- Onboarding wizard: 1 = company details, 2 = first job, 3 = complete
     onboarding_step INTEGER NOT NULL DEFAULT 1,
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
@@ -232,6 +233,7 @@ _ADDED_COLUMNS = {
     "company_profiles": {
         "hq_location": "TEXT NOT NULL DEFAULT ''",
         "onboarding_step": "INTEGER NOT NULL DEFAULT 1",
+        "logo_filename": "TEXT NOT NULL DEFAULT ''",
     },
     "applications": {
         "notes": "TEXT NOT NULL DEFAULT ''",          # private employer notes
