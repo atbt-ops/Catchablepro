@@ -278,6 +278,24 @@ so wide screens aren't mostly empty margin:
 The rails collapse away below 1180px and 900px respectively, so the layout
 degrades to a single column on tablets and phones. Auth pages stay centred.
 
+## SEO
+
+`app/templates/base.html` sets `<meta name="robots" content="noindex, nofollow">`
+by default — most routes are auth flows or signed-in dashboards, which have no
+business in a search index. The public job board opts back in per-page
+(`{% block robots %}index, follow{% endblock %}`): home, `/jobs`, a job detail
+page, and `/about`. Each of those also fills in a real `meta_description`
+(reused for Open Graph via Jinja's `{{ self.blockname() }}`) and a canonical
+URL built from `public_base_url(request)`.
+
+A job detail page additionally carries a `schema.org/JobPosting` JSON-LD block
+(`job_posting_jsonld` in `app/web.py`) for Google for Jobs rich results —
+title, description, employer, location, salary (when not hidden) and the
+application deadline, omitted entirely for a job that's gone. `/robots.txt`
+and `/sitemap.xml` (`app/main.py`) are generated routes, not static files —
+the sitemap lists every currently-active job so it never needs a manual
+rebuild.
+
 ## Run it
 
 ```bash

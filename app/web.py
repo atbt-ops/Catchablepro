@@ -7,6 +7,7 @@ and (later) app/routes/*. Must not import from app.main or app.routes.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -317,6 +318,67 @@ def description_html(value: str) -> Markup:
     return Markup(escape(value).replace("\n", "<br>"))
 
 
+#: EMPLOYMENT_TYPES values, mapped to schema.org's JobPosting enum
+#: (https://schema.org/employmentType) — not a mechanical case change,
+#: e.g. "Internship" -> INTERN and "Freelance" -> CONTRACTOR.
+_SCHEMA_EMPLOYMENT_TYPE = {
+    "Full-time": "FULL_TIME",
+    "Part-time": "PART_TIME",
+    "Contract": "CONTRACTOR",
+    "Internship": "INTERN",
+    "Freelance": "CONTRACTOR",
+}
+
+
+def job_posting_jsonld(job, company=None) -> Markup:
+    """schema.org JobPosting structured data, for Google for Jobs.
+
+    ``job`` is the sqlite3.Row a job_detail page renders around; returns an
+    empty string for a missing job so the template can call this unconditionally.
+    """
+    if not job:
+        return Markup("")
+    description = str(description_html(job["description"] or job["title"]))
+    data: dict = {
+        "@context": "https://schema.org/",
+        "@type": "JobPosting",
+        "title": job["title"],
+        "description": description,
+        "datePosted": str(job["created_at"])[:10],
+        "employmentType": _SCHEMA_EMPLOYMENT_TYPE.get(job["employment_type"], "OTHER"),
+        "hiringOrganization": {"@type": "Organization", "name": job["company_name"]},
+        "jobLocation": {
+            "@type": "Place",
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": job["location"] or "India",
+                "addressCountry": "IN",
+            },
+        },
+        "directApply": True,
+    }
+    if job["work_mode"] == "Remote":
+        data["jobLocationType"] = "TELECOMMUTE"
+    if company and company["website"]:
+        data["hiringOrganization"]["sameAs"] = company["website"]
+    lo, hi = job["salary_min"] or 0, job["salary_max"] or 0
+    if not job["hide_salary"] and (lo or hi):
+        data["baseSalary"] = {
+            "@type": "MonetaryAmount",
+            "currency": "INR",
+            "value": {
+                "@type": "QuantitativeValue",
+                "minValue": (lo or hi) * 100000,
+                "maxValue": (hi or lo) * 100000,
+                "unitText": "YEAR",
+            },
+        }
+    if job["deadline"]:
+        data["validThrough"] = job["deadline"]
+    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    return Markup(f'<script type="application/ld+json">{payload}</script>')
+
+
 @lru_cache(maxsize=32)
 def _asset_fingerprint(name: str) -> str:
     """Short content hash for a /static file, or '' if it cannot be read.
@@ -342,10 +404,12 @@ templates.env.globals["fmt_salary"] = fmt_salary
 templates.env.globals["fmt_exp"] = fmt_exp
 templates.env.globals["posted_ago"] = posted_ago
 templates.env.globals["description_html"] = description_html
+templates.env.globals["job_posting_jsonld"] = job_posting_jsonld
 templates.env.globals["stage_label"] = lambda s: STAGE_LABELS.get(s, s.title())
 templates.env.globals["audit_label"] = audit.action_label
 templates.env.globals["pipeline_stages"] = PIPELINE_STAGES
 templates.env.globals["static_url"] = static_url
+templates.env.globals["public_base_url"] = public_base_url
 #: The header job-search bar renders on every page, so its location list has to
 #: be reachable without every route passing it in.
 templates.env.globals["india_locations"] = INDIA_LOCATIONS

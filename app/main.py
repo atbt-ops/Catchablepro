@@ -391,6 +391,54 @@ def about(request: Request, db: sqlite3.Connection = Depends(get_db)):
     )
 
 
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt(request: Request):
+    """Point crawlers at the public pages and away from auth/account flows."""
+    lines = [
+        "User-agent: *",
+        "Allow: /$",
+        "Allow: /jobs",
+        "Allow: /about",
+        "Disallow: /candidate",
+        "Disallow: /employer",
+        "Disallow: /admin",
+        "Disallow: /account",
+        "Disallow: /feedback",
+        "Disallow: /login",
+        "Disallow: /register",
+        "Disallow: /reset-password",
+        "Disallow: /verify-email",
+        "",
+        f"Sitemap: {public_base_url(request)}/sitemap.xml",
+    ]
+    return PlainTextResponse("\n".join(lines))
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    """Static public pages plus every active job posting."""
+    base = public_base_url(request)
+    urls = [(f"{base}/", "daily"), (f"{base}/jobs", "daily"), (f"{base}/about", "monthly")]
+    jobs = db.execute(
+        "SELECT id, created_at FROM jobs WHERE status = 'active' ORDER BY created_at DESC"
+    ).fetchall()
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for loc, freq in urls:
+        parts.append(f"<url><loc>{loc}</loc><changefreq>{freq}</changefreq></url>")
+    for job in jobs:
+        loc = f"{base}/jobs/{job['id']}"
+        lastmod = str(job["created_at"])[:10]
+        parts.append(
+            f"<url><loc>{loc}</loc><lastmod>{lastmod}</lastmod>"
+            "<changefreq>weekly</changefreq></url>"
+        )
+    parts.append("</urlset>")
+    return Response("\n".join(parts), media_type="application/xml")
+
+
 @app.get("/register", response_class=HTMLResponse)
 def register_form(request: Request):
     return templates.TemplateResponse(

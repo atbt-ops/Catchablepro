@@ -4,9 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Catchablepro{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Catch Able Pro — a skill-based job board for India. See exactly why you match a role, apply, and track it through hiring.{% endblock %}">
+  {# Default is noindex: most pages are auth flows or signed-in dashboards.
+     The handful of public pages (home, /jobs, a job, /about) opt in. #}
+  <meta name="robots" content="{% block robots %}noindex, nofollow{% endblock %}">
+  <link rel="canonical" href="{% block canonical %}{{ public_base_url(request) }}{{ request.url.path }}{% endblock %}">
+  <meta property="og:site_name" content="Catch Able Pro">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:title" content="{{ self.title() | striptags | trim }}">
+  <meta property="og:description" content="{{ self.meta_description() | striptags | trim }}">
+  <meta property="og:url" content="{{ self.canonical() }}">
+  <meta name="twitter:card" content="summary">
   <link rel="icon" href="{{ static_url('favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   <script src="{{ static_url('forms.js') }}" defer></script>
+  {% block extra_head %}{% endblock %}
 </head>
 {% from "macros.html" import icon, job_search_bar %}
 {% set employer_area = request.url.path.startswith('/employer') %}
