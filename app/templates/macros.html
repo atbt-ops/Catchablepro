@@ -71,7 +71,7 @@
     </span>
     <span class="jmini-body">
       <span class="jmini-title">{{ job.title }}</span>
-      <span class="jmini-sub">{{ job.company_name }}{% if job.location %} · {{ job.location }}{% endif %}</span>
+      <span class="jmini-sub"><strong>{{ job.company_name }}</strong>{% if job.location %} · {{ job.location }}{% endif %}</span>
       <span class="jmini-meta">
         {{ fmt_exp(job) }} · {{ fmt_salary(job) }}
         {% if pct is not none %}<span class="jmini-pct">{{ pct }}% match</span>{% endif %}

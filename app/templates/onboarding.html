@@ -28,8 +28,30 @@
   <section class="panel">
     <h2>{{ icon('building', 18) }} Tell us about your company</h2>
     <p class="hint">Candidates see this on every job you post.</p>
-    <form action="/employer/onboarding/company" method="post">
+    {% set logo_error = request.query_params.get('logo_error') %}
+    {% if logo_error %}
+      <div class="notice">
+        {{ icon('bolt', 16) }}
+        <div>
+          {% if logo_error == 'size' %}
+            That logo is over 2&nbsp;MB. Try a smaller file.
+          {% elif logo_error == 'type' %}
+            Logos must be a PNG, JPG or WEBP image.
+          {% else %}
+            A company logo is required before you can continue — candidates should
+            be able to recognize who's hiring.
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+    <form action="/employer/onboarding/company" method="post" enctype="multipart/form-data">
       {{ csrf_field(request) }}
+      <label>Company logo *
+        <span class="muted" style="display:block;font-size:12.5px;margin:2px 0 6px;">
+          PNG, JPG or WEBP, up to 2&nbsp;MB.
+        </span>
+        <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp" required>
+      </label>
       <div class="grid2">
         <label>Company name *
           <input type="text" name="company_name" value="{{ user.company_name }}" required
