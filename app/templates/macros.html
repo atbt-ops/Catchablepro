@@ -65,7 +65,7 @@
 {# Compact clickable job card for side rails and "more jobs" strips. #}
 {% macro job_mini(job, pct=none) %}
   {% set logo = logo_url(job.employer_id, job.logo_filename, job.company_updated_at) %}
-  <a class="jmini" href="/jobs/{{ job.id }}">
+  <a class="jmini" href="/jobs/{{ job.id }}" target="_blank" rel="noopener">
     <span class="jmini-logo" aria-hidden="true">
       {% if logo %}<img src="{{ logo }}" alt="">{% else %}{{ job.company_name[0] | upper }}{% endif %}
     </span>
