@@ -71,7 +71,7 @@
           <a class="btn" href="/register">{{ icon('user', 16) }} Sign up to apply</a>
           <a class="btn ghost" href="/login">Log in</a>
         {% endif %}
-        <span class="jd-posted">{{ icon('clock', 13) }} {{ posted_ago(job.created_at) }}</span>
+        <span class="jd-posted">{{ icon('clock', 13) }} {{ posted_ago(job.active_since or job.created_at) }}</span>
       </div>
     </article>
 

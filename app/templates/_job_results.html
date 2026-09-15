@@ -127,7 +127,7 @@
             </div>
           {% endif %}
           <div class="jcard-foot">
-            <span class="jcard-posted">{{ icon('clock', 12) }} {{ posted_ago(r.job.created_at) }}</span>
+            <span class="jcard-posted">{{ icon('clock', 12) }} {{ posted_ago(r.job.active_since or r.job.created_at) }}</span>
             {% if show_match %}
               {% if r.applied %}
                 <span class="applied-pill">{{ icon('check', 15) }} Applied</span>
