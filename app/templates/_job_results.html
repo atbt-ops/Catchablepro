@@ -66,7 +66,7 @@
         <div class="jcard-body">
           <div class="jcard-head">
             <h3 class="jcard-title">
-              <a href="/jobs/{{ r.job.id }}">{{ r.job.title }}</a>
+              <a href="/jobs/{{ r.job.id }}" target="_blank" rel="noopener">{{ r.job.title }}</a>
             </h3>
             <div class="jcard-actions">
               {% if show_match %}
@@ -140,7 +140,7 @@
                 </form>
               {% endif %}
             {% else %}
-              <a class="btn small" href="/jobs/{{ r.job.id }}">View &amp; apply</a>
+              <a class="btn small" href="/jobs/{{ r.job.id }}" target="_blank" rel="noopener">View &amp; apply</a>
             {% endif %}
           </div>
         </div>

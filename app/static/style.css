@@ -626,6 +626,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .jobcard-logo { flex: none; }
 .logo-field { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
 .logo-field .jcard-logo { width: 52px; height: 52px; border-radius: 13px; font-size: 21px; }
+.logo-field .jcard-logo:has(img) { width: auto; max-width: 200px; }
 .jobcard h3 { margin: 0 0 6px; font-size: 16.5px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .jobcard h3 a { color: inherit; }
 .jobcard h3 a:hover { color: var(--brand); text-decoration: none; }
@@ -1008,7 +1009,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* job cards */
 .jcards { display: flex; flex-direction: column; gap: 12px; }
 .jcard {
-  display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 14px;
+  display: grid; grid-template-columns: minmax(52px, auto) minmax(0, 1fr); gap: 14px;
   padding: 16px 18px; border-radius: var(--radius);
   background: var(--surface-2); border: 1px solid var(--border);
   transition: transform .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
@@ -1023,15 +1024,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: linear-gradient(135deg, var(--brand), var(--violet));
   border: 1px solid var(--border);
 }
-/* An uploaded employer logo replaces the initials avatar in the same box.
-   `contain` + a white backing + a little padding, not `cover`: most real
-   logos are wide wordmarks, and `cover` on a square box was cropping the
-   edges off (e.g. "ORACLE" showing as "RACL"). The box also needs its own
-   border (Naukri-style tile) — a white-backed logo on a white card blended
-   into the page with no border, reading as "barely visible". */
+/* An uploaded employer logo replaces the initials avatar in the same box —
+   but most real logos are wide wordmarks, and forcing one into a square
+   (even with `contain` + padding) reads as cramped. So a tile with a real
+   logo drops the fixed width and sizes to the logo's own aspect ratio
+   instead, capped so an unusually wide logo can't blow out the card.
+   These `:has()` overrides are placed after each tile's own base rule
+   below (same specificity, so source order decides) rather than here. */
+.jcard-logo:has(img) { width: auto; max-width: 160px; background: #fff; padding: 0 8px; }
 .jcard-logo img, .jmini-logo img, .jd-logo img {
-  width: 100%; height: 100%; object-fit: contain; border-radius: inherit; display: block;
-  background: #fff; padding: 10%; box-sizing: border-box;
+  width: auto; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain;
+  display: block; padding: 8px 0; box-sizing: border-box;
 }
 .jcard-body { min-width: 0; }
 .jcard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -1108,6 +1111,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: linear-gradient(135deg, var(--brand), var(--violet));
   border: 1px solid var(--border);
 }
+.jmini-logo:has(img) { width: auto; max-width: 90px; background: #fff; padding: 0 6px; }
 .jmini-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .jmini-title { font-size: 13.5px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .jmini-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1123,6 +1127,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   width: 56px; height: 56px; border-radius: 14px; font-size: 22px; flex: none;
   overflow: hidden; border: 1px solid var(--border);
 }
+.jd-logo:has(img) { width: auto; max-width: 200px; background: #fff; padding: 0 10px; }
 .jd-title { margin: 0; font-size: 24px; }
 .jd-company { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 6px 0 0; color: var(--text-soft); font-size: 14px; }
 .jd-company .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); margin: 0 3px; }
