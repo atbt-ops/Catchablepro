@@ -357,7 +357,7 @@ def job_posting_jsonld(job, request: Request, company=None) -> Markup:
         "@type": "JobPosting",
         "title": job["title"],
         "description": description,
-        "datePosted": str(job["created_at"])[:10],
+        "datePosted": str(job["active_since"] or job["created_at"])[:10],
         "employmentType": _SCHEMA_EMPLOYMENT_TYPE.get(job["employment_type"], "OTHER"),
         "hiringOrganization": {"@type": "Organization", "name": job["company_name"]},
         "jobLocation": {
@@ -887,9 +887,12 @@ def _search_active_jobs(
         )
         params.extend([floor, floor])
     if posted in _POSTED_DAYS:
-        sql += " AND j.created_at >= datetime('now', ?)"
+        # active_since, not created_at: a job drafted weeks ago and published
+        # today should count as new, not sort (or filter) by when the
+        # employer first started the draft.
+        sql += " AND j.active_since >= datetime('now', ?)"
         params.append(f"-{_POSTED_DAYS[posted]} days")
-    sql += " ORDER BY j.created_at DESC, j.id DESC"
+    sql += " ORDER BY j.active_since DESC, j.id DESC"
     return db.execute(sql, params).fetchall()
 
 

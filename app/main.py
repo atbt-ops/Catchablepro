@@ -423,7 +423,8 @@ def sitemap_xml(request: Request, db: sqlite3.Connection = Depends(get_db)):
     base = public_base_url(request)
     urls = [(f"{base}/", "daily"), (f"{base}/jobs", "daily"), (f"{base}/about", "monthly")]
     jobs = db.execute(
-        "SELECT id, created_at FROM jobs WHERE status = 'active' ORDER BY created_at DESC"
+        "SELECT id, active_since, created_at FROM jobs "
+        "WHERE status = 'active' ORDER BY active_since DESC"
     ).fetchall()
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -433,7 +434,7 @@ def sitemap_xml(request: Request, db: sqlite3.Connection = Depends(get_db)):
         parts.append(f"<url><loc>{loc}</loc><changefreq>{freq}</changefreq></url>")
     for job in jobs:
         loc = f"{base}/jobs/{job['id']}"
-        lastmod = str(job["created_at"])[:10]
+        lastmod = str(job["active_since"] or job["created_at"])[:10]
         parts.append(
             f"<url><loc>{loc}</loc><lastmod>{lastmod}</lastmod>"
             "<changefreq>weekly</changefreq></url>"
@@ -1350,7 +1351,7 @@ def job_detail(
         "LEFT JOIN company_profiles c ON c.user_id = j.employer_id "
         "WHERE j.status = 'active' AND u.is_suspended = 0 AND j.id != ? "
         "AND (j.department = ? OR j.employer_id = ?) "
-        "ORDER BY j.created_at DESC, j.id DESC LIMIT 4",
+        "ORDER BY j.active_since DESC, j.id DESC LIMIT 4",
         (job_id, job["department"], job["employer_id"]),
     ).fetchall()
 
