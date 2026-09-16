@@ -71,7 +71,13 @@ def test_script_src_forbids_inline_script(client):
         if part
     )
 
-    assert directives["script-src"] == "'self'"
+    # 'self' plus a small, explicit allowlist (Razorpay Checkout, for the
+    # wallet top-up flow) is fine — 'unsafe-inline'/'unsafe-eval' is what
+    # actually reopens the injected-<script> hole this test guards against.
+    sources = directives["script-src"].split()
+    assert "'self'" in sources
+    assert "'unsafe-inline'" not in sources
+    assert "'unsafe-eval'" not in sources
 
 
 def test_powershell_scripts_contain_only_ascii():

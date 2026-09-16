@@ -45,6 +45,7 @@ from . import (
     ratelimit,
     resume as resume_module,
     totp,
+    wallet,
 )
 from .richtext import sanitize_html
 from .db import (
@@ -2084,6 +2085,7 @@ def employer_dashboard(
             "running_bill": running_bill,
             "currency": pricing.CURRENCY,
             "cap_days": pricing.CAP_DAYS,
+            "wallet_balance": company["wallet_balance_paise"] // 100,
         },
     )
 
@@ -2132,6 +2134,116 @@ async def employer_update_company(
     )
     db.commit()
     return RedirectResponse("/employer", status_code=303)
+
+
+@app.get("/employer/wallet", response_class=HTMLResponse)
+def employer_wallet(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    """Prepaid balance for the on-demand posting meter: top up, see history."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return redirect
+    company = _company(db, user["id"])
+    history = db.execute(
+        "SELECT * FROM wallet_transactions WHERE user_id = ? "
+        "AND NOT (type = 'topup' AND status = 'created') "
+        "ORDER BY created_at DESC, id DESC LIMIT 20",
+        (user["id"],),
+    ).fetchall()
+    return templates.TemplateResponse(
+        request,
+        "wallet.html",
+        {
+            "request": request, "user": user, "company": company,
+            "history": history,
+            "currency": pricing.CURRENCY,
+            "balance": company["wallet_balance_paise"] // 100,
+            "configured": wallet.is_configured(),
+            "key_id": wallet.KEY_ID,
+            "presets": wallet.PRESET_TOPUPS_PAISE,
+            "min_topup": wallet.MIN_TOPUP_PAISE // 100,
+            "max_topup": wallet.MAX_TOPUP_PAISE // 100,
+        },
+    )
+
+
+@app.post("/employer/wallet/topup")
+def employer_wallet_topup(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    amount_paise: int = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Create a Razorpay order for a top-up; the page's JS opens Checkout with it."""
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return JSONResponse({"error": "Not signed in."}, status_code=401)
+    if not wallet.is_configured():
+        return JSONResponse({"error": "Payments aren't set up yet."}, status_code=503)
+    if not (wallet.MIN_TOPUP_PAISE <= amount_paise <= wallet.MAX_TOPUP_PAISE):
+        return JSONResponse({"error": "That amount is outside the allowed range."}, status_code=400)
+
+    receipt = f"emp-{user['id']}-{int(time.time())}"
+    try:
+        order = wallet.create_order(amount_paise, receipt=receipt)
+    except wallet.WalletUnavailable as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
+
+    db.execute(
+        "INSERT INTO wallet_transactions "
+        "(user_id, type, status, amount_paise, razorpay_order_id, note) "
+        "VALUES (?, 'topup', 'created', ?, ?, 'Wallet top-up')",
+        (user["id"], amount_paise, order["id"]),
+    )
+    db.commit()
+    return JSONResponse({
+        "order_id": order["id"], "key_id": wallet.KEY_ID, "amount_paise": amount_paise,
+    })
+
+
+@app.post("/employer/wallet/verify")
+def employer_wallet_verify(
+    request: Request,
+    _csrf: None = Depends(verify_csrf),
+    razorpay_order_id: str = Form(...),
+    razorpay_payment_id: str = Form(...),
+    razorpay_signature: str = Form(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Client-side confirmation right after a successful Checkout payment.
+
+    Credits the wallet immediately for instant feedback. The webhook (a
+    later PR) is the source of truth if this call never arrives (closed
+    tab, network blip) — both converge on the same idempotent "credit only
+    a 'created' row" check, keyed off razorpay_order_id.
+    """
+    user, redirect = _require(request, db, "employer")
+    if redirect:
+        return JSONResponse({"error": "Not signed in."}, status_code=401)
+    if not wallet.verify_payment_signature(
+        razorpay_order_id, razorpay_payment_id, razorpay_signature
+    ):
+        return JSONResponse({"error": "Could not verify that payment."}, status_code=400)
+
+    row = db.execute(
+        "SELECT * FROM wallet_transactions WHERE user_id = ? AND razorpay_order_id = ? "
+        "AND type = 'topup' AND status = 'created'",
+        (user["id"], razorpay_order_id),
+    ).fetchone()
+    if row is None:
+        # Already credited (e.g. the webhook beat us to it) — not an error.
+        return JSONResponse({"ok": True})
+
+    db.execute(
+        "UPDATE wallet_transactions SET status = 'paid', razorpay_payment_id = ? WHERE id = ?",
+        (razorpay_payment_id, row["id"]),
+    )
+    db.execute(
+        "UPDATE company_profiles SET wallet_balance_paise = wallet_balance_paise + ? "
+        "WHERE user_id = ?",
+        (row["amount_paise"], user["id"]),
+    )
+    db.commit()
+    return JSONResponse({"ok": True})
 
 
 @app.get("/employer/jobs/new", response_class=HTMLResponse)

@@ -482,11 +482,19 @@ access_log = logging.getLogger("catchablepro.access")
 #: twelve templates, one of them computed per request
 #: (style="width: {{ score }}%"), so tightening it is its own piece of work.
 #: Left honest rather than quietly claimed.
+#: Razorpay Checkout (the wallet top-up flow) needs its script origin allowed,
+#: plus frame-src for the checkout iframe and connect-src for the API/beacon
+#: calls it makes on its own. Everything else stays 'self'-only. This is the
+#: one part of the policy not yet confirmed against a live checkout attempt —
+#: see app/wallet.py and the wallet-feature plan for the pending manual test.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; base-uri 'self'; form-action 'self'; "
-    "frame-ancestors 'none'; object-src 'none'; connect-src 'self'; "
-    "font-src 'self' data:; img-src 'self' data:; "
-    "script-src 'self'; style-src 'self' 'unsafe-inline'"
+    "frame-ancestors 'none'; object-src 'none'; "
+    "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; "
+    "font-src 'self' data:; img-src 'self' data: https://*.razorpay.com; "
+    "script-src 'self' https://checkout.razorpay.com; "
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com; "
+    "style-src 'self' 'unsafe-inline'"
 )
 
 
