@@ -625,8 +625,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .jobcard-main { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
 .jobcard-logo { flex: none; }
 .logo-field { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
-.logo-field .jcard-logo { width: 52px; height: 52px; border-radius: 13px; font-size: 21px; }
-.logo-field .jcard-logo:has(img) { width: auto; max-width: 200px; }
+.logo-field .jcard-logo:has(img) { max-width: 200px; }
 .jobcard h3 { margin: 0 0 6px; font-size: 16.5px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .jobcard h3 a { color: inherit; }
 .jobcard h3 a:hover { color: var(--brand); text-decoration: none; }
@@ -1009,7 +1008,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* job cards */
 .jcards { display: flex; flex-direction: column; gap: 12px; }
 .jcard {
-  display: grid; grid-template-columns: minmax(52px, auto) minmax(0, 1fr); gap: 14px;
+  display: grid; grid-template-columns: minmax(64px, auto) minmax(0, 1fr); gap: 14px;
   padding: 16px 18px; border-radius: var(--radius);
   background: var(--surface-2); border: 1px solid var(--border);
   transition: transform .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
@@ -1019,9 +1018,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
 }
 .jcard-logo {
-  width: 52px; height: 52px; border-radius: 10px;
+  width: 64px; height: 64px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 20px; color: #fff; overflow: hidden;
+  font-weight: 800; font-size: 24px; color: #fff; overflow: hidden;
   background: linear-gradient(135deg, var(--brand), var(--violet));
   border: 1px solid var(--border);
 }
@@ -1041,8 +1040,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
    height:100% correctly, so all the sizing/padding now lives on the
    container's box-sizing:border-box box instead of the <img> itself. */
 .jcard-logo:has(img) {
-  width: auto; max-width: 160px; background: #fff;
-  padding: 6px 10px; box-sizing: border-box;
+  width: auto; max-width: 190px; background: #fff;
+  padding: 6px 12px; box-sizing: border-box;
 }
 .jcard-logo img, .jmini-logo img, .jd-logo img {
   display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain;
@@ -1117,14 +1116,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 .jmini:hover { border-color: color-mix(in srgb, var(--brand) 40%, var(--border)); background: var(--surface); text-decoration: none; }
 .jmini-logo {
-  flex: none; width: 34px; height: 34px; border-radius: 9px;
+  flex: none; width: 38px; height: 38px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 14px; color: #fff; overflow: hidden;
+  font-weight: 800; font-size: 15px; color: #fff; overflow: hidden;
   background: linear-gradient(135deg, var(--brand), var(--violet));
   border: 1px solid var(--border);
 }
 .jmini-logo:has(img) {
-  width: auto; max-width: 90px; background: #fff; padding: 4px 6px; box-sizing: border-box;
+  width: auto; max-width: 100px; background: #fff; padding: 4px 6px; box-sizing: border-box;
 }
 .jmini-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .jmini-title { font-size: 13.5px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1138,11 +1137,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .jd-head { padding: 24px; }
 .jd-headrow { display: flex; gap: 16px; align-items: flex-start; }
 .jd-logo {
-  width: 56px; height: 56px; border-radius: 14px; font-size: 22px; flex: none;
+  width: 68px; height: 68px; border-radius: 14px; font-size: 26px; flex: none;
   overflow: hidden; border: 1px solid var(--border);
 }
 .jd-logo:has(img) {
-  width: auto; max-width: 200px; background: #fff; padding: 8px 12px; box-sizing: border-box;
+  width: auto; max-width: 220px; background: #fff; padding: 7px 12px; box-sizing: border-box;
 }
 .jd-title { margin: 0; font-size: 24px; }
 .jd-company { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 6px 0 0; color: var(--text-soft); font-size: 14px; }
