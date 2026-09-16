@@ -69,6 +69,9 @@ CREATE TABLE IF NOT EXISTS company_profiles (
     about           TEXT NOT NULL DEFAULT '',
     hq_location     TEXT NOT NULL DEFAULT '',
     logo_filename   TEXT NOT NULL DEFAULT '',
+    -- Prepaid balance for the on-demand job-posting meter, in paise. See
+    -- app/wallet.py and app/pricing.py.
+    wallet_balance_paise INTEGER NOT NULL DEFAULT 0,
     -- Onboarding wizard: 1 = company details, 2 = first job, 3 = complete
     onboarding_step INTEGER NOT NULL DEFAULT 1,
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
@@ -182,6 +185,27 @@ CREATE TABLE IF NOT EXISTS ai_digests (
     generated_by TEXT    NOT NULL DEFAULT '',
     created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Prepaid wallet ledger (see app/wallet.py). Amounts are in paise, matching
+-- Razorpay's own unit, so nothing here ever touches a float. 'topup' rows
+-- track a Razorpay order from creation (status='created') through payment
+-- confirmation (status='paid') or failure; 'debit' rows are written once,
+-- already-final, when a job's active spell ends (app/web.py:_finalize_job_billing).
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id              INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type                 TEXT    NOT NULL CHECK (type IN ('topup', 'debit')),
+    status               TEXT    NOT NULL DEFAULT 'created'
+                         CHECK (status IN ('created', 'paid', 'failed')),
+    amount_paise         INTEGER NOT NULL,
+    razorpay_order_id    TEXT    NOT NULL DEFAULT '',
+    razorpay_payment_id  TEXT    NOT NULL DEFAULT '',
+    job_id               INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+    note                 TEXT    NOT NULL DEFAULT '',
+    created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_user ON wallet_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_payment ON wallet_transactions(razorpay_payment_id);
 """
 
 
@@ -234,6 +258,7 @@ _ADDED_COLUMNS = {
         "hq_location": "TEXT NOT NULL DEFAULT ''",
         "onboarding_step": "INTEGER NOT NULL DEFAULT 1",
         "logo_filename": "TEXT NOT NULL DEFAULT ''",
+        "wallet_balance_paise": "INTEGER NOT NULL DEFAULT 0",
     },
     "applications": {
         "notes": "TEXT NOT NULL DEFAULT ''",          # private employer notes
