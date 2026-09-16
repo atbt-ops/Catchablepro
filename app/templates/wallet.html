@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Wallet · Catchablepro{% endblock %}
+{% block extra_head %}
+  {% if configured %}
+    <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+  {% endif %}
+  <script src="{{ static_url('wallet.js') }}" defer></script>
+{% endblock %}
+{% block content %}
+<a class="backlink" href="/employer">{{ icon('arrow-right', 14) }} Back to dashboard</a>
+<div class="page-head">
+  <div>
+    <h1>Wallet</h1>
+    <p class="sub">
+      Prepaid balance for the on-demand posting meter — the first week of each
+      job is free, then it draws from this balance.
+    </p>
+  </div>
+</div>
+
+{% if request.query_params.get('funded') %}
+  <div class="flash-ok">{{ icon('check', 15) }} Funds added — your balance is updated below.</div>
+{% endif %}
+{% if request.query_params.get('wallet_error') %}
+  <div class="notice">
+    {{ icon('bolt', 16) }}
+    <div>Something went wrong confirming that payment. If money left your account, it'll be reconciled automatically — contact us if the balance doesn't update within a few minutes.</div>
+  </div>
+{% endif %}
+
+<section class="panel">
+  <h2>{{ icon('rupee', 18) }} Current balance</h2>
+  <p class="jd-title" style="margin:4px 0 0;font-size:32px;">{{ currency }}{{ '{:,}'.format(balance) }}</p>
+</section>
+
+<section class="panel" id="add-funds">
+  <h2>{{ icon('plus', 18) }} Add funds</h2>
+  {% if not configured %}
+    <p class="hint">Payments aren't set up on this deployment yet.</p>
+  {% else %}
+    <p class="hint">Choose an amount, or enter your own ({{ currency }}{{ min_topup }}&ndash;{{ currency }}{{ '{:,}'.format(max_topup) }}).</p>
+    {{ csrf_field(request) }}
+    <div class="chips" id="topup-presets">
+      {% for p in presets %}
+        <button type="button" class="btn ghost" data-topup-amount="{{ p }}">{{ currency }}{{ '{:,}'.format(p // 100) }}</button>
+      {% endfor %}
+    </div>
+    <div class="grid2" style="margin-top:12px;align-items:end;">
+      <label>Custom amount ({{ currency }})
+        <input type="number" id="custom-amount" min="{{ min_topup }}" max="{{ max_topup }}" step="1" placeholder="{{ min_topup }}">
+      </label>
+      <button type="button" class="btn" id="topup-custom-btn">{{ icon('plus', 16) }} Add funds</button>
+    </div>
+    <p class="hint" id="topup-status" style="margin-top:10px;" hidden></p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>{{ icon('doc', 18) }} History</h2>
+  {% if history %}
+    <div class="applist">
+      {% for tx in history %}
+        <div class="approw">
+          <div class="approw-top">
+            <div class="approw-title">
+              <strong>{{ 'Added funds' if tx.type == 'topup' else (tx.note or 'Posting cost') }}</strong>
+              <span class="muted">· {{ tx.created_at }}</span>
+            </div>
+            <div class="approw-tags">
+              <span class="tag {{ 'auto' if tx.type == 'topup' else '' }}">
+                {{ '+' if tx.type == 'topup' else '-' }}{{ currency }}{{ '{:,}'.format(tx.amount_paise // 100) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="eico">{{ icon('doc', 24) }}</span>
+      <p>No transactions yet.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

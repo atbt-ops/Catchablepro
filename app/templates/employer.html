@@ -6,6 +6,7 @@
   {{ navitem('/employer', 'briefcase', 'Your jobs', true) }}
   {{ navitem('/employer/jobs/new', 'plus', 'Post a job') }}
   {{ navitem('/employer/assistant', 'sparkle', 'AI assistant') }}
+  {{ navitem('/employer/wallet', 'rupee', 'Wallet') }}
   {{ navitem('#company', 'building', 'Company profile') }}
   <div class="nav-heading">Account</div>
   {{ navitem('/account', 'user', 'Settings') }}
@@ -27,11 +28,18 @@
       <span class="k">Active postings</span>
       <span class="v {{ 'brand' if running_bill else 'green' }}">{{ currency }}{{ '{:,}'.format(running_bill) }}</span>
     </div>
+    <div class="statrow">
+      <span class="k">Wallet balance</span>
+      <span class="v {{ 'green' if wallet_balance else 'amber' }}">{{ currency }}{{ '{:,}'.format(wallet_balance) }}</span>
+    </div>
     <p class="tip" style="margin-top:8px;">
       On-demand pricing: the first week of each posting is free, then the daily
       rate rises the longer it stays live. Close a job to stop its meter.
       Jobs auto-close after {{ cap_days }} days.
     </p>
+    <a class="btn ghost small block" href="/employer/wallet" style="margin-top:8px;">
+      {{ icon('plus', 14) }} Add funds
+    </a>
   </div>
 
   <div class="railcard">
