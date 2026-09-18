@@ -611,6 +611,44 @@ def _credit_wallet_topup(db: sqlite3.Connection, order_id: str, payment_id: str)
 # --------------------------------------------------------------------------- #
 # On-demand pricing: billing transitions and the auto-expiry sweep
 # --------------------------------------------------------------------------- #
+def _finalize_job_billing(db: sqlite3.Connection, job: sqlite3.Row) -> None:
+    """Debit this job's final accrued cost from its employer's wallet.
+
+    Called exactly once per active spell, right before it ends (manual
+    close, or an auto-close from sweep_expired_jobs) — not on every sweep
+    tick. The debit is clamped to the available balance so it can never go
+    negative; sweep_expired_jobs' insufficient-funds check is what keeps
+    that clamp from ever mattering by more than a sub-minute rounding
+    amount (see its own docstring for why that gap is fine to accept).
+    Callers commit — this only executes statements, on the theory that the
+    debit and the status change it accompanies should land in one transaction.
+    """
+    if not job["active_since"]:
+        return
+    state = pricing.cost_state(job["billable_seconds"], job["active_since"])
+    owed_paise = state.accrued * 100
+    if owed_paise <= 0:
+        return
+    row = db.execute(
+        "SELECT wallet_balance_paise FROM company_profiles WHERE user_id = ?",
+        (job["employer_id"],),
+    ).fetchone()
+    charged = min(owed_paise, row["wallet_balance_paise"] if row else 0)
+    if charged <= 0:
+        return
+    db.execute(
+        "UPDATE company_profiles SET wallet_balance_paise = wallet_balance_paise - ? "
+        "WHERE user_id = ?",
+        (charged, job["employer_id"]),
+    )
+    db.execute(
+        "INSERT INTO wallet_transactions (user_id, type, status, amount_paise, job_id, note) "
+        "VALUES (?, 'debit', 'paid', ?, ?, ?)",
+        (job["employer_id"], charged, job["id"],
+         f"{job['title']} — {state.days_active:.1f} active days"),
+    )
+
+
 def _set_job_status(db: sqlite3.Connection, job: sqlite3.Row, new_status: str) -> None:
     """Change a job's status, moving the pricing meter accordingly.
 
@@ -626,6 +664,7 @@ def _set_job_status(db: sqlite3.Connection, job: sqlite3.Row, new_status: str) -
             (job["id"],),
         )
     elif old == "active" and new_status != "active":
+        _finalize_job_billing(db, job)
         db.execute(
             "UPDATE jobs SET status = ?, active_since = '' WHERE id = ?",
             (new_status, job["id"]),
@@ -662,52 +701,112 @@ def _sweep_is_due(force: bool) -> bool:
 
 
 def sweep_expired_jobs(db: sqlite3.Connection, *, force: bool = False) -> int:
-    """Auto-close any active job that has passed the pricing cap.
+    """Auto-close any active job that has passed the pricing cap, or that its
+    employer's wallet can no longer afford.
 
     Called lazily on the busy list views so expiry happens without a scheduler,
     but throttled to SWEEP_MIN_INTERVAL_SECONDS: a page render should not pay
     for bookkeeping it does not need. Pass ``force`` when the answer has to be
     current right now. Returns the number closed — 0 when the sweep was skipped.
-    Each closure is audited and the employer emailed.
+    Each closure is audited, debited from the wallet, and the employer emailed.
+
+    The funds check is per *employer*, not per job: a wallet is shared across
+    every job that employer has running, so a job whose own accrued cost
+    "fits" the balance can still need closing if it's one of several jointly
+    draining it. When a balance can't cover everything, jobs close
+    highest-accrued-first — the fewest closures needed to fit the rest back
+    under budget. A job still in its free week (daily_rate 0) never counts
+    against the balance, regardless of how low it is.
+
+    Sweep only runs once a minute, so an over-accrual between the moment a
+    balance is exhausted and the next sweep catching it is real but bounded
+    to well under a minute's worth of the (already small, ₹50-400/day) rate
+    — a few paise at most, and _finalize_job_billing clamps the debit to the
+    stored balance regardless, so it's never actually overdrawn.
     """
     if not _sweep_is_due(force):
         return 0
     active = db.execute(
-        "SELECT id, employer_id, title, billable_seconds, active_since "
-        "FROM jobs WHERE status = 'active' AND active_since != ''"
+        "SELECT j.id, j.employer_id, j.title, j.billable_seconds, j.active_since, "
+        "c.wallet_balance_paise "
+        "FROM jobs j LEFT JOIN company_profiles c ON c.user_id = j.employer_id "
+        "WHERE j.status = 'active' AND j.active_since != ''"
     ).fetchall()
-    closed = 0
+
+    by_employer: dict = {}
     for job in active:
+        by_employer.setdefault(job["employer_id"], []).append(job)
+
+    to_close = []  # list of (job, reason) — reason is "cap" or "funds"
+    for jobs in by_employer.values():
+        states = {j["id"]: pricing.cost_state(j["billable_seconds"], j["active_since"]) for j in jobs}
+        for job in jobs:
+            if states[job["id"]].expired:
+                to_close.append((job, "cap"))
+
+        balance_paise = jobs[0]["wallet_balance_paise"] or 0
+        paid_tier = [
+            j for j in jobs
+            if states[j["id"]].daily_rate > 0 and not states[j["id"]].expired
+        ]
+        paid_tier.sort(key=lambda j: states[j["id"]].accrued, reverse=True)
+        owed = sum(states[j["id"]].accrued for j in paid_tier)
+        for job in paid_tier:
+            if owed * 100 <= balance_paise:
+                break
+            to_close.append((job, "funds"))
+            owed -= states[job["id"]].accrued
+
+    closed = 0
+    for job, reason in to_close:
         state = pricing.cost_state(job["billable_seconds"], job["active_since"])
-        if not state.expired:
-            continue
+        _finalize_job_billing(db, job)
         db.execute(
             "UPDATE jobs SET status = 'closed', active_since = '' WHERE id = ?",
             (job["id"],),
         )
         db.commit()
+        if reason == "cap":
+            action, detail = (
+                "job.autoexpire",
+                f"Reached the {pricing.CAP_DAYS}-day cap; accrued {state.accrued_display}.",
+            )
+        else:
+            action, detail = (
+                "job.autoexpire_no_funds",
+                f"Wallet balance couldn't cover the running cost; accrued {state.accrued_display}.",
+            )
         audit.record(
-            db, "job.autoexpire", actor_email="system (pricing)",
+            db, action, actor_email="system (pricing)",
             target_type="job", target_id=job["id"], target_label=job["title"],
-            detail=f"Reached the {pricing.CAP_DAYS}-day cap; accrued {state.accrued_display}.",
+            detail=detail,
         )
         emp = db.execute(
             "SELECT email, name, company_name FROM users WHERE id = ?",
             (job["employer_id"],),
         ).fetchone()
         if emp:
-            mailer.send_email(
-                to=emp["email"],
-                subject=f"Your job '{job['title']}' was auto-closed",
-                body=(
+            if reason == "cap":
+                subject = f"Your job '{job['title']}' was auto-closed"
+                body = (
                     f"Hi {emp['name'] or 'there'},\n\n"
                     f"Your posting '{job['title']}' reached the "
                     f"{pricing.CAP_DAYS}-day limit and was automatically closed to "
                     f"keep listings fresh. Total holding cost: {state.accrued_display}.\n\n"
                     f"If you're still hiring for this role, you can reopen it from "
                     f"your dashboard — it starts a new free week.\n"
-                ),
-            )
+                )
+            else:
+                subject = f"Your job '{job['title']}' was closed — wallet balance ran out"
+                body = (
+                    f"Hi {emp['name'] or 'there'},\n\n"
+                    f"Your posting '{job['title']}' was automatically closed because "
+                    f"your wallet balance couldn't cover its running cost "
+                    f"({state.accrued_display} accrued).\n\n"
+                    f"Add funds from your dashboard and reopen it whenever you're "
+                    f"ready — reopening starts a new free week.\n"
+                )
+            mailer.send_email(to=emp["email"], subject=subject, body=body)
         closed += 1
     return closed
 

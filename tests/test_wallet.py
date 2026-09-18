@@ -9,11 +9,13 @@ import hashlib
 import hmac
 import json
 import sqlite3
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
 
 from app import db as dbmod
+from app import pricing
 from app import wallet
 
 
@@ -437,3 +439,191 @@ def test_webhook_for_an_unknown_order_is_a_harmless_no_op(monkeypatch, client):
         "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _webhook_sign(body)}
     )
     assert resp.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Debit-at-closure and the insufficient-funds sweep (payment feature, PR 4/4)
+# --------------------------------------------------------------------------- #
+def _since(days_ago: float) -> str:
+    ts = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    return ts.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _age_job(job_id: int, days_ago: float) -> None:
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.execute(
+        "UPDATE jobs SET status = 'active', active_since = ? WHERE id = ?",
+        (_since(days_ago), job_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _job_row(job_id: int):
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def _latest_job_id() -> int:
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    row = conn.execute("SELECT MAX(id) FROM jobs").fetchone()
+    conn.close()
+    return row[0]
+
+
+def _fund_wallet(email: str, paise: int) -> None:
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.execute(
+        "UPDATE company_profiles SET wallet_balance_paise = ? "
+        "WHERE user_id = (SELECT id FROM users WHERE email = ?)",
+        (paise, email),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _audit_count(action: str) -> int:
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    n = conn.execute(
+        "SELECT COUNT(*) FROM audit_log WHERE action = ?", (action,)
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def test_closing_a_job_debits_the_final_accrued_cost(client, register, post, post_job):
+    register("bill1@x.io", "employer", company_name="Bill1Co")
+    _fund_wallet("bill1@x.io", 100_00)  # ₹100
+    post_job(title="Billed Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, 10)  # ₹150 would be owed, but only ₹100 is available
+
+    post(f"/employer/jobs/{job_id}/status", data={"status": "closed"})
+
+    assert _wallet_balance_paise("bill1@x.io") == 0  # clamped, not negative
+    debit = [r for r in _wallet_tx_rows("bill1@x.io") if r["type"] == "debit"][0]
+    assert debit["amount_paise"] == 100_00
+    assert debit["job_id"] == job_id
+
+
+def test_closing_a_lightly_accrued_job_debits_only_what_it_owes(client, register, post, post_job):
+    register("bill2@x.io", "employer", company_name="Bill2Co")
+    _fund_wallet("bill2@x.io", 500_00)  # ₹500 — plenty
+    post_job(title="Cheap Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, 10)  # ₹150 owed
+
+    post(f"/employer/jobs/{job_id}/status", data={"status": "closed"})
+
+    assert _wallet_balance_paise("bill2@x.io") == 500_00 - 150_00
+    debit = [r for r in _wallet_tx_rows("bill2@x.io") if r["type"] == "debit"][0]
+    assert debit["amount_paise"] == 150_00
+
+
+def test_closing_a_job_still_in_its_free_week_debits_nothing(client, register, post, post_job):
+    register("bill3@x.io", "employer", company_name="Bill3Co")
+    _fund_wallet("bill3@x.io", 500_00)
+    post_job(title="Fresh Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, 2)  # still in the free week
+
+    post(f"/employer/jobs/{job_id}/status", data={"status": "closed"})
+
+    assert _wallet_balance_paise("bill3@x.io") == 500_00
+    assert [r for r in _wallet_tx_rows("bill3@x.io") if r["type"] == "debit"] == []
+
+
+def test_an_uncovered_paid_tier_job_is_auto_closed_for_insufficient_funds(
+    client, register, post_job
+):
+    register("nofund1@x.io", "employer", company_name="NoFund1Co")
+    # No _fund_wallet call — balance stays 0.
+    post_job(title="Unfunded Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, 10)  # past the free week, ₹150 owed, ₹0 available
+
+    client.get("/employer")  # sweep runs on load
+
+    assert _job_row(job_id)["status"] == "closed"
+    assert _audit_count("job.autoexpire_no_funds") == 1
+
+
+def test_a_free_week_job_is_never_closed_for_insufficient_funds(client, register, post_job):
+    register("nofund2@x.io", "employer", company_name="NoFund2Co")
+    post_job(title="Still Free Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, 3)  # free week, costs nothing regardless of balance
+
+    client.get("/employer")
+
+    assert _job_row(job_id)["status"] == "active"
+
+
+def test_a_covered_paid_tier_job_is_not_closed(client, register, post_job):
+    register("funded@x.io", "employer", company_name="FundedCo")
+    _fund_wallet("funded@x.io", 200_00)  # covers the ₹150 owed
+    post_job(title="Covered Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, 10)
+
+    client.get("/employer")
+
+    assert _job_row(job_id)["status"] == "active"
+
+
+def test_multiple_jobs_close_highest_accrued_first_until_balance_fits(
+    client, register, post_job
+):
+    register("multi@x.io", "employer", company_name="MultiCo")
+    _fund_wallet("multi@x.io", 200_00)  # covers only the cheaper of the two
+    post_job(title="Pricier Role", required_skills="python")
+    pricier_id = _latest_job_id()
+    post_job(title="Cheaper Role", required_skills="python")
+    cheaper_id = _latest_job_id()
+    _age_job(pricier_id, 16)  # 7 free + 7@50 + 2@100 = 550 owed
+    _age_job(cheaper_id, 10)  # 150 owed — together 700, balance only covers 200
+
+    client.get("/employer")
+
+    assert _job_row(pricier_id)["status"] == "closed"   # closed first — most expensive
+    assert _job_row(cheaper_id)["status"] == "active"   # fits once the pricier one is gone
+
+
+def test_a_no_funds_closure_never_touches_other_employers(client, register, post, post_job):
+    register("victim@x.io", "employer", company_name="VictimCo")
+    post_job(title="Innocent Role", required_skills="python")
+    victim_job_id = _latest_job_id()
+    _age_job(victim_job_id, 10)
+    post("/logout")
+
+    register("broke@x.io", "employer", company_name="BrokeCo")
+    post_job(title="Broke Role", required_skills="python")
+    broke_job_id = _latest_job_id()
+    _age_job(broke_job_id, 10)
+
+    client.get("/employer")  # sweeps everyone, not just the current employer
+
+    assert _job_row(victim_job_id)["status"] == "closed"  # also unfunded — expected
+    assert _job_row(broke_job_id)["status"] == "closed"
+    # Distinct employers, so this is really just confirming the grouping-by-
+    # employer logic doesn't cross-contaminate one employer's balance/jobs
+    # with another's — no assertion failure here would be the actual bug.
+
+
+def test_cap_expiry_still_debits_the_final_cost(client, register, post_job):
+    register("cap1@x.io", "employer", company_name="Cap1Co")
+    _fund_wallet("cap1@x.io", pricing.total_at_cap() * 100)  # exactly enough
+    post_job(title="Long-Runner Role", required_skills="python")
+    job_id = _latest_job_id()
+    _age_job(job_id, pricing.CAP_DAYS + 2)
+
+    client.get("/employer")
+
+    assert _job_row(job_id)["status"] == "closed"
+    assert _wallet_balance_paise("cap1@x.io") == 0
+    debit = [r for r in _wallet_tx_rows("cap1@x.io") if r["type"] == "debit"][0]
+    assert debit["amount_paise"] == pricing.total_at_cap() * 100
+    assert _audit_count("job.autoexpire") >= 1

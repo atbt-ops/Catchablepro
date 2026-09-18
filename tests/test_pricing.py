@@ -32,6 +32,17 @@ def _job(job_id: int):
     return row
 
 
+def _fund_wallet(email: str, paise: int) -> None:
+    conn = sqlite3.connect(dbmod.DB_PATH)
+    conn.execute(
+        "UPDATE company_profiles SET wallet_balance_paise = ? "
+        "WHERE user_id = (SELECT id FROM users WHERE email = ?)",
+        (paise, email),
+    )
+    conn.commit()
+    conn.close()
+
+
 # --------------------------------------------------------------------------- #
 # pure cost engine
 # --------------------------------------------------------------------------- #
@@ -109,6 +120,7 @@ def test_reopening_starts_a_fresh_free_week(client, register, post, post_job):
 def test_dashboard_shows_the_running_cost(client, register, post_job):
     register("dm@x.io", "employer", company_name="DM")
     post_job(title="Costly Role", required_skills="python")
+    _fund_wallet("dm@x.io", 20000)              # ₹200 — enough to cover ₹150
     _age_job(1, 10)                            # ₹150 accrued, ₹50/day
     page = client.get("/employer").text
     assert "₹150" in page
