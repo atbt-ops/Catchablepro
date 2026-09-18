@@ -581,6 +581,34 @@ def _company(db: sqlite3.Connection, user_id: int) -> sqlite3.Row:
 
 
 # --------------------------------------------------------------------------- #
+# Wallet: crediting a top-up, shared by the client-side /verify callback and
+# the /webhooks/razorpay endpoint — whichever arrives first does the credit,
+# the other is a no-op. See app/wallet.py for the Razorpay-facing half.
+# --------------------------------------------------------------------------- #
+def _credit_wallet_topup(db: sqlite3.Connection, order_id: str, payment_id: str) -> bool:
+    """Credit a 'created' topup transaction exactly once. Returns whether this
+    call was the one that did it (False if already credited, or unknown order)."""
+    row = db.execute(
+        "SELECT * FROM wallet_transactions WHERE razorpay_order_id = ? "
+        "AND type = 'topup' AND status = 'created'",
+        (order_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    db.execute(
+        "UPDATE wallet_transactions SET status = 'paid', razorpay_payment_id = ? WHERE id = ?",
+        (payment_id, row["id"]),
+    )
+    db.execute(
+        "UPDATE company_profiles SET wallet_balance_paise = wallet_balance_paise + ? "
+        "WHERE user_id = ?",
+        (row["amount_paise"], row["user_id"]),
+    )
+    db.commit()
+    return True
+
+
+# --------------------------------------------------------------------------- #
 # On-demand pricing: billing transitions and the auto-expiry sweep
 # --------------------------------------------------------------------------- #
 def _set_job_status(db: sqlite3.Connection, job: sqlite3.Row, new_status: str) -> None:

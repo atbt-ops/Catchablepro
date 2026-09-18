@@ -7,6 +7,7 @@ way tests/test_pricing.py exercises the job-status/sweep routes.
 """
 import hashlib
 import hmac
+import json
 import sqlite3
 
 import httpx
@@ -332,3 +333,107 @@ def test_dashboard_shows_the_wallet_balance(monkeypatch, client, register, post)
     page = client.get("/employer").text
     assert "Wallet balance" in page
     assert "₹750" in page
+
+
+# --------------------------------------------------------------------------- #
+# /webhooks/razorpay — the reconciliation safety net
+# --------------------------------------------------------------------------- #
+def _webhook_body(order_id: str, payment_id: str, event: str = "payment.captured") -> bytes:
+    return json.dumps({
+        "event": event,
+        "payload": {"payment": {"entity": {"id": payment_id, "order_id": order_id, "amount": 50000}}},
+    }).encode()
+
+
+def _webhook_sign(body: bytes, secret: str = "whsecret") -> str:
+    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def test_webhook_credits_balance_on_a_valid_signature(monkeypatch, client, register, post):
+    _configure(monkeypatch)
+    _stub_create_order(monkeypatch, order_id="order_wh1")
+    register("wh1@x.io", "employer", company_name="Wh1Co")
+    post("/employer/wallet/topup", data={"amount_paise": "50000"})
+
+    body = _webhook_body("order_wh1", "pay_wh1")
+    resp = client.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _webhook_sign(body)}
+    )
+
+    assert resp.status_code == 200
+    assert _wallet_balance_paise("wh1@x.io") == 50000
+    assert _wallet_tx_rows("wh1@x.io")[0]["razorpay_payment_id"] == "pay_wh1"
+
+
+def test_webhook_rejects_an_invalid_signature(monkeypatch, client, register, post):
+    _configure(monkeypatch)
+    _stub_create_order(monkeypatch, order_id="order_wh2")
+    register("wh2@x.io", "employer", company_name="Wh2Co")
+    post("/employer/wallet/topup", data={"amount_paise": "50000"})
+
+    body = _webhook_body("order_wh2", "pay_wh2")
+    resp = client.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": "not-the-real-signature"}
+    )
+
+    assert resp.status_code == 400
+    assert _wallet_balance_paise("wh2@x.io") == 0
+
+
+def test_webhook_without_a_signature_header_is_rejected(monkeypatch, client):
+    _configure(monkeypatch)
+    resp = client.post("/webhooks/razorpay", content=b'{"event": "payment.captured"}')
+    assert resp.status_code == 400
+
+
+def test_webhook_and_client_verify_racing_only_credit_once(monkeypatch, client, register, post):
+    """Whichever of the webhook / client-side /verify call fires first should
+    credit the wallet; the other must be a safe no-op, not a double-credit."""
+    _configure(monkeypatch)
+    _stub_create_order(monkeypatch, order_id="order_wh3")
+    register("wh3@x.io", "employer", company_name="Wh3Co")
+    post("/employer/wallet/topup", data={"amount_paise": "50000"})
+
+    body = _webhook_body("order_wh3", "pay_wh3")
+    client.post("/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _webhook_sign(body)})
+
+    payment_signature = _sign("order_wh3", "pay_wh3")
+    post("/employer/wallet/verify", data={
+        "razorpay_order_id": "order_wh3", "razorpay_payment_id": "pay_wh3",
+        "razorpay_signature": payment_signature,
+    })
+
+    assert _wallet_balance_paise("wh3@x.io") == 50000  # not 100000
+
+
+def test_webhook_ignores_event_types_it_does_not_handle(monkeypatch, client, register, post):
+    _configure(monkeypatch)
+    _stub_create_order(monkeypatch, order_id="order_wh4")
+    register("wh4@x.io", "employer", company_name="Wh4Co")
+    post("/employer/wallet/topup", data={"amount_paise": "50000"})
+
+    body = _webhook_body("order_wh4", "pay_wh4", event="payment.failed")
+    resp = client.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _webhook_sign(body)}
+    )
+
+    assert resp.status_code == 200
+    assert _wallet_balance_paise("wh4@x.io") == 0
+
+
+def test_webhook_survives_a_malformed_but_validly_signed_payload(monkeypatch, client):
+    _configure(monkeypatch)
+    body = json.dumps({"event": "payment.captured", "payload": {}}).encode()  # no payment.entity
+    resp = client.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _webhook_sign(body)}
+    )
+    assert resp.status_code == 200
+
+
+def test_webhook_for_an_unknown_order_is_a_harmless_no_op(monkeypatch, client):
+    _configure(monkeypatch)
+    body = _webhook_body("order_never_created", "pay_x")
+    resp = client.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _webhook_sign(body)}
+    )
+    assert resp.status_code == 200

@@ -116,6 +116,7 @@ from .web import (  # noqa: F401  (re-exported for the route bodies)
     _configured_hosts,
     _consume_recovery_code,
     _contact_target,
+    _credit_wallet_topup,
     _dashboard_url,
     _export_payload,
     _job_form_context,
@@ -2211,10 +2212,11 @@ def employer_wallet_verify(
 ):
     """Client-side confirmation right after a successful Checkout payment.
 
-    Credits the wallet immediately for instant feedback. The webhook (a
-    later PR) is the source of truth if this call never arrives (closed
-    tab, network blip) — both converge on the same idempotent "credit only
-    a 'created' row" check, keyed off razorpay_order_id.
+    Credits the wallet immediately for instant feedback. /webhooks/razorpay
+    is the source of truth if this call never arrives (closed tab, network
+    blip) — both converge on _credit_wallet_topup's idempotent "credit only
+    a 'created' row" check, keyed off razorpay_order_id, so whichever fires
+    first does the crediting and the other is a safe no-op.
     """
     user, redirect = _require(request, db, "employer")
     if redirect:
@@ -2224,26 +2226,36 @@ def employer_wallet_verify(
     ):
         return JSONResponse({"error": "Could not verify that payment."}, status_code=400)
 
-    row = db.execute(
-        "SELECT * FROM wallet_transactions WHERE user_id = ? AND razorpay_order_id = ? "
-        "AND type = 'topup' AND status = 'created'",
-        (user["id"], razorpay_order_id),
-    ).fetchone()
-    if row is None:
-        # Already credited (e.g. the webhook beat us to it) — not an error.
-        return JSONResponse({"ok": True})
-
-    db.execute(
-        "UPDATE wallet_transactions SET status = 'paid', razorpay_payment_id = ? WHERE id = ?",
-        (razorpay_payment_id, row["id"]),
-    )
-    db.execute(
-        "UPDATE company_profiles SET wallet_balance_paise = wallet_balance_paise + ? "
-        "WHERE user_id = ?",
-        (row["amount_paise"], user["id"]),
-    )
-    db.commit()
+    _credit_wallet_topup(db, razorpay_order_id, razorpay_payment_id)
     return JSONResponse({"ok": True})
+
+
+@app.post("/webhooks/razorpay")
+async def razorpay_webhook(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    """Server-to-server payment confirmation — the reconciliation safety net.
+
+    No session, no CSRF: Razorpay calls this directly, authenticated purely
+    by the signature over the raw body. This is genuinely different from
+    every other route in the app (all session-form routes) so it doesn't
+    fit _require/verify_csrf at all; unauthenticated-by-signature is the
+    correct shape for a webhook, not a gap in the usual pattern.
+    """
+    raw = await request.body()  # verify against the exact bytes — re-parsing first would break the signature
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    if not wallet.verify_webhook_signature(raw, signature):
+        raise HTTPException(status_code=400, detail="Invalid signature.")
+
+    kind = ""
+    try:
+        event = json.loads(raw)
+        kind = event.get("event", "")
+        if kind == "payment.captured":
+            payment = event["payload"]["payment"]["entity"]
+            _credit_wallet_topup(db, payment["order_id"], payment["id"])
+    except (ValueError, KeyError, TypeError):
+        access_log.warning("razorpay webhook: unexpected payload shape for event %r", kind)
+
+    return {"status": "ok"}
 
 
 @app.get("/employer/jobs/new", response_class=HTMLResponse)
