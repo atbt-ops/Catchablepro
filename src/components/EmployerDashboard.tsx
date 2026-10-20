@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
 import { Job, ApplicationStage, JobStatus, CostState } from '../types';
 import { computeCostState } from '../services/pricing';
@@ -17,23 +18,307 @@ import {
   Edit,
   Clock,
   Sparkles,
-  TrendingUp,
-  AlertCircle,
   Building2,
   CheckCircle2,
   CreditCard,
   ArrowRight,
-  ShieldAlert,
   Send,
-  MessageSquare,
-  ChevronRight,
-  Search,
-  Filter,
-  ArrowUpRight,
-  Check,
-  QrCode,
   ShieldCheck,
 } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  container: {
+    maxWidth: '1280px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    paddingLeft: spacing.md,
+    paddingRight: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.lg,
+  },
+  header: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    padding: spacing.lg,
+    boxShadow: shadows.sm,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  headerTitle: {
+    fontSize: '1.5rem',
+    fontWeight: 900,
+    color: colors.text,
+    margin: 0,
+    letterSpacing: '-0.025em',
+  },
+  headerSub: {
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+    margin: '2px 0 0',
+  },
+  badgeVerified: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    borderRadius: radii.full,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  walletBtn: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.successText,
+    backgroundColor: colors.successLight,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  postBtn: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '20px',
+    paddingRight: '20px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    boxShadow: shadows.sm,
+    transition: 'background-color 0.15s ease',
+  },
+  tabNav: {
+    display: 'flex',
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+    gap: spacing.lg,
+    fontSize: '0.875rem',
+    fontWeight: 700,
+    overflowX: 'auto',
+  },
+  tabItem: {
+    paddingBottom: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderBottomWidth: '2px',
+    borderBottomStyle: 'solid',
+    transition: 'all 0.15s ease',
+  },
+  tabItemActive: {
+    borderBottomColor: colors.primary,
+    color: colors.primary,
+  },
+  tabItemInactive: {
+    borderBottomColor: 'transparent',
+    color: colors.textMuted,
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: spacing.md,
+  },
+  statCard: {
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    boxShadow: shadows.sm,
+  },
+  statLabel: {
+    fontSize: '0.625rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textMuted,
+    display: 'block',
+  },
+  statVal: {
+    fontSize: '1.5rem',
+    fontWeight: 900,
+    color: colors.text,
+    display: 'block',
+    marginTop: '4px',
+  },
+  statSub: {
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    marginTop: '2px',
+    display: 'block',
+  },
+  jobsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+  jobRow: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    padding: spacing.lg,
+    boxShadow: shadows.sm,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+  },
+  meterBox: {
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceSubtle,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  kanbanGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: spacing.md,
+  },
+  kanbanCol: {
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+    minHeight: '420px',
+  },
+  kanbanCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    boxShadow: shadows.sm,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  modal: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    maxWidth: '440px',
+    width: '100%',
+    padding: spacing.lg,
+    boxShadow: shadows.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+  input: {
+    width: '100%',
+    fontSize: '0.8125rem',
+    padding: '10px 14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  btnPrimary: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    boxShadow: shadows.sm,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'background-color 0.15s ease',
+  },
+});
 
 interface EmployerDashboardProps {
   activeTab: 'jobs' | 'matches' | 'pipeline' | 'wallet' | 'profile';
@@ -62,70 +347,62 @@ const PricingMeterVisualizer: React.FC<{ cost: CostState; status: JobStatus }> =
   const percentElapsed = Math.min((cost.daysActive / 30) * 100, 100);
 
   return (
-    <div className="p-4 rounded-3xl bg-slate-50 border border-slate-200/90 space-y-3">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-bold text-slate-700 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5 text-indigo-600" />
+    <div {...stylex.props(styles.meterBox)}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+        <span style={{ fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Clock size={14} color="#4f46e5" />
           <span>30-Day On-Demand Holding Meter</span>
         </span>
         {status === 'active' ? (
-          <span className="font-extrabold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 text-[10px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span style={{ fontWeight: 800, color: '#047857', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '9999px', border: '1px solid #a7f3d0', fontSize: '10px' }}>
             LIVE • Day {cost.daysActive.toFixed(1)} / 30
           </span>
         ) : (
-          <span className="font-bold text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full text-[10px]">
+          <span style={{ fontWeight: 700, color: '#94a3b8', backgroundColor: '#e2e8f0', padding: '2px 8px', borderRadius: '9999px', fontSize: '10px' }}>
             Meter Paused
           </span>
         )}
       </div>
 
       {/* 5-Week Segmented Bar */}
-      <div className="space-y-1.5">
-        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex relative">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ width: '100%', backgroundColor: '#e2e8f0', height: '10px', borderRadius: '9999px', overflow: 'hidden' }}>
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 via-indigo-500 to-amber-500 transition-all duration-500 rounded-full"
-            style={{ width: `${percentElapsed}%` }}
+            style={{
+              height: '100%',
+              width: `${percentElapsed}%`,
+              background: 'linear-gradient(to right, #10b981, #4f46e5, #f59e0b)',
+              borderRadius: '9999px',
+              transition: 'all 0.5s ease',
+            }}
           />
         </div>
 
         {/* Milestone Labels */}
-        <div className="grid grid-cols-5 text-[10px] font-semibold text-slate-400 pt-0.5 text-center">
-          <span className={cost.daysActive < 7 ? 'text-emerald-700 font-bold' : ''}>W1: Free</span>
-          <span className={cost.daysActive >= 7 && cost.daysActive < 14 ? 'text-indigo-700 font-bold' : ''}>
-            W2: ₹50/d
-          </span>
-          <span className={cost.daysActive >= 14 && cost.daysActive < 21 ? 'text-indigo-700 font-bold' : ''}>
-            W3: ₹100/d
-          </span>
-          <span className={cost.daysActive >= 21 && cost.daysActive < 28 ? 'text-amber-700 font-bold' : ''}>
-            W4: ₹200/d
-          </span>
-          <span className={cost.daysActive >= 28 ? 'text-rose-700 font-bold' : ''}>W5: ₹400/d</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', fontSize: '10px', fontWeight: 600, color: '#94a3b8', textAlign: 'center' }}>
+          <span style={{ color: cost.daysActive < 7 ? '#047857' : undefined, fontWeight: cost.daysActive < 7 ? 'bold' : undefined }}>W1: Free</span>
+          <span style={{ color: cost.daysActive >= 7 && cost.daysActive < 14 ? '#4338ca' : undefined, fontWeight: cost.daysActive >= 7 && cost.daysActive < 14 ? 'bold' : undefined }}>W2: ₹50/d</span>
+          <span style={{ color: cost.daysActive >= 14 && cost.daysActive < 21 ? '#4338ca' : undefined, fontWeight: cost.daysActive >= 14 && cost.daysActive < 21 ? 'bold' : undefined }}>W3: ₹100/d</span>
+          <span style={{ color: cost.daysActive >= 21 && cost.daysActive < 28 ? '#b45309' : undefined, fontWeight: cost.daysActive >= 21 && cost.daysActive < 28 ? 'bold' : undefined }}>W4: ₹200/d</span>
+          <span style={{ color: cost.daysActive >= 28 ? '#be123c' : undefined, fontWeight: cost.daysActive >= 28 ? 'bold' : undefined }}>W5: ₹400/d</span>
         </div>
       </div>
 
       {/* Metric details */}
-      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-xs">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Current Rate
-          </span>
-          <span className="font-extrabold text-slate-900 mt-0.5 block">
+          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', display: 'block' }}>Current Rate</span>
+          <span style={{ fontWeight: 800, color: '#0f172a', display: 'block', marginTop: '2px' }}>
             {cost.dailyRate === 0 ? 'FREE' : `₹${cost.dailyRate}/day`}
           </span>
         </div>
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Accrued Spend
-          </span>
-          <span className="font-extrabold text-indigo-700 mt-0.5 block">{cost.accruedDisplay}</span>
+          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', display: 'block' }}>Accrued Spend</span>
+          <span style={{ fontWeight: 800, color: '#4338ca', display: 'block', marginTop: '2px' }}>{cost.accruedDisplay}</span>
         </div>
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Auto-Cap
-          </span>
-          <span className="font-semibold text-slate-600 mt-0.5 block text-[11px]">
+          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', display: 'block' }}>Auto-Cap</span>
+          <span style={{ fontWeight: 600, color: '#475569', display: 'block', marginTop: '2px', fontSize: '11px' }}>
             {cost.daysToCap > 0 ? `${cost.daysToCap.toFixed(1)} days left` : 'Closed'}
           </span>
         </div>
@@ -269,7 +546,6 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
     setTimeout(() => setProfileSaved(false), 3000);
   };
 
-  // Quick Action: Shortlist candidate directly from matches
   const handleShortlistCandidate = (candidateId: number) => {
     if (!targetJobForMatches) return;
     const existing = applications.find(
@@ -303,33 +579,33 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
   }, [walletTransactions, txTypeFilter, txSearch]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div {...stylex.props(styles.container)}>
       {/* Top Employer Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
+      <div {...stylex.props(styles.header)}>
+        <div {...stylex.props(styles.headerLeft)}>
           <CompanyAvatar name={currentUser?.company_name || 'Acme'} size="lg" showVerified={true} />
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 {...stylex.props(styles.headerTitle)}>
                 {currentUser?.company_name || 'Employer Portal'}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+              <span {...stylex.props(styles.badgeVerified)}>
                 Verified Recruiter
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p {...stylex.props(styles.headerSub)}>
               Logged in as {currentUser?.name} ({currentUser?.designation || 'Head of Talent'})
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div {...stylex.props(styles.headerActions)}>
           <button
             onClick={() => setShowTopupModal(true)}
-            className="flex-1 md:flex-initial px-4 py-2.5 rounded-2xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center justify-center gap-2 shadow-xs"
+            {...stylex.props(styles.walletBtn)}
           >
-            <Wallet className="w-4 h-4 text-emerald-600" />
+            <Wallet size={16} color="#059669" />
             <span>Wallet: ₹{((currentCompany?.walletBalancePaise || 0) / 100).toLocaleString('en-IN')}</span>
           </button>
 
@@ -338,246 +614,182 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               setEditingJob(null);
               setShowPostModal(true);
             }}
-            className="flex-1 md:flex-initial px-5 py-2.5 rounded-2xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+            {...stylex.props(styles.postBtn)}
           >
-            <Plus className="w-4 h-4" />
+            <Plus size={16} />
             <span>Post New Job</span>
           </button>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-4 sm:gap-6 text-sm font-bold overflow-x-auto">
+      <div {...stylex.props(styles.tabNav)}>
         <button
           onClick={() => setActiveTab('jobs')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'jobs'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'jobs' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Briefcase className="w-4 h-4" />
-          <span>My Jobs & Meter ({myJobs.length})</span>
+          <Briefcase size={16} />
+          <span>My Jobs &amp; Meter ({myJobs.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('matches')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'matches'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'matches' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Sparkles className="w-4 h-4" />
+          <Sparkles size={16} />
           <span>Ranked Candidates ({rankedCandidates.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('pipeline')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'pipeline'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'pipeline' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Layers className="w-4 h-4" />
+          <Layers size={16} />
           <span>Hiring Pipeline ({pipelineApplications.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('wallet')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'wallet'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'wallet' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Wallet className="w-4 h-4" />
-          <span>Prepaid Wallet & Pricing</span>
+          <Wallet size={16} />
+          <span>Prepaid Wallet &amp; Pricing</span>
         </button>
 
         <button
           onClick={() => setActiveTab('profile')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'profile'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'profile' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Building2 className="w-4 h-4" />
+          <Building2 size={16} />
           <span>Company Profile</span>
         </button>
       </div>
 
       {/* TAB 1: JOBS & ON-DEMAND PRICING METER */}
       {activeTab === 'jobs' && (
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Top KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Active Job Postings
-              </span>
-              <span className="text-2xl font-black text-slate-900 mt-1 block">
-                {activeJobCount}
-              </span>
-              <span className="text-[11px] text-emerald-600 font-semibold">Live in search</span>
+          <div {...stylex.props(styles.statsGrid)}>
+            <div {...stylex.props(styles.statCard)}>
+              <span {...stylex.props(styles.statLabel)}>Active Job Postings</span>
+              <span {...stylex.props(styles.statVal)}>{activeJobCount}</span>
+              <span {...stylex.props(styles.statSub)} style={{ color: '#059669' }}>Live in search</span>
             </div>
 
-            <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Total Applicants
-              </span>
-              <span className="text-2xl font-black text-slate-900 mt-1 block">
-                {pipelineApplications.length}
-              </span>
-              <span className="text-[11px] text-indigo-600 font-semibold">Across all stages</span>
+            <div {...stylex.props(styles.statCard)}>
+              <span {...stylex.props(styles.statLabel)}>Total Applicants</span>
+              <span {...stylex.props(styles.statVal)}>{pipelineApplications.length}</span>
+              <span {...stylex.props(styles.statSub)} style={{ color: '#4f46e5' }}>Across all stages</span>
             </div>
 
-            <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Prepaid Wallet
-              </span>
-              <span className="text-2xl font-black text-slate-900 mt-1 block">
+            <div {...stylex.props(styles.statCard)}>
+              <span {...stylex.props(styles.statLabel)}>Prepaid Wallet</span>
+              <span {...stylex.props(styles.statVal)}>
                 ₹{((currentCompany?.walletBalancePaise || 0) / 100).toLocaleString('en-IN')}
               </span>
-              <span className="text-[11px] text-slate-500 font-medium">Ready for on-demand meter</span>
+              <span {...stylex.props(styles.statSub)} style={{ color: '#64748b' }}>Ready for on-demand meter</span>
             </div>
 
-            <div className="p-4 rounded-3xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 shadow-xs">
-              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">
-                Free Week Policy
-              </span>
-              <span className="text-sm font-black text-indigo-950 mt-1 block">
+            <div {...stylex.props(styles.statCard)} style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)', borderColor: '#c7d2fe' }}>
+              <span {...stylex.props(styles.statLabel)} style={{ color: '#3730a3' }}>Free Week Policy</span>
+              <span {...stylex.props(styles.statVal)} style={{ fontSize: '1.125rem', color: '#1e1b4b' }}>
                 7 Days FREE per job
               </span>
-              <span className="text-[11px] text-indigo-700 font-medium">
+              <span {...stylex.props(styles.statSub)} style={{ color: '#4338ca' }}>
                 Closes fast hires at zero cost
               </span>
             </div>
           </div>
 
           {/* Job Postings List */}
-          <div className="space-y-4">
+          <div {...stylex.props(styles.jobsList)}>
             {myJobs.map((job) => {
               const cost = computeCostState(job.billableSeconds, job.activeSince);
               const jobApps = applications.filter((a) => a.jobId === job.id);
 
               return (
-                <div
-                  key={job.id}
-                  className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6 hover:border-slate-300 transition-all"
-                >
-                  {/* Left Column: Job Meta */}
-                  <div className="space-y-2.5 max-w-xl">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                          job.status === 'active'
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                            : job.status === 'paused'
-                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
+                <div key={job.id} {...stylex.props(styles.jobRow)}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '600px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: '9999px',
+                        fontSize: '0.75rem',
+                        fontWeight: 900,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        backgroundColor: job.status === 'active' ? '#ecfdf5' : '#fffbeb',
+                        color: job.status === 'active' ? '#065f46' : '#92400e',
+                        border: `1px solid ${job.status === 'active' ? '#a7f3d0' : '#fde68a'}`,
+                      }}>
                         {job.status}
                       </span>
-                      <span className="text-xs text-slate-300">•</span>
-                      <span className="text-xs font-bold text-slate-600">{job.department}</span>
-                      <span className="text-xs text-slate-300">•</span>
-                      <span className="text-xs text-slate-600">{job.workMode}</span>
-                      <span className="text-xs text-slate-300">•</span>
-                      <span className="text-xs text-slate-600">{job.location}</span>
+                      <span style={{ color: '#cbd5e1' }}>•</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>{job.department}</span>
+                      <span style={{ color: '#cbd5e1' }}>•</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>{job.workMode}</span>
+                      <span style={{ color: '#cbd5e1' }}>•</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>{job.location}</span>
                     </div>
 
-                    <h3 className="text-lg font-black text-slate-900">{job.title}</h3>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#0f172a', margin: '2px 0 0' }}>{job.title}</h3>
 
-                    <div className="flex flex-wrap gap-1.5 pt-1">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '4px' }}>
                       {job.requiredSkills.split(',').map((skill) => (
-                        <span
-                          key={skill}
-                          className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700"
-                        >
+                        <span key={skill} style={{ padding: '2px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: '#f1f5f9', color: '#334155' }}>
                           {skill.trim()}
                         </span>
                       ))}
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.75rem', color: '#94a3b8', paddingTop: '4px' }}>
                       <span>Posted: {new Date(job.createdAt).toLocaleDateString()}</span>
-                      <span>Applicants: <strong className="text-slate-700">{jobApps.length}</strong></span>
-                      <span>
-                        Salary: {job.hideSalary ? 'Confidential' : `₹${job.salaryMin}-${job.salaryMax} LPA`}
-                      </span>
+                      <span>Applicants: <strong style={{ color: '#334155' }}>{jobApps.length}</strong></span>
+                      <span>Salary: {job.hideSalary ? 'Confidential' : `₹${job.salaryMin}-${job.salaryMax} LPA`}</span>
                     </div>
                   </div>
 
-                  {/* Middle Column: Visual Pricing Meter */}
-                  <div className="xl:w-[360px]">
+                  <div style={{ width: '100%', maxWidth: '380px' }}>
                     <PricingMeterVisualizer cost={cost} status={job.status} />
                   </div>
 
-                  {/* Right Column: Actions */}
-                  <div className="flex xl:flex-col items-center gap-2 justify-end">
-                    <div className="flex items-center gap-2 w-full">
-                      {job.status === 'active' ? (
-                        <button
-                          onClick={() => setJobStatus(job.id, 'paused')}
-                          className="flex-1 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <Pause className="w-3.5 h-3.5" />
-                          <span>Pause Meter</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setJobStatus(job.id, 'active')}
-                          className="flex-1 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <Play className="w-3.5 h-3.5" />
-                          <span>Activate</span>
-                        </button>
-                      )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {job.status === 'active' ? (
+                      <button
+                        onClick={() => setJobStatus(job.id, 'paused')}
+                        style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, color: '#92400e', backgroundColor: '#fffbeb', border: '1px solid #fde68a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Pause size={14} />
+                        <span>Pause Meter</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setJobStatus(job.id, 'active')}
+                        style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, color: '#065f46', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Play size={14} />
+                        <span>Activate</span>
+                      </button>
+                    )}
 
-                      <button
-                        onClick={() => {
-                          setEditingJob(job);
-                          setShowPostModal(true);
-                        }}
-                        className="p-2.5 rounded-2xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-colors"
-                        title="Edit posting"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                    <button
+                      onClick={() => {
+                        setEditingJob(job);
+                        setShowPostModal(true);
+                      }}
+                      style={{ padding: '8px', borderRadius: '10px', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer' }}
+                      title="Edit posting"
+                    >
+                      <Edit size={16} />
+                    </button>
 
-                      <button
-                        onClick={() => setJobStatus(job.id, 'closed')}
-                        className="p-2.5 rounded-2xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 transition-colors"
-                        title="Close job permanently"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full pt-1">
-                      <button
-                        onClick={() => {
-                          setSelectedJobIdForMatches(job.id);
-                          setActiveTab('matches');
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors text-center"
-                      >
-                        Ranked Matches
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedJobIdForPipeline(job.id);
-                          setActiveTab('pipeline');
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors text-center"
-                      >
-                        Pipeline ({jobApps.length})
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setJobStatus(job.id, 'closed')}
+                      style={{ padding: '8px', borderRadius: '10px', color: '#e11d48', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', cursor: 'pointer' }}
+                      title="Close job permanently"
+                    >
+                      <XCircle size={16} />
+                    </button>
                   </div>
                 </div>
               );
@@ -588,17 +800,16 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
 
       {/* TAB 2: RANKED CANDIDATE MATCHES */}
       {activeTab === 'matches' && (
-        <div className="space-y-6">
-          {/* Job Selector Dropdown */}
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Matching Candidates For:
               </span>
               <select
                 value={targetJobForMatches?.id || ''}
                 onChange={(e) => setSelectedJobIdForMatches(Number(e.target.value))}
-                className="bg-slate-100 text-sm font-bold text-slate-900 rounded-xl px-3 py-1.5 border-none focus:outline-none cursor-pointer"
+                style={{ backgroundColor: '#f1f5f9', fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', borderRadius: '10px', padding: '6px 12px', border: 0, outline: 'none', cursor: 'pointer' }}
               >
                 {myJobs.map((j) => (
                   <option key={j.id} value={j.id}>
@@ -607,85 +818,68 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 ))}
               </select>
             </div>
-
-            <div className="text-xs text-slate-500 font-medium">
-              Required skills:{' '}
-              <code className="bg-slate-100 px-2 py-1 rounded-lg font-mono text-slate-800">
-                {targetJobForMatches?.requiredSkills}
-              </code>
+            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Required skills: <code style={{ backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontFamily: 'monospace' }}>{targetJobForMatches?.requiredSkills}</code>
             </div>
           </div>
 
-          {/* Ranked Candidate List */}
           {rankedCandidates.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
               {rankedCandidates.map(({ user, profile, match }) => (
-                <div
-                  key={user.id}
-                  className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:border-indigo-300 transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-800 text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-xs">
-                          {user.name[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-slate-900">{user.name}</h3>
-                          <p className="text-xs text-slate-500">{user.email}</p>
-                          <p className="text-xs font-semibold text-indigo-700 mt-0.5">
-                            {profile?.headline || 'Candidate Profile'}
-                          </p>
-                        </div>
+                <div key={user.id} {...stylex.props(styles.kanbanCard)}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #4f46e5, #3730a3)', color: '#fff', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {user.name[0].toUpperCase()}
                       </div>
-
-                      <div className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black flex items-center gap-1 shadow-2xs">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{match.pct}% Match</span>
+                      <div>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>{user.name}</h3>
+                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>{user.email}</p>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4338ca', margin: '2px 0 0' }}>{profile?.headline || 'Candidate Profile'}</p>
                       </div>
                     </div>
+                    <span style={{ padding: '4px 10px', borderRadius: '9999px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Sparkles size={14} color="#059669" />
+                      <span>{match.pct}% Match</span>
+                    </span>
+                  </div>
 
-                    {/* Skill Breakdown */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        Candidate Skills
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {profile?.skills.split(',').map((s) => {
-                          const skill = s.trim();
-                          const isReq = match.matched.includes(skill.toLowerCase());
-                          return (
-                            <span
-                              key={skill}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                isReq
-                                  ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 shadow-2xs'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                            >
-                              {skill}
-                            </span>
-                          );
-                        })}
-                      </div>
-
-                      {profile?.resumeFilename && (
-                        <p className="text-[11px] text-slate-500 italic pt-1 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>Resume on file: {profile.resumeFilename}</span>
-                        </p>
-                      )}
+                  <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
+                      Candidate Skills
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {profile?.skills.split(',').map((s) => {
+                        const skill = s.trim();
+                        const isReq = match.matched.includes(skill.toLowerCase());
+                        return (
+                          <span
+                            key={skill}
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: isReq ? 700 : 500,
+                              backgroundColor: isReq ? '#ecfdf5' : '#f1f5f9',
+                              color: isReq ? '#065f46' : '#475569',
+                              border: isReq ? '1px solid #a7f3d0' : undefined,
+                            }}
+                          >
+                            {skill}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-400">
+                  <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                       {profile?.autoApply ? '⚡ Auto-Apply Active' : 'Direct Search'}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
                         onClick={() => handleShortlistCandidate(user.id)}
-                        className="px-3.5 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                        style={{ padding: '6px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, color: '#4338ca', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', cursor: 'pointer' }}
                       >
                         Shortlist
                       </button>
@@ -697,9 +891,9 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                             message: `Direct interview invite sent to ${user.name} for ${targetJobForMatches?.title}`,
                           });
                         }}
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all flex items-center gap-1.5"
+                        {...stylex.props(styles.btnPrimary)}
                       >
-                        <Send className="w-3.5 h-3.5" />
+                        <Send size={14} />
                         <span>Invite</span>
                       </button>
                     </div>
@@ -708,10 +902,10 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-900 mb-1">No candidate matches</h3>
-              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+            <div style={{ textAlign: 'center', padding: '64px 20px', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <Users size={48} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>No candidate matches</h3>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '360px', margin: '0 auto' }}>
                 No registered candidates currently match the skill criteria for this job.
               </p>
             </div>
@@ -719,13 +913,12 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB 3: HIRING PIPELINE (KANBAN STAGES) */}
+      {/* TAB 3: HIRING PIPELINE (KANBAN) */}
       {activeTab === 'pipeline' && (
-        <div className="space-y-6">
-          {/* Filter Bar */}
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Filter by Role:
               </span>
               <select
@@ -733,7 +926,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 onChange={(e) =>
                   setSelectedJobIdForPipeline(e.target.value ? Number(e.target.value) : null)
                 }
-                className="bg-slate-100 text-sm font-bold text-slate-900 rounded-xl px-3 py-1.5 border-none focus:outline-none cursor-pointer"
+                style={{ backgroundColor: '#f1f5f9', fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', borderRadius: '10px', padding: '6px 12px', border: 0, outline: 'none', cursor: 'pointer' }}
               >
                 <option value="">All Job Postings</option>
                 {myJobs.map((j) => (
@@ -743,67 +936,57 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 ))}
               </select>
             </div>
-
-            <span className="text-xs font-bold text-slate-500">
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
               Total Applicants: {pipelineApplications.length}
             </span>
           </div>
 
-          {/* Kanban Columns */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div {...stylex.props(styles.kanbanGrid)}>
             {STAGES.map((stg) => {
               const stageApps = pipelineApplications.filter((a) => a.status === stg);
 
               return (
-                <div
-                  key={stg}
-                  className="bg-slate-50/80 rounded-3xl p-4 border border-slate-200/80 flex flex-col space-y-3 min-h-[420px]"
-                >
-                  <div className="flex items-center justify-between px-1">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                <div key={stg} {...stylex.props(styles.kanbanCol)}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                    <h3 style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b', margin: 0 }}>
                       {STAGE_TITLES[stg]}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                    <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '10px', fontWeight: 900, backgroundColor: '#fff', border: '1px solid #e2e8f0', color: '#334155' }}>
                       {stageApps.length}
                     </span>
                   </div>
 
-                  {/* Cards in column */}
-                  <div className="space-y-3 flex-1 overflow-y-auto">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
                     {stageApps.map((app) => (
-                      <div
-                        key={app.id}
-                        className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3 hover:border-indigo-300 transition-all"
-                      >
-                        <div className="flex items-start justify-between gap-2">
+                      <div key={app.id} {...stylex.props(styles.kanbanCard)}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                           <div>
-                            <h4 className="font-bold text-slate-900 text-xs">
+                            <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
                               {app.candidateUser?.name || 'Applicant'}
                             </h4>
-                            <p className="text-[11px] text-slate-500 truncate max-w-[140px]">
+                            <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {app.job?.title}
                             </p>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '10px', fontWeight: 800, backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>
                             {app.matchPct}%
                           </span>
                         </div>
 
                         {app.notes && (
-                          <p className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded-lg italic">
+                          <p style={{ fontSize: '10px', color: '#475569', backgroundColor: '#f8fafc', padding: '6px 8px', borderRadius: '6px', fontStyle: 'italic', margin: 0 }}>
                             "{app.notes}"
                           </p>
                         )}
 
-                        {/* Move Stage Selector */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                          <span className="text-[10px] font-bold text-slate-400">Move:</span>
+                        <div style={{ paddingTop: '8px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8' }}>Move:</span>
                           <select
                             value={app.status}
                             onChange={(e) =>
                               updateApplicationStage(app.id, e.target.value as ApplicationStage)
                             }
-                            className="bg-slate-100 text-[11px] font-bold text-slate-700 rounded-lg px-2 py-1 border-none focus:outline-none cursor-pointer"
+                            style={{ backgroundColor: '#f1f5f9', fontSize: '11px', fontWeight: 700, color: '#334155', borderRadius: '6px', padding: '4px 8px', border: 0, outline: 'none', cursor: 'pointer' }}
                           >
                             {STAGES.map((s) => (
                               <option key={s} value={s}>
@@ -816,7 +999,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                     ))}
 
                     {stageApps.length === 0 && (
-                      <div className="h-32 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 text-xs">
+                      <div style={{ height: '120px', border: '2px dashed #cbd5e1', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
                         No candidates
                       </div>
                     )}
@@ -830,85 +1013,80 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
 
       {/* TAB 4: PREPAID WALLET & PRICING */}
       {activeTab === 'wallet' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Wallet Overview & Policy */}
-          <div className="space-y-6">
-            <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-200">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #1e1b4b, #0f172a)', borderRadius: '24px', padding: '24px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7d2fe' }}>
                   Prepaid Wallet Balance
                 </span>
-                <Wallet className="w-5 h-5 text-emerald-400" />
+                <Wallet size={20} color="#34d399" />
               </div>
-              <div className="text-3xl sm:text-4xl font-black">
+              <div style={{ fontSize: '2rem', fontWeight: 900 }}>
                 ₹{((currentCompany?.walletBalancePaise || 0) / 100).toLocaleString('en-IN')}
               </div>
-              <p className="text-xs text-indigo-200/80">
+              <p style={{ fontSize: '0.75rem', color: '#e0e7ff', margin: 0 }}>
                 Covers on-demand daily holding fees after your 7-day free window.
               </p>
               <button
                 onClick={() => setShowTopupModal(true)}
-                className="w-full py-3 rounded-2xl text-xs font-bold text-indigo-950 bg-white hover:bg-indigo-50 shadow-md transition-all flex items-center justify-center gap-1.5"
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, color: '#1e1b4b', backgroundColor: '#fff', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                <Plus className="w-4 h-4" />
+                <Plus size={16} />
                 <span>Recharge Wallet Balance</span>
               </button>
             </div>
 
-            {/* Pricing Policy Card */}
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
-              <h3 className="font-black text-slate-900 text-sm">On-Demand Tier Schedule</h3>
-              <p className="text-slate-600 leading-relaxed">
+            <div style={{ backgroundColor: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.75rem' }}>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>On-Demand Tier Schedule</h3>
+              <p style={{ color: '#475569', margin: 0 }}>
                 Catchablepro uses an on-demand meter to incentivize fast closure:
               </p>
-              <ul className="space-y-2 text-slate-700 font-medium">
-                <li className="flex items-center justify-between p-2 rounded-xl bg-emerald-50 text-emerald-900 font-bold">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#065f46', fontWeight: 700 }}>
                   <span>Week 1 (Days 0-6):</span>
                   <span>FREE</span>
-                </li>
-                <li className="flex items-center justify-between p-2 rounded-xl bg-slate-50">
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
                   <span>Week 2 (Days 7-13):</span>
-                  <span className="font-bold">₹50 / day</span>
-                </li>
-                <li className="flex items-center justify-between p-2 rounded-xl bg-slate-50">
+                  <span style={{ fontWeight: 700 }}>₹50 / day</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
                   <span>Week 3 (Days 14-20):</span>
-                  <span className="font-bold">₹100 / day</span>
-                </li>
-                <li className="flex items-center justify-between p-2 rounded-xl bg-slate-50">
+                  <span style={{ fontWeight: 700 }}>₹100 / day</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
                   <span>Week 4 (Days 21-27):</span>
-                  <span className="font-bold">₹200 / day</span>
-                </li>
-                <li className="flex items-center justify-between p-2 rounded-xl bg-slate-50">
+                  <span style={{ fontWeight: 700 }}>₹200 / day</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
                   <span>Week 5 (Days 28-29):</span>
-                  <span className="font-bold">₹400 / day</span>
-                </li>
-                <li className="flex items-center justify-between p-2 rounded-xl bg-rose-50 text-rose-800 font-bold">
+                  <span style={{ fontWeight: 700 }}>₹400 / day</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#fff1f2', color: '#9f1239', fontWeight: 700 }}>
                   <span>Day 30 Hard Cap:</span>
                   <span>Auto-Closed</span>
-                </li>
-              </ul>
-              <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-                Pausing or closing a posting stops meter accrual immediately.
-              </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Ledger Table */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-slate-900">Wallet Transactions Ledger</h3>
-              <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Wallet Transactions Ledger</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
                   type="text"
-                  placeholder="Search transactions..."
+                  placeholder="Search..."
                   value={txSearch}
                   onChange={(e) => setTxSearch(e.target.value)}
-                  className="text-xs px-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
+                  style={{ width: '140px', padding: '6px 10px', fontSize: '0.75rem' }}
                 />
                 <select
                   value={txTypeFilter}
-                  onChange={(e) => setTxTypeFilter(e.target.value as any)}
-                  className="text-xs font-semibold bg-slate-100 rounded-xl px-2.5 py-1.5 border-none cursor-pointer"
+                  onChange={(e) => setTxTypeFilter(e.target.value as 'all' | 'topup' | 'debit')}
+                  style={{ backgroundColor: '#f1f5f9', fontSize: '0.75rem', fontWeight: 600, borderRadius: '8px', padding: '6px 10px', border: 0, outline: 'none' }}
                 >
                   <option value="all">All</option>
                   <option value="topup">Top-ups</option>
@@ -917,50 +1095,51 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase font-bold text-[10px]">
+            <div style={{ backgroundColor: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              <table style={{ width: '100%', textAlign: 'left', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#94a3b8', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700 }}>
                   <tr>
-                    <th className="p-3.5">Type</th>
-                    <th className="p-3.5">Details</th>
-                    <th className="p-3.5">Amount</th>
-                    <th className="p-3.5">Date</th>
+                    <th style={{ padding: '12px' }}>Type</th>
+                    <th style={{ padding: '12px' }}>Details</th>
+                    <th style={{ padding: '12px' }}>Amount</th>
+                    <th style={{ padding: '12px' }}>Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody>
                   {filteredTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3.5">
-                        <span
-                          className={`px-2 py-0.5 rounded font-black uppercase text-[10px] ${
-                            tx.type === 'topup'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-rose-50 text-rose-700'
-                          }`}
-                        >
+                    <tr key={tx.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontWeight: 900,
+                          fontSize: '10px',
+                          textTransform: 'uppercase',
+                          backgroundColor: tx.type === 'topup' ? '#ecfdf5' : '#fff1f2',
+                          color: tx.type === 'topup' ? '#065f46' : '#9f1239',
+                        }}>
                           {tx.type}
                         </span>
                       </td>
-                      <td className="p-3.5 text-slate-700">
-                        <div className="font-semibold">{tx.note}</div>
+                      <td style={{ padding: '12px', color: '#334155' }}>
+                        <div style={{ fontWeight: 600 }}>{tx.note}</div>
                         {tx.razorpayPaymentId && (
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: 'monospace' }}>
                             {tx.razorpayPaymentId}
                           </div>
                         )}
                       </td>
-                      <td className="p-3.5 font-black text-slate-900">
-                        {tx.type === 'topup' ? '+' : '-'}₹
-                        {(tx.amountPaise / 100).toLocaleString('en-IN')}
+                      <td style={{ padding: '12px', fontWeight: 900, color: '#0f172a' }}>
+                        {tx.type === 'topup' ? '+' : '-'}₹{(tx.amountPaise / 100).toLocaleString('en-IN')}
                       </td>
-                      <td className="p-3.5 text-slate-400 whitespace-nowrap">
+                      <td style={{ padding: '12px', color: '#94a3b8' }}>
                         {new Date(tx.createdAt).toLocaleDateString()}
                       </td>
                     </tr>
                   ))}
                   {filteredTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-slate-400">
+                      <td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>
                         No transactions found.
                       </td>
                     </tr>
@@ -974,32 +1153,33 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
 
       {/* TAB 5: COMPANY PROFILE */}
       {activeTab === 'profile' && (
-        <div className="max-w-2xl bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Company Details</h2>
+        <div style={{ maxWidth: '640px', backgroundColor: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Company Details</h2>
             {profileSaved && (
-              <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saved!
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', backgroundColor: '#ecfdf5', padding: '4px 10px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                <CheckCircle2 size={14} color="#059669" /> Saved!
               </span>
             )}
           </div>
 
-          <form onSubmit={handleSaveCompany} className="space-y-4">
+          <form onSubmit={handleSaveCompany} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '4px' }}>
                 Company Name
               </label>
               <input
                 type="text"
                 value={currentUser?.company_name || 'Acme'}
                 disabled
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 font-bold"
+                {...stylex.props(styles.input)}
+                style={{ backgroundColor: '#f8fafc', color: '#94a3b8', fontWeight: 'bold' }}
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '4px' }}>
                   Industry
                 </label>
                 <input
@@ -1007,18 +1187,18 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                   value={industry}
                   onChange={(e) => setIndustry(e.target.value)}
                   placeholder="e.g. Cloud Infrastructure, SaaS"
-                  className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '4px' }}>
                   Company Size
                 </label>
                 <select
                   value={companySize}
                   onChange={(e) => setCompanySize(e.target.value)}
-                  className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 >
                   <option value="1-10 employees">1-10 employees</option>
                   <option value="11-50 employees">11-50 employees</option>
@@ -1030,7 +1210,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '4px' }}>
                 Website URL
               </label>
               <input
@@ -1038,12 +1218,12 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="https://example.com"
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '4px' }}>
                 Headquarters Location
               </label>
               <input
@@ -1051,12 +1231,12 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 value={hqLocation}
                 onChange={(e) => setHqLocation(e.target.value)}
                 placeholder="e.g. Bengaluru, India"
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '4px' }}>
                 About the Company
               </label>
               <textarea
@@ -1064,14 +1244,14 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 value={about}
                 onChange={(e) => setAbout(e.target.value)}
                 placeholder="Write a brief overview shown on job postings..."
-                className="w-full text-sm p-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               />
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '8px' }}>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all"
+                {...stylex.props(styles.btnPrimary)}
               >
                 Save Details
               </button>
@@ -1080,56 +1260,58 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
         </div>
       )}
 
-      {/* Topup Modal (Simulated Razorpay with realistic UPI/Card/Netbanking tabs) */}
+      {/* Topup Modal (Simulated Razorpay) */}
       {showTopupModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-                  <CreditCard className="w-4 h-4" />
+        <div {...stylex.props(styles.overlay)}>
+          <div {...stylex.props(styles.modal)}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CreditCard size={16} />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 text-base leading-tight">
-                    Razorpay Checkout
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Recharge Employer Wallet</p>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Razorpay Checkout</h3>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: '2px 0 0' }}>Recharge Employer Wallet</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowTopupModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl"
+                style={{ background: 'none', border: 0, cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
               >
-                <XCircle className="w-5 h-5" />
+                <XCircle size={20} />
               </button>
             </div>
 
             {paymentSuccessNotice ? (
-              <div className="py-8 text-center space-y-2 animate-in zoom-in-95">
-                <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto" />
-                <h4 className="text-lg font-black text-slate-900">Payment Verified!</h4>
-                <p className="text-xs text-slate-500">
+              <div style={{ padding: '32px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <CheckCircle2 size={48} color="#10b981" style={{ margin: '0 auto' }} />
+                <h4 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Payment Verified!</h4>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
                   ₹{topupAmountINR.toLocaleString('en-IN')} has been added to your company balance.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleTopup} className="space-y-4">
-                {/* Preset Chips */}
+              <form onSubmit={handleTopup} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '8px' }}>
                     Quick Recharge Presets
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                     {[500, 1000, 2500, 5000].map((amt) => (
                       <button
                         type="button"
                         key={amt}
                         onClick={() => setTopupAmountINR(amt)}
-                        className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all text-center ${
-                          topupAmountINR === amt
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
+                        style={{
+                          padding: '8px 4px',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          backgroundColor: topupAmountINR === amt ? '#4f46e5' : '#f8fafc',
+                          color: topupAmountINR === amt ? '#fff' : '#334155',
+                          border: `1px solid ${topupAmountINR === amt ? '#4f46e5' : '#e2e8f0'}`,
+                        }}
                       >
                         ₹{amt.toLocaleString('en-IN')}
                       </button>
@@ -1138,7 +1320,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     Amount (INR ₹)
                   </label>
                   <input
@@ -1147,72 +1329,82 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                     max="50000"
                     value={topupAmountINR}
                     onChange={(e) => setTopupAmountINR(Number(e.target.value))}
-                    className="w-full text-lg font-black px-4 py-2.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    {...stylex.props(styles.input)}
+                    style={{ fontSize: '1.25rem', fontWeight: 900 }}
                     required
                   />
                 </div>
 
-                {/* Simulated Payment Method Selector */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '6px' }}>
                     Payment Method
                   </label>
-                  <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', fontSize: '0.75rem' }}>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('upi')}
-                      className={`p-2 rounded-xl border text-center transition-all ${
-                        paymentMethod === 'upi'
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        backgroundColor: paymentMethod === 'upi' ? '#eef2ff' : '#fff',
+                        color: paymentMethod === 'upi' ? '#4338ca' : '#475569',
+                        border: `1px solid ${paymentMethod === 'upi' ? '#4f46e5' : '#e2e8f0'}`,
+                      }}
                     >
-                      UPI (GPay/PhonePe)
+                      UPI
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('card')}
-                      className={`p-2 rounded-xl border text-center transition-all ${
-                        paymentMethod === 'card'
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        backgroundColor: paymentMethod === 'card' ? '#eef2ff' : '#fff',
+                        color: paymentMethod === 'card' ? '#4338ca' : '#475569',
+                        border: `1px solid ${paymentMethod === 'card' ? '#4f46e5' : '#e2e8f0'}`,
+                      }}
                     >
-                      Credit / Debit Card
+                      Card
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('netbanking')}
-                      className={`p-2 rounded-xl border text-center transition-all ${
-                        paymentMethod === 'netbanking'
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        backgroundColor: paymentMethod === 'netbanking' ? '#eef2ff' : '#fff',
+                        color: paymentMethod === 'netbanking' ? '#4338ca' : '#475569',
+                        border: `1px solid ${paymentMethod === 'netbanking' ? '#4f46e5' : '#e2e8f0'}`,
+                      }}
                     >
                       Net Banking
                     </button>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={16} color="#059669" style={{ flexShrink: 0 }} />
                   <span>256-bit encrypted Razorpay Sandbox test environment</span>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isProcessingPayment}
-                  className="w-full py-3.5 rounded-2xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  {...stylex.props(styles.btnPrimary)}
+                  style={{ padding: '12px', width: '100%' }}
                 >
                   {isProcessingPayment ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Verifying with Razorpay...</span>
-                    </div>
+                    <span>Verifying with Razorpay...</span>
                   ) : (
                     <>
                       <span>Pay ₹{topupAmountINR.toLocaleString('en-IN')}</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <ArrowRight size={16} />
                     </>
                   )}
                 </button>

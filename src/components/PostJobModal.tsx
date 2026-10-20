@@ -1,17 +1,314 @@
 import React, { useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
 import { Job, WorkMode, EmploymentType, JobStatus } from '../types';
 import {
   X,
   Briefcase,
   Sparkles,
-  MapPin,
-  DollarSign,
-  Calendar,
-  AlertCircle,
-  HelpCircle,
   CheckCircle2,
 } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    overflowY: 'auto',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  modal: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    maxWidth: '672px',
+    width: '100%',
+    maxHeight: '92vh',
+    overflow: 'hidden',
+    boxShadow: shadows.xl,
+    display: 'flex',
+    flexDirection: 'column',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  header: {
+    padding: spacing.lg,
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceSubtle,
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  iconBox: {
+    width: '40px',
+    height: '40px',
+    borderRadius: radii.md,
+    backgroundColor: colors.primary,
+    color: colors.textInverse,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+  },
+  title: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    color: colors.text,
+    margin: 0,
+  },
+  subtitle: {
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+    margin: 0,
+    marginTop: '2px',
+  },
+  closeBtn: {
+    padding: '8px',
+    borderRadius: radii.md,
+    color: {
+      default: colors.textMuted,
+      ':hover': colors.textSecondary,
+    },
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.border,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.15s ease',
+  },
+  form: {
+    padding: spacing.lg,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '18px',
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+    gap: spacing.md,
+  },
+  fullWidth: {
+    gridColumn: '1 / -1',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  label: {
+    fontSize: '0.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textSecondary,
+    marginBottom: '4px',
+  },
+  input: {
+    width: '100%',
+    fontSize: '0.875rem',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  inputMonospace: {
+    fontFamily: 'monospace',
+    fontSize: '0.8125rem',
+  },
+  textarea: {
+    width: '100%',
+    fontSize: '0.8125rem',
+    padding: '12px 14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'monospace',
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  rangeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rangeText: {
+    fontSize: '0.75rem',
+    color: colors.textMuted,
+  },
+  salaryBox: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px',
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSubtle,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+  },
+  checkboxText: {
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    color: colors.textSecondary,
+  },
+  vacanciesText: {
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+  },
+  aiHeaderRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '6px',
+  },
+  aiBtn: {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: 'none',
+    borderWidth: 0,
+    cursor: 'pointer',
+  },
+  aiMsg: {
+    marginBottom: spacing.sm,
+    padding: '8px 12px',
+    borderRadius: radii.sm,
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
+  },
+  helperText: {
+    fontSize: '0.6875rem',
+    color: colors.textMuted,
+    marginTop: '4px',
+    margin: 0,
+  },
+  statusSection: {
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primaryLight,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  statusLabel: {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.primaryActive,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    display: 'block',
+  },
+  statusDesc: {
+    fontSize: '0.75rem',
+    color: colors.primaryHover,
+    margin: 0,
+    marginTop: '2px',
+  },
+  statusSelect: {
+    backgroundColor: colors.surface,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.primaryActive,
+    borderRadius: radii.md,
+    padding: '6px 12px',
+    outline: 'none',
+    cursor: 'pointer',
+  },
+  actionsRow: {
+    paddingTop: spacing.sm,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+  },
+  cancelBtn: {
+    padding: '8px 16px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textSecondary,
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.surfaceSubtle,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  submitBtn: {
+    padding: '10px 22px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    boxShadow: shadows.sm,
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
+  },
+});
 
 interface PostJobModalProps {
   initialJob?: Job | null;
@@ -33,9 +330,9 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
   const [salaryMin, setSalaryMin] = useState(initialJob?.salaryMin ?? 15);
   const [salaryMax, setSalaryMax] = useState(initialJob?.salaryMax ?? 28);
   const [hideSalary, setHideSalary] = useState(initialJob?.hideSalary ?? false);
-  const [vacancies, setVacancies] = useState(initialJob?.vacancies ?? 1);
-  const [education, setEducation] = useState(initialJob?.education || 'Graduate');
-  const [deadline, setDeadline] = useState(initialJob?.deadline || '2026-12-31');
+  const [vacancies] = useState(initialJob?.vacancies ?? 1);
+  const [education] = useState(initialJob?.education || 'Graduate');
+  const [deadline] = useState(initialJob?.deadline || '2026-12-31');
   const [requiredSkills, setRequiredSkills] = useState(
     initialJob?.requiredSkills || 'python, sql, docker'
   );
@@ -110,36 +407,36 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
+    <div {...stylex.props(styles.overlay)}>
+      <div {...stylex.props(styles.modal)}>
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-              <Briefcase className="w-5 h-5" />
+        <div {...stylex.props(styles.header)}>
+          <div {...stylex.props(styles.headerLeft)}>
+            <div {...stylex.props(styles.iconBox)}>
+              <Briefcase size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 {...stylex.props(styles.title)}>
                 {initialJob ? 'Edit Job Posting' : 'Post a New Job'}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p {...stylex.props(styles.subtitle)}>
                 On-demand billing starts with 7 days FREE on publication.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors"
+            {...stylex.props(styles.closeBtn)}
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
         {/* Scrollable Form */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+        <form onSubmit={handleSubmit} {...stylex.props(styles.form)}>
+          <div {...stylex.props(styles.grid)}>
+            <div {...stylex.props(styles.formGroup, styles.fullWidth)}>
+              <label {...stylex.props(styles.label)}>
                 Job Title *
               </label>
               <input
@@ -147,19 +444,19 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Senior Backend Engineer, Data Scientist"
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Department
               </label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               >
                 <option value="Engineering">Engineering</option>
                 <option value="Data Science">Data Science</option>
@@ -169,8 +466,8 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Location
               </label>
               <input
@@ -178,19 +475,19 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. Bengaluru, Remote, Hyderabad"
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Work Mode
               </label>
               <select
                 value={workMode}
                 onChange={(e) => setWorkMode(e.target.value as WorkMode)}
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               >
                 <option value="Remote">Remote</option>
                 <option value="Hybrid">Hybrid</option>
@@ -198,14 +495,14 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Employment Type
               </label>
               <select
                 value={employmentType}
                 onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
-                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               >
                 <option value="Full-time">Full-time</option>
                 <option value="Contract">Contract</option>
@@ -214,95 +511,94 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Experience Range (Years)
               </label>
-              <div className="flex items-center gap-2">
+              <div {...stylex.props(styles.rangeRow)}>
                 <input
                   type="number"
                   min="0"
                   max="25"
                   value={expMin}
                   onChange={(e) => setExpMin(Number(e.target.value))}
-                  className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
-                <span className="text-xs text-slate-400">to</span>
+                <span {...stylex.props(styles.rangeText)}>to</span>
                 <input
                   type="number"
                   min="0"
                   max="30"
                   value={expMax}
                   onChange={(e) => setExpMax(Number(e.target.value))}
-                  className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Salary Range (LPA in ₹)
               </label>
-              <div className="flex items-center gap-2">
+              <div {...stylex.props(styles.rangeRow)}>
                 <input
                   type="number"
                   min="0"
                   max="150"
                   value={salaryMin}
                   onChange={(e) => setSalaryMin(Number(e.target.value))}
-                  className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
-                <span className="text-xs text-slate-400">to</span>
+                <span {...stylex.props(styles.rangeText)}>to</span>
                 <input
                   type="number"
                   min="0"
                   max="200"
                   value={salaryMax}
                   onChange={(e) => setSalaryMax(Number(e.target.value))}
-                  className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <label className="flex items-center gap-2.5 cursor-pointer">
+          <div {...stylex.props(styles.salaryBox)}>
+            <label {...stylex.props(styles.checkboxLabel)}>
               <input
                 type="checkbox"
                 checked={hideSalary}
                 onChange={(e) => setHideSalary(e.target.checked)}
-                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
               />
-              <span className="text-xs font-semibold text-slate-700">
+              <span {...stylex.props(styles.checkboxText)}>
                 Hide salary on public card (show as Confidential)
               </span>
             </label>
-            <div className="text-xs text-slate-500">
+            <div {...stylex.props(styles.vacanciesText)}>
               Vacancies: <strong>{vacancies}</strong>
             </div>
           </div>
 
           {/* Required Skills & AI Assistant */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+          <div {...stylex.props(styles.formGroup)}>
+            <div {...stylex.props(styles.aiHeaderRow)}>
+              <label {...stylex.props(styles.label)}>
                 Required Skills (comma separated) *
               </label>
               <button
                 type="button"
                 onClick={handleAiExtract}
                 disabled={aiAnalyzing}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                {...stylex.props(styles.aiBtn)}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles size={14} />
                 <span>{aiAnalyzing ? 'Analyzing...' : 'AI Auto-Extract from Description'}</span>
               </button>
             </div>
 
             {aiSuggestionMessage && (
-              <div className="mb-2 p-2 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-medium flex items-center gap-1.5 border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                {aiSuggestionMessage}
+              <div {...stylex.props(styles.aiMsg)}>
+                <CheckCircle2 size={14} color="#059669" />
+                <span>{aiSuggestionMessage}</span>
               </div>
             )}
 
@@ -311,17 +607,17 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
               value={requiredSkills}
               onChange={(e) => setRequiredSkills(e.target.value)}
               placeholder="e.g. python, fastapi, sql, docker, aws"
-              className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              {...stylex.props(styles.input, styles.inputMonospace)}
               required
             />
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p {...stylex.props(styles.helperText)}>
               Skills are scored semantically against candidate profiles.
             </p>
           </div>
 
           {/* Description */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+          <div {...stylex.props(styles.formGroup)}>
+            <label {...stylex.props(styles.label)}>
               Job Description (HTML or Plain Text)
             </label>
             <textarea
@@ -329,18 +625,18 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Outline responsibilities, perks, and qualifications..."
-              className="w-full text-sm p-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+              {...stylex.props(styles.textarea)}
               required
             />
           </div>
 
           {/* Status selector */}
-          <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
+          <div {...stylex.props(styles.statusSection)}>
             <div>
-              <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider block">
+              <span {...stylex.props(styles.statusLabel)}>
                 Publication Status
               </span>
-              <p className="text-xs text-indigo-700">
+              <p {...stylex.props(styles.statusDesc)}>
                 {status === 'active'
                   ? 'Active postings are live to candidates and begin their 7-day free meter spell.'
                   : 'Draft postings are saved privately with no meter running.'}
@@ -349,7 +645,7 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as JobStatus)}
-              className="bg-white border border-indigo-200 text-xs font-bold text-indigo-900 rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
+              {...stylex.props(styles.statusSelect)}
             >
               <option value="active">Publish Live (Active)</option>
               <option value="draft">Save as Draft</option>
@@ -357,17 +653,17 @@ export const PostJobModal: React.FC<PostJobModalProps> = ({ initialJob, onClose 
             </select>
           </div>
 
-          <div className="pt-2 flex justify-end gap-3">
+          <div {...stylex.props(styles.actionsRow)}>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              {...stylex.props(styles.cancelBtn)}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all"
+              {...stylex.props(styles.submitBtn)}
             >
               {initialJob ? 'Save Changes' : 'Create Job Posting'}
             </button>

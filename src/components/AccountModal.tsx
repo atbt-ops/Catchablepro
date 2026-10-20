@@ -1,15 +1,277 @@
 import React, { useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
 import {
   X,
   User,
   Shield,
-  Key,
   Download,
   Trash2,
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    overflowY: 'auto',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  modal: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    maxWidth: '576px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: shadows.xl,
+    display: 'flex',
+    flexDirection: 'column',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  header: {
+    padding: spacing.lg,
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceSubtle,
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  headerIcon: {
+    width: '40px',
+    height: '40px',
+    borderRadius: radii.md,
+    backgroundColor: colors.primaryLight,
+    color: colors.primary,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+  },
+  title: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    color: colors.text,
+    margin: 0,
+  },
+  subtitle: {
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+    margin: '2px 0 0',
+  },
+  closeBtn: {
+    padding: '8px',
+    borderRadius: radii.md,
+    color: colors.textMuted,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: {
+    padding: spacing.lg,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.lg,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+  input: {
+    width: '100%',
+    fontSize: '0.8125rem',
+    padding: '10px 14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  label: {
+    display: 'block',
+    fontSize: '0.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textSecondary,
+    marginBottom: '4px',
+  },
+  grid2: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: spacing.md,
+  },
+  saveBtn: {
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    boxShadow: shadows.sm,
+  },
+  section: {
+    paddingTop: spacing.md,
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors.border,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+  rowBetween: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  statusBadgeActive: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    borderRadius: radii.full,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
+  },
+  statusBadgeInactive: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    borderRadius: radii.full,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.textSecondary,
+  },
+  totpBox: {
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primaryLight,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  secretKey: {
+    fontFamily: 'monospace',
+    fontWeight: 700,
+    backgroundColor: colors.surface,
+    padding: '8px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    color: colors.primary,
+    fontSize: '0.8125rem',
+    marginTop: '4px',
+  },
+  totpRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  totpInput: {
+    width: '160px',
+    fontSize: '0.8125rem',
+    padding: '8px 12px',
+    backgroundColor: colors.surface,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    borderRadius: radii.md,
+    textAlign: 'center',
+    fontFamily: 'monospace',
+    fontWeight: 700,
+  },
+  actionSecondaryBtn: {
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textSecondary,
+    backgroundColor: {
+      default: colors.surface,
+      ':hover': colors.surfaceSubtle,
+    },
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  deleteBtn: {
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.dangerBorder,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.dangerText,
+    backgroundColor: {
+      default: colors.dangerLight,
+      ':hover': '#fee2e2',
+    },
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+});
 
 interface AccountModalProps {
   onClose: () => void;
@@ -56,7 +318,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
       updateUser(currentUser.id, { totp_enabled: false });
       setShowRecoveryCodes(false);
     } else {
-      // Simulate verifying 6 digit code
       if (totpCode.length !== 6) {
         setTotpError('Enter any 6-digit authenticator code (e.g. 123456)');
         return;
@@ -108,59 +369,59 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
+    <div {...stylex.props(styles.overlay)}>
+      <div {...stylex.props(styles.modal)}>
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-              <User className="w-5 h-5" />
+        <div {...stylex.props(styles.header)}>
+          <div {...stylex.props(styles.headerLeft)}>
+            <div {...stylex.props(styles.headerIcon)}>
+              <User size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Account & Security</h2>
-              <p className="text-xs text-slate-500">{currentUser.email}</p>
+              <h2 {...stylex.props(styles.title)}>Account &amp; Security</h2>
+              <p {...stylex.props(styles.subtitle)}>{currentUser.email}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors"
+            {...stylex.props(styles.closeBtn)}
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-6 text-sm">
+        <div {...stylex.props(styles.body)}>
           {/* Profile Details Form */}
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <h3 className="font-bold text-slate-900 text-sm">Personal Information</h3>
+          <form onSubmit={handleSaveProfile} {...stylex.props(styles.form)}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Personal Information</h3>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label {...stylex.props(styles.label)}>
                 Full Name
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div {...stylex.props(styles.grid2)}>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                <label {...stylex.props(styles.label)}>
                   Designation / Role Title
                 </label>
                 <input
                   type="text"
                   value={designation}
                   onChange={(e) => setDesignation(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                <label {...stylex.props(styles.label)}>
                   Phone Number
                 </label>
                 <input
@@ -168,21 +429,21 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 98765 43210"
-                  className="w-full text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...stylex.props(styles.input)}
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
               {savedNotice && (
-                <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Profile updated!
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#065f46', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <CheckCircle2 size={14} color="#059669" /> Profile updated!
                 </span>
               )}
-              <div className="ml-auto">
+              <div style={{ marginLeft: 'auto' }}>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm"
+                  {...stylex.props(styles.saveBtn)}
                 >
                   Save Profile
                 </button>
@@ -191,63 +452,63 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
           </form>
 
           {/* Two-Factor Authentication (TOTP) */}
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <div className="flex items-center justify-between">
+          <div {...stylex.props(styles.section)}>
+            <div {...stylex.props(styles.rowBetween)}>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <Shield className="w-4 h-4 text-indigo-600" />
+                <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Shield size={16} color="#4f46e5" />
                   <span>Two-Factor Authentication (2FA)</span>
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
                   Secure your account using TOTP authenticator apps.
                 </p>
               </div>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                {...stylex.props(
                   currentUser.totp_enabled
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-slate-100 text-slate-500'
-                }`}
+                    ? styles.statusBadgeActive
+                    : styles.statusBadgeInactive
+                )}
               >
                 {currentUser.totp_enabled ? 'Enabled' : 'Disabled'}
               </span>
             </div>
 
             {!currentUser.totp_enabled ? (
-              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-3">
-                <div className="text-xs text-indigo-950 font-medium">
+              <div {...stylex.props(styles.totpBox)}>
+                <div style={{ fontSize: '0.75rem', color: '#1e1b4b', fontWeight: 500 }}>
                   Scan QR with Google Authenticator / 1Password or enter secret key:
-                  <div className="mt-1 font-mono font-bold bg-white p-2 rounded-lg border border-indigo-200 text-indigo-700 select-all">
+                  <div {...stylex.props(styles.secretKey)}>
                     JBSWY3DPEHPK3PXP
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div {...stylex.props(styles.totpRow)}>
                   <input
                     type="text"
                     maxLength={6}
                     value={totpCode}
                     onChange={(e) => setTotpCode(e.target.value)}
                     placeholder="Enter 6-digit code"
-                    className="w-40 text-xs px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-center font-mono font-bold"
+                    {...stylex.props(styles.totpInput)}
                   />
                   <button
                     onClick={handleToggle2FA}
-                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm"
+                    {...stylex.props(styles.saveBtn)}
                   >
                     Enable 2FA
                   </button>
                 </div>
-                {totpError && <p className="text-xs text-rose-600 font-medium">{totpError}</p>}
+                {totpError && <p style={{ fontSize: '0.75rem', color: '#e11d48', margin: 0, fontWeight: 500 }}>{totpError}</p>}
               </div>
             ) : (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-xs text-slate-600">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.75rem', color: '#475569' }}>
                   2FA is active on your account.
                 </span>
                 <button
                   onClick={handleToggle2FA}
-                  className="px-3 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200"
+                  style={{ padding: '4px 12px', fontSize: '0.75rem', fontWeight: 700, color: '#e11d48', backgroundColor: '#fff', border: '1px solid #fecdd3', borderRadius: '6px', cursor: 'pointer' }}
                 >
                   Disable 2FA
                 </button>
@@ -255,14 +516,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
             )}
 
             {showRecoveryCodes && (
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
+                  <AlertTriangle size={16} color="#d97706" />
                   <span>Save your emergency recovery codes:</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 font-mono text-xs text-slate-800">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'monospace', fontSize: '0.75rem' }}>
                   {recoveryCodes.map((c) => (
-                    <code key={c} className="bg-white p-1 rounded border border-amber-200 text-center">
+                    <code key={c} style={{ backgroundColor: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #fde68a', textAlign: 'center' }}>
                       {c}
                     </code>
                   ))}
@@ -272,39 +533,39 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
           </div>
 
           {/* Data Export & Account Deletion */}
-          <div className="pt-4 border-t border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
+          <div {...stylex.props(styles.section)}>
+            <div {...stylex.props(styles.rowBetween)}>
               <div>
-                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                <h4 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', margin: 0 }}>
                   Download Account Data
                 </h4>
-                <p className="text-xs text-slate-500">
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
                   Export all your personal profile, jobs, applications, and logs in JSON format.
                 </p>
               </div>
               <button
                 onClick={handleExportData}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs"
+                {...stylex.props(styles.actionSecondaryBtn)}
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download size={14} />
                 <span>Export JSON</span>
               </button>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div {...stylex.props(styles.rowBetween)} style={{ paddingTop: '8px' }}>
               <div>
-                <h4 className="font-bold text-rose-700 text-xs uppercase tracking-wider">
+                <h4 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#be123c', margin: 0 }}>
                   Delete Account
                 </h4>
-                <p className="text-xs text-slate-500">
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
                   Permanently delete this account and all linked records.
                 </p>
               </div>
               <button
                 onClick={handleDeleteAccount}
-                className="px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                {...stylex.props(styles.deleteBtn)}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 size={14} />
                 <span>Delete Account</span>
               </button>
             </div>

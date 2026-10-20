@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
 import { Job, ApplicationStage } from '../types';
 import { JobCard } from './JobCard';
@@ -6,26 +7,604 @@ import { JobDetailModal } from './JobDetailModal';
 import { matchPct, parseSkills } from '../services/matching';
 import {
   Search,
-  Filter,
   Sparkles,
   Zap,
   UploadCloud,
   FileText,
   CheckCircle2,
   Bookmark,
-  Briefcase,
   Layers,
   ArrowUpDown,
-  Clock,
-  ShieldCheck,
   ChevronRight,
   Plus,
   X,
   TrendingUp,
-  MapPin,
-  Building2,
   RotateCcw,
 } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  container: {
+    maxWidth: '1280px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    paddingLeft: spacing.md,
+    paddingRight: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.lg,
+  },
+  heroBanner: {
+    background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #3b0764 100%)',
+    borderRadius: radii.xl,
+    color: colors.textInverse,
+    padding: spacing.xl,
+    position: 'relative',
+    overflow: 'hidden',
+    boxShadow: shadows.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#312e81',
+  },
+  heroContent: {
+    position: 'relative',
+    zIndex: 1,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xl,
+  },
+  heroLeft: {
+    maxWidth: '580px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  heroPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backdropFilter: 'blur(6px)',
+    color: '#c7d2fe',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    alignSelf: 'flex-start',
+  },
+  heroTitle: {
+    fontSize: '2rem',
+    fontWeight: 900,
+    letterSpacing: '-0.025em',
+    color: colors.textInverse,
+    margin: 0,
+    lineHeight: 1.15,
+  },
+  heroSubtitle: {
+    fontSize: '0.875rem',
+    lineHeight: 1.5,
+    color: '#e0e7ff',
+    margin: 0,
+  },
+  heroTrending: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '6px',
+    marginTop: '6px',
+  },
+  heroTrendingLabel: {
+    fontSize: '0.6875rem',
+    fontWeight: 700,
+    color: '#c7d2fe',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  heroTag: {
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    backgroundColor: {
+      default: 'rgba(255, 255, 255, 0.1)',
+      ':hover': 'rgba(255, 255, 255, 0.2)',
+    },
+    color: colors.textInverse,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
+  },
+  heroRight: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+    minWidth: '280px',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: spacing.sm,
+  },
+  statCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(8px)',
+    padding: '12px 16px',
+    borderRadius: radii.lg,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  statLabel: {
+    fontSize: '0.625rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: '#c7d2fe',
+    display: 'block',
+  },
+  statValue: {
+    fontSize: '1.5rem',
+    fontWeight: 900,
+    color: colors.textInverse,
+    display: 'block',
+    marginTop: '2px',
+  },
+  statSub: {
+    fontSize: '0.625rem',
+    color: '#6ee7b7',
+    fontWeight: 600,
+  },
+  autoApplyBox: {
+    padding: '14px',
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(8px)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  autoApplyLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  autoApplyIconBox: {
+    width: '36px',
+    height: '36px',
+    borderRadius: radii.md,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  autoApplyIconActive: {
+    backgroundColor: colors.success,
+    color: colors.textInverse,
+  },
+  autoApplyIconInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    color: colors.textInverse,
+  },
+  autoApplyTitle: {
+    fontWeight: 700,
+    fontSize: '0.75rem',
+    color: colors.textInverse,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  autoApplySub: {
+    fontSize: '0.625rem',
+    color: '#c7d2fe',
+    margin: 0,
+  },
+  autoApplyBtn: {
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    borderWidth: 0,
+    transition: 'all 0.15s ease',
+  },
+  autoApplyBtnActive: {
+    backgroundColor: colors.surface,
+    color: '#1e1b4b',
+  },
+  autoApplyBtnInactive: {
+    backgroundColor: colors.primary,
+    color: colors.textInverse,
+  },
+  tabNav: {
+    display: 'flex',
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+    gap: spacing.lg,
+    fontSize: '0.875rem',
+    fontWeight: 700,
+    overflowX: 'auto',
+  },
+  tabItem: {
+    paddingBottom: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderBottomWidth: '2px',
+    borderBottomStyle: 'solid',
+    transition: 'all 0.15s ease',
+  },
+  tabItemActive: {
+    borderBottomColor: colors.primary,
+    color: colors.primary,
+  },
+  tabItemInactive: {
+    borderBottomColor: 'transparent',
+    color: colors.textMuted,
+  },
+  filterBar: {
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    boxShadow: shadows.sm,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  filterPillRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  filterGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+  },
+  filterLabel: {
+    fontWeight: 700,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    fontSize: '0.625rem',
+  },
+  filterPill: {
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.md,
+    fontWeight: 700,
+    fontSize: '0.75rem',
+    cursor: 'pointer',
+    borderWidth: 0,
+    transition: 'all 0.15s ease',
+  },
+  filterPillActive: {
+    backgroundColor: colors.primary,
+    color: colors.textInverse,
+  },
+  filterPillInactive: {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.textSecondary,
+  },
+  filterDivider: {
+    height: '16px',
+    width: '1px',
+    backgroundColor: colors.border,
+  },
+  sortGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sortSelect: {
+    backgroundColor: colors.surfaceSubtle,
+    fontWeight: 700,
+    color: colors.text,
+    borderRadius: radii.md,
+    padding: '6px 12px',
+    borderWidth: 0,
+    outline: 'none',
+    cursor: 'pointer',
+    fontSize: '0.75rem',
+  },
+  resetBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    color: colors.textSecondary,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+  },
+  jobGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+    gap: spacing.lg,
+  },
+  emptyCard: {
+    textAlign: 'center',
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    boxShadow: shadows.sm,
+  },
+  appCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    padding: spacing.lg,
+    boxShadow: shadows.sm,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+  appHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+  },
+  appCompanyAvatar: {
+    width: '48px',
+    height: '48px',
+    borderRadius: radii.md,
+    backgroundColor: colors.primaryLight,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    color: colors.primary,
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    fontSize: '1rem',
+  },
+  pipelineGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gap: spacing.sm,
+    textAlign: 'center',
+    paddingTop: '12px',
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors.border,
+  },
+  pipelineStepDot: {
+    width: '28px',
+    height: '28px',
+    borderRadius: radii.full,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    margin: '0 auto',
+  },
+  stepActive: {
+    backgroundColor: colors.primary,
+    color: colors.textInverse,
+    boxShadow: `0 0 0 4px ${colors.primaryLight}`,
+  },
+  stepCompleted: {
+    backgroundColor: colors.success,
+    color: colors.textInverse,
+  },
+  stepUpcoming: {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.textMuted,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  stepLabel: {
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    marginTop: '6px',
+    textTransform: 'capitalize',
+  },
+  profileGrid: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr',
+    gap: spacing.lg,
+  },
+  profileCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    padding: spacing.lg,
+    boxShadow: shadows.sm,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.lg,
+  },
+  profileStrengthBox: {
+    padding: spacing.md,
+    borderRadius: radii.md,
+    background: 'linear-gradient(to right, #f8fafc, #eef2ff)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  strengthBarBg: {
+    width: '100%',
+    backgroundColor: colors.border,
+    height: '8px',
+    borderRadius: radii.full,
+    overflow: 'hidden',
+  },
+  strengthBarFill: {
+    height: '100%',
+    background: 'linear-gradient(to right, #4f46e5, #c026d3)',
+    borderRadius: radii.full,
+    transition: 'all 0.5s ease',
+  },
+  skillsBox: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    padding: '12px',
+    backgroundColor: colors.surfaceSubtle,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    minHeight: '56px',
+  },
+  skillChip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '12px',
+    paddingRight: '8px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    backgroundColor: colors.surface,
+    color: colors.primaryHover,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    boxShadow: shadows.sm,
+  },
+  removeSkillBtn: {
+    padding: '2px',
+    borderRadius: radii.full,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: colors.textMuted,
+  },
+  addSkillRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: '10px',
+  },
+  input: {
+    width: '100%',
+    fontSize: '0.8125rem',
+    padding: '10px 14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    backgroundColor: colors.surface,
+    color: colors.text,
+  },
+  addBtn: {
+    padding: '10px 16px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.text,
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  uploadBox: {
+    borderWidth: '2px',
+    borderStyle: 'dashed',
+    borderColor: colors.primaryBorder,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    textAlign: 'center',
+    position: 'relative',
+    cursor: 'pointer',
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.primaryLight,
+    },
+    transition: 'all 0.15s ease',
+  },
+  fileInputHidden: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    opacity: 0,
+    cursor: 'pointer',
+  },
+  primaryBtn: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.lg,
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    boxShadow: shadows.sm,
+    transition: 'background-color 0.15s ease',
+  },
+});
 
 interface CandidateViewProps {
   activeTab: 'browse' | 'applications' | 'saved' | 'profile';
@@ -45,7 +624,6 @@ const POPULAR_SKILLS = [
   'Docker',
   'PostgreSQL',
   'Next.js',
-  'Tailwind',
   'FastAPI',
   'GraphQL',
   'Kubernetes',
@@ -214,8 +792,8 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
   }, [filteredJobs]);
 
   const hasActiveFilters =
-    searchQuery ||
-    (locationFilter && locationFilter !== 'All India') ||
+    Boolean(searchQuery) ||
+    Boolean(locationFilter && locationFilter !== 'All India') ||
     workModeFilter !== 'All' ||
     expFilter !== 'All' ||
     deptFilter !== 'All';
@@ -274,23 +852,23 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
     if (!file) return;
 
     const sampleText = `Candidate CV proficient in ${skillsText || 'Python, JavaScript, React, Docker, SQL, AWS, TypeScript'}. Seeking engineering challenges.`;
-    const skills = handleResumeUpload(file.name, sampleText);
-    setDetectedSkills(skills);
+    const extracted = handleResumeUpload(file.name, sampleText);
+    setDetectedSkills(extracted);
     showToast({
       type: 'success',
       title: 'Resume Analyzed! 📄',
-      message: `Found ${skills.length} matching tech skills`,
+      message: `Found ${extracted.length} matching tech skills`,
     });
   };
 
   const handleAnalyzePastedResume = () => {
     if (!resumeTextInput.trim()) return;
-    const skills = handleResumeUpload('pasted_resume.txt', resumeTextInput);
-    setDetectedSkills(skills);
+    const extracted = handleResumeUpload('pasted_resume.txt', resumeTextInput);
+    setDetectedSkills(extracted);
     showToast({
       type: 'success',
       title: 'Text Processed ✨',
-      message: `Identified ${skills.length} technical skills`,
+      message: `Identified ${extracted.length} technical skills`,
     });
   };
 
@@ -310,44 +888,34 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
     });
   };
 
-  const STAGE_COLORS: Record<string, string> = {
-    applied: 'bg-blue-50 text-blue-700 border-blue-200',
-    shortlisted: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    interview: 'bg-purple-50 text-purple-700 border-purple-200',
-    offered: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    hired: 'bg-green-100 text-green-800 border-green-300 font-bold',
-    rejected: 'bg-rose-50 text-rose-700 border-rose-200',
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div {...stylex.props(styles.container)}>
       {/* Top Hero Banner */}
-      <div className="bg-gradient-to-r from-indigo-950 via-indigo-900 to-fuchsia-950 rounded-3xl text-white p-6 sm:p-10 relative overflow-hidden shadow-2xl border border-indigo-900/50">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-indigo-200 text-xs font-semibold mb-3 border border-white/10 shadow-xs">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+      <div {...stylex.props(styles.heroBanner)}>
+        <div {...stylex.props(styles.heroContent)}>
+          <div {...stylex.props(styles.heroLeft)}>
+            <div {...stylex.props(styles.heroPill)}>
+              <Sparkles size={14} color="#a5b4fc" />
               <span>Semantic Skill Matching Engine</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white mb-2 leading-tight">
+            <h1 {...stylex.props(styles.heroTitle)}>
               Roles ranked by what you actually build.
             </h1>
-            <p className="text-indigo-100 text-xs sm:text-sm leading-relaxed text-slate-200/90">
+            <p {...stylex.props(styles.heroSubtitle)}>
               Transparent compatibility scoring with credit for aliases (Postgres → PostgreSQL),
               related technologies, and zero resume black holes.
             </p>
 
             {/* Quick Skill Search Tags */}
-            <div className="mt-4 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-indigo-200/80 uppercase tracking-wider mr-1">
+            <div {...stylex.props(styles.heroTrending)}>
+              <span {...stylex.props(styles.heroTrendingLabel)}>
                 Trending:
               </span>
               {['React', 'Python', 'TypeScript', 'Remote', 'Node.js'].map((tag) => (
                 <button
                   key={tag}
                   onClick={() => setSearchQuery(tag)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors"
+                  {...stylex.props(styles.heroTag)}
                 >
                   +{tag}
                 </button>
@@ -356,50 +924,47 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
           </div>
 
           {/* Quick Metrics & Auto-Apply Card */}
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 min-w-[280px]">
+          <div {...stylex.props(styles.heroRight)}>
             {/* Live Stats Row */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200 block">
-                  Active Roles
-                </span>
-                <span className="text-xl font-black text-white mt-0.5 block">
+            <div {...stylex.props(styles.statsGrid)}>
+              <div {...stylex.props(styles.statCard)}>
+                <span {...stylex.props(styles.statLabel)}>Active Roles</span>
+                <span {...stylex.props(styles.statValue)}>
                   {jobs.filter((j) => j.status === 'active').length}
                 </span>
-                <span className="text-[10px] text-emerald-300 font-semibold">Live in India</span>
+                <span {...stylex.props(styles.statSub)}>Live in India</span>
               </div>
 
-              <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200 block">
-                  Avg Compatibility
-                </span>
-                <span className="text-xl font-black text-white mt-0.5 block">
+              <div {...stylex.props(styles.statCard)}>
+                <span {...stylex.props(styles.statLabel)}>Avg Compatibility</span>
+                <span {...stylex.props(styles.statValue)}>
                   {averageMatchPct}%
                 </span>
-                <span className="text-[10px] text-indigo-200 font-semibold">Across listings</span>
+                <span {...stylex.props(styles.statSub)}>Across listings</span>
               </div>
             </div>
 
             {/* Auto-Apply Controller */}
-            <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
+            <div {...stylex.props(styles.autoApplyBox)}>
+              <div {...stylex.props(styles.autoApplyLeft)}>
                 <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                  {...stylex.props(
+                    styles.autoApplyIconBox,
                     currentCandidateProfile?.autoApply
-                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                      : 'bg-white/20 text-white'
-                  }`}
+                      ? styles.autoApplyIconActive
+                      : styles.autoApplyIconInactive
+                  )}
                 >
-                  <Zap className="w-4 h-4" />
+                  <Zap size={16} />
                 </div>
                 <div>
-                  <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                  <div {...stylex.props(styles.autoApplyTitle)}>
                     <span>Auto-Apply</span>
                     {currentCandidateProfile?.autoApply && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#34d399' }} />
                     )}
                   </div>
-                  <p className="text-[10px] text-indigo-200">
+                  <p {...stylex.props(styles.autoApplySub)}>
                     {currentCandidateProfile?.autoApply ? 'Applying to ≥1% match' : 'Automated apply is off'}
                   </p>
                 </div>
@@ -407,11 +972,12 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
 
               <button
                 onClick={() => toggleAutoApply(!currentCandidateProfile?.autoApply)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                {...stylex.props(
+                  styles.autoApplyBtn,
                   currentCandidateProfile?.autoApply
-                    ? 'bg-white text-indigo-950 hover:bg-indigo-50'
-                    : 'bg-indigo-500 hover:bg-indigo-400 text-white'
-                }`}
+                    ? styles.autoApplyBtnActive
+                    : styles.autoApplyBtnInactive
+                )}
               >
                 {currentCandidateProfile?.autoApply ? 'Turn Off' : 'Turn On'}
               </button>
@@ -421,85 +987,68 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
       </div>
 
       {/* Main Tab Navigation */}
-      <div className="flex border-b border-slate-200 gap-4 sm:gap-6 text-sm font-bold overflow-x-auto">
+      <div {...stylex.props(styles.tabNav)}>
         <button
           onClick={() => setActiveTab('browse')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'browse'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'browse' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Search className="w-4 h-4" />
+          <Search size={16} />
           <span>Browse Jobs ({filteredJobs.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('applications')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'applications'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'applications' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Layers className="w-4 h-4" />
+          <Layers size={16} />
           <span>My Applications ({myApplications.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('saved')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'saved'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'saved' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <Bookmark className="w-4 h-4" />
+          <Bookmark size={16} />
           <span>Saved Jobs ({mySavedJobs.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('profile')}
-          className={`pb-3.5 border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'profile'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
+          {...stylex.props(styles.tabItem, activeTab === 'profile' ? styles.tabItemActive : styles.tabItemInactive)}
         >
-          <FileText className="w-4 h-4" />
-          <span>Profile & Resume</span>
+          <FileText size={16} />
+          <span>Profile &amp; Resume</span>
         </button>
       </div>
 
       {/* TAB 1: BROWSE JOBS */}
       {activeTab === 'browse' && (
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Filter Bar with Active Badges */}
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
+          <div {...stylex.props(styles.filterBar)}>
+            <div {...stylex.props(styles.filterPillRow)}>
               {/* Work Mode */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Mode:</span>
+              <div {...stylex.props(styles.filterGroup)}>
+                <span {...stylex.props(styles.filterLabel)}>Mode:</span>
                 {['All', 'Remote', 'Hybrid', 'On-site'].map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setWorkModeFilter(mode)}
-                    className={`px-3 py-1 rounded-xl font-bold transition-all text-xs ${
-                      workModeFilter === mode
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    {...stylex.props(
+                      styles.filterPill,
+                      workModeFilter === mode ? styles.filterPillActive : styles.filterPillInactive
+                    )}
                   >
                     {mode}
                   </button>
                 ))}
               </div>
 
-              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+              <div {...stylex.props(styles.filterDivider)} />
 
               {/* Experience */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Exp:</span>
+              <div {...stylex.props(styles.filterGroup)}>
+                <span {...stylex.props(styles.filterLabel)}>Exp:</span>
                 {[
                   { label: 'All', val: 'All' },
                   { label: '0-2y', val: '0-2' },
@@ -509,31 +1058,29 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                   <button
                     key={item.val}
                     onClick={() => setExpFilter(item.val)}
-                    className={`px-3 py-1 rounded-xl font-bold transition-all text-xs ${
-                      expFilter === item.val
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    {...stylex.props(
+                      styles.filterPill,
+                      expFilter === item.val ? styles.filterPillActive : styles.filterPillInactive
+                    )}
                   >
                     {item.label}
                   </button>
                 ))}
               </div>
 
-              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+              <div {...stylex.props(styles.filterDivider)} />
 
               {/* Department */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Dept:</span>
+              <div {...stylex.props(styles.filterGroup)}>
+                <span {...stylex.props(styles.filterLabel)}>Dept:</span>
                 {['All', 'Engineering', 'Data Science'].map((dept) => (
                   <button
                     key={dept}
                     onClick={() => setDeptFilter(dept)}
-                    className={`px-3 py-1 rounded-xl font-bold transition-all text-xs ${
-                      deptFilter === dept
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    {...stylex.props(
+                      styles.filterPill,
+                      deptFilter === dept ? styles.filterPillActive : styles.filterPillInactive
+                    )}
                   >
                     {dept}
                   </button>
@@ -542,24 +1089,24 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
             </div>
 
             {/* Sort & Reset Actions */}
-            <div className="flex items-center gap-3 justify-between md:justify-end text-xs">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {hasActiveFilters && (
                 <button
                   onClick={resetAllFilters}
-                  className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 font-semibold"
+                  {...stylex.props(styles.resetBtn)}
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw size={14} />
                   <span>Reset</span>
                 </button>
               )}
 
-              <div className="flex items-center gap-2">
-                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Sort:</span>
+              <div {...stylex.props(styles.sortGroup)}>
+                <ArrowUpDown size={14} color="#94a3b8" />
+                <span {...stylex.props(styles.filterLabel)}>Sort:</span>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-slate-100 font-bold text-slate-800 rounded-xl px-3 py-1.5 border-none focus:outline-none cursor-pointer"
+                  onChange={(e) => setSortBy(e.target.value as 'match' | 'newest')}
+                  {...stylex.props(styles.sortSelect)}
                 >
                   <option value="match">Match % (High to Low)</option>
                   <option value="newest">Recently Posted</option>
@@ -570,7 +1117,7 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
 
           {/* Job Cards Grid */}
           {filteredJobs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div {...stylex.props(styles.jobGrid)}>
               {filteredJobs.map((job) => (
                 <JobCard
                   key={job.id}
@@ -585,15 +1132,17 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-              <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-900 mb-1">No matching roles found</h3>
-              <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+            <div {...stylex.props(styles.emptyCard)}>
+              <Search size={48} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
+                No matching roles found
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '400px', margin: '0 auto 16px' }}>
                 We couldn't find any listings matching your active filters. Try expanding your search or resetting filters.
               </p>
               <button
                 onClick={resetAllFilters}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                {...stylex.props(styles.primaryBtn)}
               >
                 Clear All Filters
               </button>
@@ -604,126 +1153,117 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
 
       {/* TAB 2: MY APPLICATIONS */}
       {activeTab === 'applications' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Application Pipeline</h2>
-            <span className="text-xs font-semibold text-slate-500">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Application Pipeline</h2>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
               Real-time recruiter pipeline tracking
             </span>
           </div>
 
           {myApplications.length > 0 ? (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {myApplications.map((app) => {
                 const currentStageIndex = STAGES.indexOf(app.status as any);
 
                 return (
-                  <div
-                    key={app.id}
-                    className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:border-slate-300 transition-all space-y-5"
-                  >
+                  <div key={app.id} {...stylex.props(styles.appCard)}>
                     {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold flex items-center justify-center flex-shrink-0 text-base shadow-xs">
+                    <div {...stylex.props(styles.appHeader)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div {...stylex.props(styles.appCompanyAvatar)}>
                           {app.job?.companyName?.[0] || 'C'}
                         </div>
                         <div>
                           <h3
                             onClick={() => app.job && setSelectedJob(app.job)}
-                            className="font-bold text-slate-900 hover:text-indigo-600 cursor-pointer text-base"
+                            style={{ fontWeight: 700, color: '#0f172a', cursor: 'pointer', margin: 0, fontSize: '1rem' }}
                           >
                             {app.job?.title || 'Job Posting'}
                           </h3>
-                          <p className="text-xs text-slate-600 font-semibold">{app.job?.companyName}</p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                          <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600, margin: '2px 0 0' }}>
+                            {app.job?.companyName}
+                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '0.75rem', color: '#94a3b8' }}>
                             <span>Applied {new Date(app.createdAt).toLocaleDateString()}</span>
                             <span>•</span>
-                            <span className="font-bold text-indigo-600">{app.matchPct}% Match</span>
+                            <span style={{ fontWeight: 700, color: '#4f46e5' }}>{app.matchPct}% Match</span>
                             <span>•</span>
-                            <span className="capitalize">{app.source === 'auto' ? '⚡ Auto-applied' : 'Direct Apply'}</span>
+                            <span style={{ textTransform: 'capitalize' }}>{app.source === 'auto' ? '⚡ Auto-applied' : 'Direct Apply'}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        <span
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider border ${
-                            STAGE_COLORS[app.status] || 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
                           {STAGE_LABELS[app.status] || app.status}
                         </span>
                         {app.job && (
                           <button
                             onClick={() => setSelectedJob(app.job!)}
-                            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                            style={{ padding: '8px', borderRadius: '8px', color: '#94a3b8', background: 'none', border: 0, cursor: 'pointer' }}
                             title="View job details"
                           >
-                            <ChevronRight className="w-5 h-5" />
+                            <ChevronRight size={20} />
                           </button>
                         )}
                       </div>
                     </div>
 
                     {/* Visual 5-Step Pipeline Progress Indicator */}
-                    <div className="pt-3 border-t border-slate-100">
-                      <div className="hidden sm:grid grid-cols-5 gap-2 text-center">
-                        {STAGES.map((stg, idx) => {
-                          const isCompleted = currentStageIndex >= idx;
-                          const isCurrent = app.status === stg;
+                    <div {...stylex.props(styles.pipelineGrid)}>
+                      {STAGES.map((stg, idx) => {
+                        const isCompleted = currentStageIndex >= idx;
+                        const isCurrent = app.status === stg;
 
-                          return (
-                            <div key={stg} className="flex flex-col items-center">
-                              <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                  isCurrent
-                                    ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 shadow-sm'
-                                    : isCompleted
-                                    ? 'bg-emerald-500 text-white'
-                                    : 'bg-slate-100 text-slate-400 border border-slate-200'
-                                }`}
-                              >
-                                {isCompleted && !isCurrent ? '✓' : idx + 1}
-                              </div>
-                              <span
-                                className={`text-[11px] font-semibold mt-1.5 capitalize ${
-                                  isCurrent
-                                    ? 'text-indigo-600 font-bold'
-                                    : isCompleted
-                                    ? 'text-slate-800'
-                                    : 'text-slate-400'
-                                }`}
-                              >
-                                {stg}
-                              </span>
+                        return (
+                          <div key={stg} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div
+                              {...stylex.props(
+                                styles.pipelineStepDot,
+                                isCurrent
+                                  ? styles.stepActive
+                                  : isCompleted
+                                  ? styles.stepCompleted
+                                  : styles.stepUpcoming
+                              )}
+                            >
+                              {isCompleted && !isCurrent ? '✓' : idx + 1}
                             </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Recruiter Note if any */}
-                      {app.notes && (
-                        <div className="mt-4 text-xs bg-indigo-50/60 border border-indigo-100 p-3 rounded-2xl text-slate-700 flex items-start gap-2">
-                          <span className="font-bold text-indigo-900">Recruiter Note:</span>
-                          <span>{app.notes}</span>
-                        </div>
-                      )}
+                            <span
+                              {...stylex.props(styles.stepLabel)}
+                              style={{ color: isCurrent ? '#4f46e5' : isCompleted ? '#0f172a' : '#94a3b8' }}
+                            >
+                              {stg}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    {/* Recruiter Note if any */}
+                    {app.notes && (
+                      <div style={{ fontSize: '0.75rem', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', padding: '10px 14px', borderRadius: '10px', color: '#1e1b4b', display: 'flex', gap: '6px' }}>
+                        <strong>Recruiter Note:</strong>
+                        <span>{app.notes}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-              <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-900 mb-1">No applications yet</h3>
-              <p className="text-sm text-slate-500 max-w-sm mx-auto mb-4">
+            <div {...stylex.props(styles.emptyCard)}>
+              <Layers size={48} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
+                No applications yet
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '360px', margin: '0 auto 16px' }}>
                 Explore recommended jobs matching your skills or turn on Auto-Apply to apply automatically.
               </p>
               <button
                 onClick={() => setActiveTab('browse')}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                {...stylex.props(styles.primaryBtn)}
               >
                 Browse Open Roles
               </button>
@@ -734,16 +1274,16 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
 
       {/* TAB 3: SAVED JOBS */}
       {activeTab === 'saved' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Saved Opportunities</h2>
-            <span className="text-xs font-semibold text-slate-500">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Saved Opportunities</h2>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
               Bookmarked roles for later review
             </span>
           </div>
 
           {mySavedJobs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div {...stylex.props(styles.jobGrid)}>
               {mySavedJobs.map((job) => (
                 <JobCard
                   key={job.id}
@@ -758,15 +1298,17 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-              <Bookmark className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-900 mb-1">No saved jobs</h3>
-              <p className="text-sm text-slate-500 max-w-sm mx-auto mb-4">
+            <div {...stylex.props(styles.emptyCard)}>
+              <Bookmark size={48} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
+                No saved jobs
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '360px', margin: '0 auto 16px' }}>
                 Click the bookmark icon on any job card to save it for later review.
               </p>
               <button
                 onClick={() => setActiveTab('browse')}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                {...stylex.props(styles.primaryBtn)}
               >
                 Browse Jobs
               </button>
@@ -777,285 +1319,289 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
 
       {/* TAB 4: PROFILE & RESUME */}
       {activeTab === 'profile' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div {...stylex.props(styles.profileGrid)}>
           {/* Left Column: Profile Form & Interactive Skills Tag Editor */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">Candidate Profile</h2>
-                  <p className="text-xs text-slate-500">
-                    Your skills power the semantic matching engine for all job listings.
-                  </p>
-                </div>
-                {profileSavedNotice && (
-                  <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 animate-in fade-in">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Changes saved!
-                  </span>
-                )}
-              </div>
-
-              {/* Profile Strength Meter */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-indigo-50/50 border border-indigo-100/80 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4 text-indigo-600" />
-                    <span>Profile Completeness: {profileStrength}%</span>
-                  </span>
-                  <span className="font-semibold text-indigo-700">
-                    {profileStrength >= 80 ? 'All-Star ⭐' : 'Intermediate'}
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 transition-all duration-500 rounded-full"
-                    style={{ width: `${profileStrength}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  {profileStrength < 80
-                    ? 'Tip: Upload a resume and add 5+ skills to unlock higher recruiter match visibility.'
-                    : 'Your profile has optimal skill coverage for auto-apply and recruiter searches.'}
+          <div {...stylex.props(styles.profileCard)}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Candidate Profile</h2>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
+                  Your skills power the semantic matching engine for all job listings.
                 </p>
               </div>
+              {profileSavedNotice && (
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065f46', backgroundColor: '#ecfdf5', padding: '6px 12px', borderRadius: '10px', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <CheckCircle2 size={16} color="#059669" /> Changes saved!
+                </span>
+              )}
+            </div>
 
-              <form onSubmit={handleSaveProfile} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                    Professional Headline
+            {/* Profile Strength Meter */}
+            <div {...stylex.props(styles.profileStrengthBox)}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                <span style={{ fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TrendingUp size={16} color="#4f46e5" />
+                  <span>Profile Completeness: {profileStrength}%</span>
+                </span>
+                <span style={{ fontWeight: 600, color: '#4338ca' }}>
+                  {profileStrength >= 80 ? 'All-Star ⭐' : 'Intermediate'}
+                </span>
+              </div>
+              <div {...stylex.props(styles.strengthBarBg)}>
+                <div
+                  {...stylex.props(styles.strengthBarFill)}
+                  style={{ width: `${profileStrength}%` }}
+                />
+              </div>
+              <p style={{ fontSize: '0.6875rem', color: '#64748b', margin: 0 }}>
+                {profileStrength < 80
+                  ? 'Tip: Upload a resume and add 5+ skills to unlock higher recruiter match visibility.'
+                  : 'Your profile has optimal skill coverage for auto-apply and recruiter searches.'}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '6px' }}>
+                  Professional Headline
+                </label>
+                <input
+                  type="text"
+                  value={headline}
+                  onChange={(e) => setHeadline(e.target.value)}
+                  placeholder="e.g. Senior Backend Engineer | Python & Distributed Systems"
+                  {...stylex.props(styles.input)}
+                  required
+                />
+              </div>
+
+              {/* Interactive Skill Tag Editor */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                    Your Technical Stack ({activeSkillsList.length} skills)
                   </label>
+                  <span style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>Click &times; to remove</span>
+                </div>
+
+                {/* Active Skill Chips */}
+                <div {...stylex.props(styles.skillsBox)}>
+                  {activeSkillsList.length > 0 ? (
+                    activeSkillsList.map((skill) => (
+                      <span key={skill} {...stylex.props(styles.skillChip)}>
+                        <span>{skill}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSkill(skill)}
+                          {...stylex.props(styles.removeSkillBtn)}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', padding: '4px' }}>No skills added yet.</span>
+                  )}
+                </div>
+
+                {/* Add New Skill Input */}
+                <div {...stylex.props(styles.addSkillRow)}>
                   <input
                     type="text"
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    placeholder="e.g. Senior Backend Engineer | Python & Distributed Systems"
-                    className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-
-                {/* Interactive Skill Tag Editor */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Your Technical Stack ({activeSkillsList.length} skills)
-                    </label>
-                    <span className="text-[11px] text-slate-400">Click &times; to remove</span>
-                  </div>
-
-                  {/* Active Skill Chips */}
-                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl min-h-[56px]">
-                    {activeSkillsList.length > 0 ? (
-                      activeSkillsList.map((skill) => (
-                        <span
-                          key={skill}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs group"
-                        >
-                          <span>{skill}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSkill(skill)}
-                            className="p-0.5 rounded-full hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-slate-400 py-1">No skills added yet.</span>
-                    )}
-                  </div>
-
-                  {/* Add New Skill Input */}
-                  <div className="mt-2.5 flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newSkillInput}
-                      onChange={(e) => setNewSkillInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ',') {
-                          e.preventDefault();
-                          handleAddSkill(newSkillInput);
-                        }
-                      }}
-                      placeholder="Type a skill and press Enter (e.g. Docker, GraphQL)..."
-                      className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddSkill(newSkillInput)}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add</span>
-                    </button>
-                  </div>
-
-                  {/* Popular Skills Cloud (Click-to-Add) */}
-                  <div className="mt-4 pt-3 border-t border-slate-100">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                      Suggested Tech Skills (Click to add)
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {POPULAR_SKILLS.map((sk) => {
-                        const isAdded = activeSkillsList.includes(sk.toLowerCase());
-                        return (
-                          <button
-                            key={sk}
-                            type="button"
-                            disabled={isAdded}
-                            onClick={() => handleAddSkill(sk)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                              isAdded
-                                ? 'bg-slate-100 text-slate-400 cursor-default'
-                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60'
-                            }`}
-                          >
-                            {isAdded ? `✓ ${sk}` : `+ ${sk}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Job alerts & auto-apply preferences */}
-                <div className="pt-4 border-t border-slate-100 space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={currentCandidateProfile?.autoApply || false}
-                      onChange={(e) => toggleAutoApply(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                    />
-                    <div>
-                      <span className="text-sm font-bold text-slate-800">
-                        Enable Auto-Apply Mode
-                      </span>
-                      <p className="text-xs text-slate-500">
-                        Automatically submit applications when skill compatibility is ≥ 1%.
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={currentCandidateProfile?.jobAlerts || false}
-                      onChange={(e) =>
-                        updateCandidateProfile({ jobAlerts: e.target.checked })
+                    value={newSkillInput}
+                    onChange={(e) => setNewSkillInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        handleAddSkill(newSkillInput);
                       }
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                    />
-                    <div>
-                      <span className="text-sm font-bold text-slate-800">
-                        Skill-Matched Daily Alerts
-                      </span>
-                      <p className="text-xs text-slate-500">
-                        Receive instant notifications when new jobs matching your tech stack are posted.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="pt-4 flex justify-end">
+                    }}
+                    placeholder="Type a skill and press Enter (e.g. Docker, GraphQL)..."
+                    {...stylex.props(styles.input)}
+                  />
                   <button
-                    type="submit"
-                    className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all"
+                    type="button"
+                    onClick={() => handleAddSkill(newSkillInput)}
+                    {...stylex.props(styles.addBtn)}
                   >
-                    Save Changes
+                    <Plus size={14} />
+                    <span>Add</span>
                   </button>
                 </div>
-              </form>
-            </div>
+
+                {/* Popular Skills Cloud (Click-to-Add) */}
+                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                    Suggested Tech Skills (Click to add)
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {POPULAR_SKILLS.map((sk) => {
+                      const isAdded = activeSkillsList.includes(sk.toLowerCase());
+                      return (
+                        <button
+                          key={sk}
+                          type="button"
+                          disabled={isAdded}
+                          onClick={() => handleAddSkill(sk)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: isAdded ? 'default' : 'pointer',
+                            backgroundColor: isAdded ? '#f1f5f9' : '#eef2ff',
+                            color: isAdded ? '#94a3b8' : '#4338ca',
+                            border: '1px solid #c7d2fe',
+                          }}
+                        >
+                          {isAdded ? `✓ ${sk}` : `+ ${sk}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Job alerts & auto-apply preferences */}
+              <div style={{ paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={currentCandidateProfile?.autoApply || false}
+                    onChange={(e) => toggleAutoApply(e.target.checked)}
+                  />
+                  <div>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a' }}>
+                      Enable Auto-Apply Mode
+                    </span>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
+                      Automatically submit applications when skill compatibility is ≥ 1%.
+                    </p>
+                  </div>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={currentCandidateProfile?.jobAlerts || false}
+                    onChange={(e) =>
+                      updateCandidateProfile({ jobAlerts: e.target.checked })
+                    }
+                  />
+                  <div>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a' }}>
+                      Skill-Matched Daily Alerts
+                    </span>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
+                      Receive instant notifications when new jobs matching your tech stack are posted.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ paddingTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="submit"
+                  {...stylex.props(styles.primaryBtn)}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* Right Column: Resume & Skill Extractor */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base mb-1">Resume & Skill Extractor</h3>
-                <p className="text-xs text-slate-500">
-                  Upload a resume or paste text to auto-detect tech skills into your profile.
-                </p>
-              </div>
+          <div {...stylex.props(styles.profileCard)}>
+            <div>
+              <h3 style={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', margin: '0 0 4px' }}>
+                Resume &amp; Skill Extractor
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
+                Upload a resume or paste text to auto-detect tech skills into your profile.
+              </p>
+            </div>
 
-              {/* Upload file box */}
-              <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-3xl p-6 text-center hover:bg-indigo-50/30 transition-all relative cursor-pointer">
-                <UploadCloud className="w-9 h-9 text-indigo-600 mx-auto mb-2" />
-                <p className="text-xs font-bold text-indigo-900">Upload Resume (PDF / DOCX / TXT)</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Drag & drop or click to browse</p>
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.txt"
-                  onChange={handleSimulateResumeUpload}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-              </div>
+            {/* Upload file box */}
+            <div {...stylex.props(styles.uploadBox)}>
+              <UploadCloud size={36} color="#4f46e5" style={{ margin: '0 auto 8px' }} />
+              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e1b4b', margin: 0 }}>
+                Upload Resume (PDF / DOCX / TXT)
+              </p>
+              <p style={{ fontSize: '0.6875rem', color: '#94a3b8', margin: '2px 0 0' }}>
+                Drag &amp; drop or click to browse
+              </p>
+              <input
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleSimulateResumeUpload}
+                {...stylex.props(styles.fileInputHidden)}
+              />
+            </div>
 
-              {currentCandidateProfile?.resumeFilename && (
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-                  <div className="flex items-center gap-2 truncate">
-                    <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                    <span className="font-semibold text-slate-800 truncate">
-                      {currentCandidateProfile.resumeFilename}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    Active CV
+            {currentCandidateProfile?.resumeFilename && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                  <FileText size={16} color="#4f46e5" style={{ flexShrink: 0 }} />
+                  <span style={{ fontWeight: 600, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {currentCandidateProfile.resumeFilename}
                   </span>
                 </div>
-              )}
+                <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#065f46', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                  Active CV
+                </span>
+              </div>
+            )}
 
-              {/* Or paste text */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">
-                  Or Paste Resume Summary:
-                </label>
-                <textarea
-                  rows={3}
-                  value={resumeTextInput}
-                  onChange={(e) => setResumeTextInput(e.target.value)}
-                  placeholder="Paste bio, work history, or bullet points here to extract skills..."
-                  className="w-full text-xs p-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                />
+            {/* Or paste text */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                Or Paste Resume Summary:
+              </label>
+              <textarea
+                rows={3}
+                value={resumeTextInput}
+                onChange={(e) => setResumeTextInput(e.target.value)}
+                placeholder="Paste bio, work history, or bullet points here to extract skills..."
+                {...stylex.props(styles.input)}
+              />
+              <button
+                type="button"
+                onClick={handleAnalyzePastedResume}
+                {...stylex.props(styles.addBtn)}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Analyze Text
+              </button>
+            </div>
+
+            {/* Detected Skills Box */}
+            {detectedSkills.length > 0 && (
+              <div style={{ padding: '14px', borderRadius: '12px', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={16} color="#4f46e5" />
+                    Detected {detectedSkills.length} Skills
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {detectedSkills.map((s) => (
+                    <span
+                      key={s}
+                      style={{ padding: '4px 10px', borderRadius: '8px', backgroundColor: '#fff', color: '#4338ca', fontWeight: 700, fontSize: '0.75rem', border: '1px solid #c7d2fe' }}
+                    >
+                      +{s}
+                    </span>
+                  ))}
+                </div>
                 <button
-                  type="button"
-                  onClick={handleAnalyzePastedResume}
-                  className="mt-2 w-full py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors"
+                  onClick={addDetectedSkillsToProfile}
+                  {...stylex.props(styles.primaryBtn)}
+                  style={{ width: '100%' }}
                 >
-                  Analyze Text
+                  Add Detected Skills to Stack
                 </button>
               </div>
-
-              {/* Detected Skills Box */}
-              {detectedSkills.length > 0 && (
-                <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 space-y-3 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-indigo-600" />
-                      Detected {detectedSkills.length} Skills
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {detectedSkills.map((s) => (
-                      <span
-                        key={s}
-                        className="px-2.5 py-1 rounded-lg bg-white text-indigo-700 font-bold text-xs border border-indigo-100 shadow-2xs"
-                      >
-                        +{s}
-                      </span>
-                    ))}
-                  </div>
-                  <button
-                    onClick={addDetectedSkillsToProfile}
-                    className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
-                  >
-                    Add Detected Skills to Stack
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}

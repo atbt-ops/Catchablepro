@@ -1,63 +1,119 @@
 import React from 'react';
+import * as stylex from '@stylexjs/stylex';
+import { radii, shadows } from '../theme/tokens.stylex';
 
 interface CompanyAvatarProps {
   name: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  className?: string;
   showVerified?: boolean;
 }
 
-// Generate deterministic vibrant pastel gradient from name
-const GRADIENTS = [
-  'from-indigo-500 to-purple-600',
-  'from-blue-600 to-cyan-500',
-  'from-violet-600 to-fuchsia-600',
-  'from-emerald-500 to-teal-700',
-  'from-rose-500 to-pink-600',
-  'from-amber-500 to-orange-600',
-  'from-teal-600 to-emerald-600',
-  'from-purple-600 to-indigo-700',
+const GRADIENT_BACKGROUNDS = [
+  'linear-gradient(135deg, #6366f1, #9333ea)',
+  'linear-gradient(135deg, #2563eb, #06b6d4)',
+  'linear-gradient(135deg, #7c3aed, #c026d3)',
+  'linear-gradient(135deg, #10b981, #0f766e)',
+  'linear-gradient(135deg, #f43f5e, #db2777)',
+  'linear-gradient(135deg, #f59e0b, #ea580c)',
+  'linear-gradient(135deg, #0d9488, #059669)',
+  'linear-gradient(135deg, #9333ea, #4338ca)',
 ];
+
+const styles = stylex.create({
+  container: {
+    position: 'relative',
+    display: 'inline-flex',
+    flexShrink: 0,
+  },
+  baseAvatar: {
+    color: '#ffffff',
+    fontWeight: 900,
+    letterSpacing: '0.05em',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: shadows.sm,
+    userSelect: 'none',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  sm: {
+    width: 32,
+    height: 32,
+    fontSize: 12,
+    borderRadius: radii.sm,
+  },
+  md: {
+    width: 44,
+    height: 44,
+    fontSize: 14,
+    borderRadius: radii.md,
+  },
+  lg: {
+    width: 56,
+    height: 56,
+    fontSize: 18,
+    borderRadius: radii.lg,
+  },
+  xl: {
+    width: 64,
+    height: 64,
+    fontSize: 20,
+    borderRadius: radii.xl,
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    backgroundColor: '#10b981',
+    borderWidth: 2,
+    borderStyle: 'solid',
+    borderColor: '#ffffff',
+    borderRadius: radii.full,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 9,
+    color: '#ffffff',
+    fontWeight: 900,
+    boxShadow: shadows.sm,
+  },
+});
 
 export const CompanyAvatar: React.FC<CompanyAvatarProps> = ({
   name,
   size = 'md',
-  className = '',
   showVerified = false,
 }) => {
   const cleanName = (name || 'Company').trim();
-  
-  // Calculate deterministic index
+
   let hash = 0;
   for (let i = 0; i < cleanName.length; i++) {
     hash = (hash << 5) - hash + cleanName.charCodeAt(i);
     hash |= 0;
   }
-  const gradient = GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+  const bgGradient = GRADIENT_BACKGROUNDS[Math.abs(hash) % GRADIENT_BACKGROUNDS.length];
 
-  // Get initials (up to 2 letters)
   const parts = cleanName.split(/\s+/).filter(Boolean);
-  const initials = parts.length >= 2
-    ? (parts[0][0] + parts[1][0]).toUpperCase()
-    : cleanName.slice(0, 2).toUpperCase();
-
-  const sizeClasses = {
-    sm: 'w-8 h-8 text-xs rounded-lg',
-    md: 'w-11 h-11 text-sm rounded-xl',
-    lg: 'w-14 h-14 text-lg rounded-2xl',
-    xl: 'w-16 h-16 text-xl rounded-2xl',
-  };
+  const initials =
+    parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : cleanName.slice(0, 2).toUpperCase();
 
   return (
-    <div className="relative inline-flex flex-shrink-0">
+    <div {...stylex.props(styles.container)}>
       <div
-        className={`${sizeClasses[size]} bg-gradient-to-br ${gradient} text-white font-black tracking-wider flex items-center justify-center shadow-sm select-none border border-white/20 ${className}`}
+        {...stylex.props(styles.baseAvatar, styles[size])}
+        style={{ backgroundImage: bgGradient }}
       >
         <span>{initials}</span>
       </div>
       {showVerified && (
         <span
-          className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[9px] text-white font-black shadow-xs"
+          {...stylex.props(styles.verifiedBadge)}
           title="Verified Employer"
         >
           ✓

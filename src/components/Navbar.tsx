@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
-import { CompanyAvatar } from './CompanyAvatar';
 import {
   Target,
   Search,
   MapPin,
-  Briefcase,
-  User as UserIcon,
   Settings,
   LogOut,
   Shield,
@@ -21,6 +19,541 @@ import {
   Menu,
   ArrowRightLeft,
 } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  header: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(8px)',
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+    boxShadow: shadows.sm,
+  },
+  container: {
+    maxWidth: '1280px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    paddingLeft: spacing.md,
+    paddingRight: spacing.md,
+  },
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: '64px',
+    gap: spacing.md,
+  },
+  leftGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  logoBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    background: 'none',
+    borderWidth: 0,
+    cursor: 'pointer',
+    padding: 0,
+    textAlign: 'left',
+  },
+  logoIcon: {
+    width: '36px',
+    height: '36px',
+    borderRadius: radii.md,
+    background: 'linear-gradient(135deg, #4f46e5, #c026d3)',
+    color: colors.textInverse,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.25)',
+    flexShrink: 0,
+  },
+  logoTextCol: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  logoText: {
+    fontSize: '1.25rem',
+    fontWeight: 900,
+    letterSpacing: '-0.025em',
+    color: colors.text,
+    lineHeight: 1,
+    margin: 0,
+  },
+  logoHighlight: {
+    color: colors.primary,
+  },
+  logoSub: {
+    fontSize: '0.625rem',
+    color: colors.textMuted,
+    fontWeight: 600,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    marginTop: '2px',
+    margin: 0,
+  },
+  demoSwitcherWrap: {
+    position: 'relative',
+    display: {
+      default: 'none',
+      '@media (min-width: 1280px)': 'block',
+    },
+  },
+  demoPill: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    borderRadius: radii.full,
+    backgroundColor: {
+      default: colors.surfaceSubtle,
+      ':hover': colors.border,
+    },
+    color: colors.textSecondary,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
+  },
+  demoDropdown: {
+    position: 'absolute',
+    left: 0,
+    marginTop: '8px',
+    width: '280px',
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    boxShadow: shadows.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    zIndex: 50,
+  },
+  demoHeader: {
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    fontSize: '0.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textMuted,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  demoItem: {
+    width: '100%',
+    textAlign: 'left',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    fontSize: '0.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.surfaceSubtle,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
+  },
+  demoItemActive: {
+    backgroundColor: colors.primaryLight,
+    fontWeight: 700,
+  },
+  demoRoleBadgeEmployer: {
+    fontSize: '0.625rem',
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.full,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+  },
+  demoRoleBadgeCandidate: {
+    fontSize: '0.625rem',
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.full,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+  },
+  searchBar: {
+    display: {
+      default: 'none',
+      '@media (min-width: 768px)': 'flex',
+    },
+    flex: 1,
+    maxWidth: '480px',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: radii.lg,
+    padding: '6px 10px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    transition: 'all 0.15s ease',
+  },
+  searchInputWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    paddingRight: '8px',
+  },
+  searchInput: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    fontSize: '0.8125rem',
+    color: colors.text,
+    outline: 'none',
+    borderWidth: 0,
+    fontFamily: 'inherit',
+  },
+  searchDivider: {
+    width: '1px',
+    height: '20px',
+    backgroundColor: colors.border,
+    marginLeft: '4px',
+    marginRight: '4px',
+  },
+  locationSelect: {
+    backgroundColor: 'transparent',
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+    fontWeight: 600,
+    outline: 'none',
+    borderWidth: 0,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  rightNav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  roleSwitchBtn: {
+    display: {
+      default: 'none',
+      '@media (min-width: 768px)': 'flex',
+    },
+    alignItems: 'center',
+    gap: '6px',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    backgroundColor: {
+      default: colors.primaryLight,
+      ':hover': '#e0e7ff',
+    },
+    color: colors.primaryHover,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
+  },
+  navGroup: {
+    display: {
+      default: 'none',
+      '@media (min-width: 1024px)': 'flex',
+    },
+    alignItems: 'center',
+    gap: '4px',
+  },
+  navLink: {
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.md,
+    fontSize: '0.8125rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    borderWidth: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'all 0.15s ease',
+    backgroundColor: 'transparent',
+    color: colors.textSecondary,
+  },
+  navLinkActive: {
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+  },
+  navBadge: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    borderRadius: radii.full,
+    fontSize: '0.625rem',
+    fontWeight: 900,
+    backgroundColor: colors.primary,
+    color: colors.textInverse,
+  },
+  walletBadge: {
+    fontWeight: 700,
+    color: colors.successText,
+    fontSize: '0.75rem',
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    backgroundColor: colors.successLight,
+    borderRadius: radii.sm,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
+  },
+  adminBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    borderWidth: 0,
+    backgroundColor: colors.purpleLight,
+    color: colors.purpleText,
+  },
+  iconBtn: {
+    padding: '8px',
+    color: colors.textSecondary,
+    borderRadius: radii.md,
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.surfaceSubtle,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBtn: {
+    padding: '4px',
+    borderRadius: radii.full,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+  },
+  avatarCircle: {
+    width: '36px',
+    height: '36px',
+    borderRadius: radii.full,
+    background: 'linear-gradient(135deg, #4f46e5, #3730a3)',
+    color: colors.textInverse,
+    fontWeight: 800,
+    fontSize: '0.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: shadows.sm,
+  },
+  userDropdown: {
+    position: 'absolute',
+    right: 0,
+    marginTop: '8px',
+    width: '260px',
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    boxShadow: shadows.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    zIndex: 50,
+  },
+  userProfileHeader: {
+    paddingTop: '12px',
+    paddingBottom: '12px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+  },
+  userName: {
+    fontSize: '0.875rem',
+    fontWeight: 700,
+    color: colors.text,
+    margin: 0,
+  },
+  userEmail: {
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+    margin: 0,
+    marginTop: '2px',
+  },
+  menuItem: {
+    width: '100%',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    color: colors.textSecondary,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.surfaceSubtle,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'background-color 0.15s ease',
+  },
+  menuItemDanger: {
+    color: colors.danger,
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.dangerLight,
+    },
+  },
+  mobileToggleBtn: {
+    display: {
+      default: 'flex',
+      '@media (min-width: 1024px)': 'none',
+    },
+    padding: '8px',
+    borderRadius: radii.md,
+    color: colors.textSecondary,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+  },
+  mobileDrawer: {
+    paddingTop: '16px',
+    paddingBottom: '16px',
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors.border,
+    display: {
+      default: 'flex',
+      '@media (min-width: 1024px)': 'none',
+    },
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  mobileGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: spacing.sm,
+  },
+  mobileBtn: {
+    padding: '10px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    cursor: 'pointer',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+  },
+  mobileBtnPrimary: {
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+    borderColor: colors.primaryBorder,
+  },
+  mobileBtnSubtle: {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.textSecondary,
+    borderColor: colors.border,
+  },
+  visitorBtnLog: {
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textSecondary,
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.surfaceSubtle,
+    },
+    borderRadius: radii.md,
+    borderWidth: 0,
+    cursor: 'pointer',
+  },
+  visitorBtnSign: {
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderRadius: radii.md,
+    borderWidth: 0,
+    cursor: 'pointer',
+    boxShadow: shadows.sm,
+  },
+  visitorBtnEmp: {
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.primaryHover,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    cursor: 'pointer',
+  },
+});
 
 interface NavbarProps {
   onOpenAccount: () => void;
@@ -106,45 +639,47 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-3 sm:gap-4">
+    <header {...stylex.props(styles.header)}>
+      <div {...stylex.props(styles.container)}>
+        <div {...stylex.props(styles.row)}>
           {/* Brand Logo & Demo Switcher */}
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div {...stylex.props(styles.leftGroup)}>
             <button
               onClick={() => setActiveView(isEmployer ? 'employer_jobs' : 'candidate_browse')}
-              className="flex items-center gap-2.5 text-left group focus:outline-none"
+              {...stylex.props(styles.logoBtn)}
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-fuchsia-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform flex-shrink-0">
-                <Target className="w-5 h-5" />
+              <div {...stylex.props(styles.logoIcon)}>
+                <Target size={20} />
               </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-black tracking-tight text-slate-900 leading-none">
-                  Catch <span className="text-indigo-600">Able Pro</span>
+              <div {...stylex.props(styles.logoTextCol)}>
+                <span {...stylex.props(styles.logoText)}>
+                  Catch <span {...stylex.props(styles.logoHighlight)}>Able Pro</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-semibold tracking-wide uppercase mt-0.5 hidden sm:block">
+                <span {...stylex.props(styles.logoSub)}>
                   Semantic Hiring
                 </span>
               </div>
             </button>
 
             {/* Quick Demo Switcher Pill */}
-            <div className="relative hidden xl:block">
+            <div {...stylex.props(styles.demoSwitcherWrap)}>
               <button
                 onClick={() => setShowDemoSwitcher(!showDemoSwitcher)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors"
+                {...stylex.props(styles.demoPill)}
                 title="Switch test accounts"
               >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <Sparkles size={14} color="#4f46e5" />
                 <span>Demo As: {currentUser?.name || 'Visitor'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <ChevronDown size={12} />
               </button>
 
               {showDemoSwitcher && (
-                <div className="absolute left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                  <div className="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <div {...stylex.props(styles.demoDropdown)}>
+                  <div {...stylex.props(styles.demoHeader)}>
                     <span>Select Persona</span>
-                    <span className="text-[10px] text-indigo-600 lowercase font-normal">instant switch</span>
+                    <span style={{ fontSize: '10px', color: '#4f46e5', fontWeight: 'normal', textTransform: 'lowercase' }}>
+                      instant switch
+                    </span>
                   </div>
                   {users.map((u) => (
                     <button
@@ -153,25 +688,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                         switchUser(u.id);
                         setShowDemoSwitcher(false);
                       }}
-                      className={`w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                        currentUser?.id === u.id
-                          ? 'bg-indigo-50/80 font-bold text-indigo-700'
-                          : 'text-slate-700'
-                      }`}
+                      {...stylex.props(
+                        styles.demoItem,
+                        currentUser?.id === u.id && styles.demoItemActive
+                      )}
                     >
-                      <div className="truncate pr-2">
-                        <div className="font-semibold text-slate-900">{u.name || u.email}</div>
-                        <div className="text-[11px] text-slate-400">
+                      <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', paddingRight: '8px' }}>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{u.name || u.email}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>
                           {u.role === 'employer' ? u.company_name || 'Employer' : u.designation || 'Candidate'}
                           {u.is_admin ? ' • Admin' : ''}
                         </div>
                       </div>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        {...stylex.props(
                           u.role === 'employer'
-                            ? 'bg-indigo-100 text-indigo-700'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
+                            ? styles.demoRoleBadgeEmployer
+                            : styles.demoRoleBadgeCandidate
+                        )}
                       >
                         {u.role}
                       </span>
@@ -184,37 +718,37 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Job Search Bar (Candidate view) */}
           {!isEmployer && (
-            <div className="hidden md:flex flex-1 max-w-lg items-center bg-slate-100/90 hover:bg-slate-100 rounded-2xl p-1.5 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-3 focus-within:ring-indigo-100 transition-all">
-              <div className="flex items-center pl-2.5 pr-2 flex-1 min-w-0">
-                <Search className="w-4 h-4 text-slate-400 flex-shrink-0 mr-2" />
+            <div {...stylex.props(styles.searchBar)}>
+              <div {...stylex.props(styles.searchInputWrap)}>
+                <Search size={16} color="#94a3b8" style={{ marginRight: '8px', flexShrink: 0 }} />
                 <input
                   ref={searchInputRef}
                   type="text"
                   placeholder="Search jobs, skills (e.g. React, Python)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
+                  {...stylex.props(styles.searchInput)}
                 />
                 {searchQuery ? (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 transition-colors"
+                    style={{ background: 'none', border: 0, cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X size={14} />
                   </button>
                 ) : (
-                  <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">
+                  <kbd style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 6px' }}>
                     /
                   </kbd>
                 )}
               </div>
-              <div className="h-5 w-px bg-slate-200 mx-1" />
-              <div className="flex items-center px-2 flex-shrink-0">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 mr-1.5" />
+              <div {...stylex.props(styles.searchDivider)} />
+              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <MapPin size={14} color="#94a3b8" style={{ marginRight: '6px' }} />
                 <select
                   value={locationFilter}
                   onChange={(e) => setLocationFilter(e.target.value)}
-                  className="bg-transparent text-xs text-slate-700 font-semibold focus:outline-none cursor-pointer pr-1"
+                  {...stylex.props(styles.locationSelect)}
                 >
                   {INDIAN_LOCATIONS.map((loc) => (
                     <option key={loc} value={loc === 'All India' ? '' : loc}>
@@ -227,117 +761,85 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Navigation Items (Right Side) */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div {...stylex.props(styles.rightNav)}>
             {currentUser ? (
               <>
                 {/* Quick Role Perspective Switcher Pill */}
                 <button
                   onClick={handleQuickRoleSwitch}
                   title={`Switch to ${isEmployer ? 'Candidate' : 'Employer'} perspective`}
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 transition-colors"
+                  {...stylex.props(styles.roleSwitchBtn)}
                 >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <ArrowRightLeft size={14} />
                   <span>Switch to {isEmployer ? 'Candidate' : 'Employer'}</span>
                 </button>
 
                 {/* Candidate Nav Links */}
                 {!isEmployer && (
-                  <div className="hidden lg:flex items-center gap-1 text-sm font-semibold">
+                  <div {...stylex.props(styles.navGroup)}>
                     <button
                       onClick={() => setActiveView('candidate_browse')}
-                      className={`px-3 py-1.5 rounded-xl transition-all ${
-                        activeView === 'candidate_browse'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'candidate_browse' && styles.navLinkActive)}
                     >
-                      Jobs & Match
+                      Jobs &amp; Match
                     </button>
                     <button
                       onClick={() => setActiveView('candidate_applications')}
-                      className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-                        activeView === 'candidate_applications'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'candidate_applications' && styles.navLinkActive)}
                     >
-                      <FileCheck className="w-4 h-4" />
+                      <FileCheck size={16} />
                       <span>Applications</span>
                       {candidateAppCount > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white">
+                        <span {...stylex.props(styles.navBadge)}>
                           {candidateAppCount}
                         </span>
                       )}
                     </button>
                     <button
                       onClick={() => setActiveView('candidate_saved')}
-                      className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-                        activeView === 'candidate_saved'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'candidate_saved' && styles.navLinkActive)}
                     >
-                      <Bookmark className="w-4 h-4" />
+                      <Bookmark size={16} />
                       <span>Saved</span>
                     </button>
                     <button
                       onClick={() => setActiveView('candidate_profile')}
-                      className={`px-3 py-1.5 rounded-xl transition-all ${
-                        activeView === 'candidate_profile'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'candidate_profile' && styles.navLinkActive)}
                     >
-                      Profile & Resume
+                      Profile &amp; Resume
                     </button>
                   </div>
                 )}
 
                 {/* Employer Nav Links */}
                 {isEmployer && (
-                  <div className="hidden lg:flex items-center gap-1 text-sm font-semibold">
+                  <div {...stylex.props(styles.navGroup)}>
                     <button
                       onClick={() => setActiveView('employer_jobs')}
-                      className={`px-3 py-1.5 rounded-xl transition-all ${
-                        activeView === 'employer_jobs'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'employer_jobs' && styles.navLinkActive)}
                     >
-                      Jobs & Meter
+                      Jobs &amp; Meter
                     </button>
                     <button
                       onClick={() => setActiveView('employer_matches')}
-                      className={`px-3 py-1.5 rounded-xl transition-all ${
-                        activeView === 'employer_matches'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'employer_matches' && styles.navLinkActive)}
                     >
                       Ranked Matches
                     </button>
                     <button
                       onClick={() => setActiveView('employer_pipeline')}
-                      className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-                        activeView === 'employer_pipeline'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'employer_pipeline' && styles.navLinkActive)}
                     >
-                      <Layers className="w-4 h-4" />
+                      <Layers size={16} />
                       <span>Pipeline</span>
                     </button>
                     <button
                       onClick={() => setActiveView('employer_wallet')}
-                      className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-                        activeView === 'employer_wallet'
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      {...stylex.props(styles.navLink, activeView === 'employer_wallet' && styles.navLinkActive)}
                     >
-                      <Wallet className="w-4 h-4 text-emerald-600" />
+                      <Wallet size={16} color="#059669" />
                       <span>Wallet</span>
-                      <span className="font-bold text-emerald-800 text-xs px-2 py-0.5 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <span {...stylex.props(styles.walletBadge)}>
                         ₹{((companyProfile?.walletBalancePaise || 0) / 100).toLocaleString('en-IN')}
                       </span>
                     </button>
@@ -348,13 +850,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {isAdmin && (
                   <button
                     onClick={() => setActiveView('admin')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      activeView === 'admin'
-                        ? 'bg-purple-100 text-purple-900'
-                        : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
-                    }`}
+                    {...stylex.props(styles.adminBadge)}
                   >
-                    <Shield className="w-3.5 h-3.5" />
+                    <Shield size={14} />
                     <span>Admin</span>
                   </button>
                 )}
@@ -363,51 +861,51 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   onClick={onOpenFeedback}
                   title="Send feedback"
-                  className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
+                  {...stylex.props(styles.iconBtn)}
                 >
-                  <MessageSquare className="w-4 h-4" />
+                  <MessageSquare size={16} />
                 </button>
 
                 {/* User Avatar & Dropdown */}
-                <div className="relative">
+                <div style={{ position: 'relative' }}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors focus:outline-none"
+                    {...stylex.props(styles.avatarBtn)}
                   >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-800 text-white font-extrabold text-xs flex items-center justify-center ring-2 ring-indigo-200 shadow-sm">
+                    <div {...stylex.props(styles.avatarCircle)}>
                       {(currentUser.name || currentUser.email)[0].toUpperCase()}
                     </div>
                   </button>
 
                   {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-68 bg-white rounded-3xl shadow-2xl border border-slate-200 py-2.5 z-50 animate-in fade-in zoom-in-95">
-                      <div className="px-4 py-3 border-b border-slate-100">
-                        <p className="text-sm font-bold text-slate-900 truncate">
+                    <div {...stylex.props(styles.userDropdown)}>
+                      <div {...stylex.props(styles.userProfileHeader)}>
+                        <p {...stylex.props(styles.userName)}>
                           {currentUser.name || currentUser.email}
                         </p>
-                        <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <p {...stylex.props(styles.userEmail)}>{currentUser.email}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                          <span {...stylex.props(styles.demoRoleBadgeEmployer)}>
                             {currentUser.role}
                           </span>
                           {isEmployer && companyProfile && (
-                            <span className="text-[11px] font-bold text-emerald-700">
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#047857' }}>
                               ₹{((companyProfile.walletBalancePaise || 0) / 100).toLocaleString('en-IN')}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="py-1">
+                      <div style={{ padding: '4px 0' }}>
                         <button
                           onClick={() => {
                             onOpenAccount();
                             setShowUserMenu(false);
                           }}
-                          className="w-full px-4 py-2.5 text-xs font-semibold text-slate-700 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
+                          {...stylex.props(styles.menuItem)}
                         >
-                          <Settings className="w-4 h-4 text-slate-400" />
-                          <span>Account & 2FA</span>
+                          <Settings size={16} color="#94a3b8" />
+                          <span>Account &amp; 2FA</span>
                         </button>
 
                         <button
@@ -415,9 +913,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                             onOpenFeedback();
                             setShowUserMenu(false);
                           }}
-                          className="w-full px-4 py-2.5 text-xs font-semibold text-slate-700 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
+                          {...stylex.props(styles.menuItem)}
                         >
-                          <MessageSquare className="w-4 h-4 text-slate-400" />
+                          <MessageSquare size={16} color="#94a3b8" />
                           <span>Send Feedback</span>
                         </button>
 
@@ -426,22 +924,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                             handleQuickRoleSwitch();
                             setShowUserMenu(false);
                           }}
-                          className="w-full px-4 py-2.5 text-xs font-semibold text-indigo-600 flex items-center gap-2.5 hover:bg-indigo-50 transition-colors"
+                          {...stylex.props(styles.menuItem)}
+                          style={{ color: '#4f46e5' }}
                         >
-                          <ArrowRightLeft className="w-4 h-4 text-indigo-500" />
+                          <ArrowRightLeft size={16} color="#6366f1" />
                           <span>Switch to {isEmployer ? 'Candidate' : 'Employer'}</span>
                         </button>
                       </div>
 
-                      <div className="border-t border-slate-100 pt-1">
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '4px' }}>
                         <button
                           onClick={() => {
                             logout();
                             setShowUserMenu(false);
                           }}
-                          className="w-full px-4 py-2.5 text-xs font-semibold text-rose-600 flex items-center gap-2.5 hover:bg-rose-50 transition-colors"
+                          {...stylex.props(styles.menuItem, styles.menuItemDanger)}
                         >
-                          <LogOut className="w-4 h-4 text-rose-500" />
+                          <LogOut size={16} color="#e11d48" />
                           <span>Sign out</span>
                         </button>
                       </div>
@@ -452,29 +951,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {/* Mobile Hamburger Button */}
                 <button
                   onClick={() => setShowMobileDrawer(!showMobileDrawer)}
-                  className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                  {...stylex.props(styles.mobileToggleBtn)}
                 >
-                  {showMobileDrawer ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  {showMobileDrawer ? <X size={20} /> : <Menu size={20} />}
                 </button>
               </>
             ) : (
               /* Anonymous visitor options */
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   onClick={() => onOpenAuth('candidate')}
-                  className="px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                  {...stylex.props(styles.visitorBtnLog)}
                 >
                   Log in
                 </button>
                 <button
                   onClick={() => onOpenAuth('candidate')}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all"
+                  {...stylex.props(styles.visitorBtnSign)}
                 >
                   Sign up
                 </button>
                 <button
                   onClick={() => onOpenAuth('employer')}
-                  className="hidden sm:inline-flex px-3.5 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors border border-indigo-200"
+                  {...stylex.props(styles.visitorBtnEmp)}
                 >
                   For Employers
                 </button>
@@ -485,30 +984,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Slide-down Drawer */}
         {showMobileDrawer && (
-          <div className="lg:hidden py-4 border-t border-slate-100 animate-in slide-in-from-top-3 duration-200 space-y-3">
-            {/* Mobile Search input */}
-            {!isEmployer && (
-              <div className="flex items-center bg-slate-100 rounded-xl p-2 border border-slate-200">
-                <Search className="w-4 h-4 text-slate-400 mr-2 flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search jobs, skills..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 text-xs font-bold pt-1">
+          <div {...stylex.props(styles.mobileDrawer)}>
+            <div {...stylex.props(styles.mobileGrid)}>
               <button
                 onClick={() => {
                   handleQuickRoleSwitch();
                   setShowMobileDrawer(false);
                 }}
-                className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center gap-1.5 border border-indigo-100"
+                {...stylex.props(styles.mobileBtn, styles.mobileBtnPrimary)}
               >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
+                <ArrowRightLeft size={14} />
                 <span>Switch to {isEmployer ? 'Candidate' : 'Employer'}</span>
               </button>
 
@@ -517,9 +1002,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onOpenAccount();
                   setShowMobileDrawer(false);
                 }}
-                className="p-2.5 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center gap-1.5"
+                {...stylex.props(styles.mobileBtn, styles.mobileBtnSubtle)}
               >
-                <Settings className="w-3.5 h-3.5 text-slate-500" />
+                <Settings size={14} />
                 <span>Settings</span>
               </button>
             </div>

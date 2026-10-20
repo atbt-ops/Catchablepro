@@ -1,7 +1,250 @@
 import React, { useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
 import { Role } from '../types';
-import { X, Sparkles, Building2, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, Sparkles, Building2, User } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    overflowY: 'auto',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    maxWidth: '440px',
+    width: '100%',
+    padding: spacing.lg,
+    boxShadow: shadows.xl,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '18px',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    color: colors.text,
+    margin: 0,
+  },
+  subtitle: {
+    fontSize: '0.75rem',
+    color: colors.textSecondary,
+    marginTop: '2px',
+    margin: 0,
+  },
+  closeBtn: {
+    padding: '6px',
+    color: {
+      default: colors.textMuted,
+      ':hover': colors.text,
+    },
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.surfaceSubtle,
+    },
+    borderWidth: 0,
+    borderRadius: radii.sm,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'color 0.15s ease, background-color 0.15s ease',
+  },
+  tabs: {
+    display: 'flex',
+    backgroundColor: colors.surfaceSubtle,
+    padding: '4px',
+    borderRadius: radii.md,
+    gap: '4px',
+  },
+  tab: {
+    flex: 1,
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    borderRadius: radii.sm,
+    borderWidth: 0,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  tabActive: {
+    backgroundColor: colors.surface,
+    color: colors.text,
+    boxShadow: shadows.sm,
+  },
+  tabInactive: {
+    backgroundColor: 'transparent',
+    color: colors.textSecondary,
+  },
+  roleGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: spacing.sm,
+  },
+  roleCard: {
+    padding: '12px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    textAlign: 'left',
+    cursor: 'pointer',
+    backgroundColor: {
+      default: colors.surface,
+      ':hover': colors.surfaceSubtle,
+    },
+    transition: 'all 0.15s ease',
+  },
+  roleCardActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryBorder,
+    boxShadow: `0 0 0 2px ${colors.primaryBorder}`,
+  },
+  roleIcon: {
+    width: '16px',
+    height: '16px',
+    marginBottom: '4px',
+    color: colors.primary,
+  },
+  roleCardTitle: {
+    fontWeight: 700,
+    fontSize: '0.75rem',
+    color: colors.text,
+  },
+  roleCardDesc: {
+    fontSize: '0.625rem',
+    color: colors.textMuted,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  label: {
+    fontSize: '0.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textSecondary,
+    marginBottom: '4px',
+  },
+  input: {
+    width: '100%',
+    fontSize: '0.75rem',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  submitBtn: {
+    width: '100%',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    boxShadow: shadows.sm,
+    transition: 'background-color 0.15s ease',
+  },
+  demoSection: {
+    paddingTop: '12px',
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors.border,
+  },
+  demoHeader: {
+    fontSize: '0.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  demoIcon: {
+    width: '14px',
+    height: '14px',
+    color: colors.primary,
+  },
+  demoGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '6px',
+  },
+  demoCard: {
+    padding: '8px 10px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: {
+      default: colors.border,
+      ':hover': colors.primaryBorder,
+    },
+    backgroundColor: {
+      default: colors.surfaceSubtle,
+      ':hover': colors.primaryLight,
+    },
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  demoCardName: {
+    fontWeight: 700,
+    color: colors.text,
+    fontSize: '0.75rem',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  demoCardRole: {
+    fontSize: '0.625rem',
+    color: colors.textSecondary,
+    textTransform: 'capitalize',
+  },
+});
 
 interface AuthModalProps {
   initialRole?: Role;
@@ -36,41 +279,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialRole = 'candidate',
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+    <div {...stylex.props(styles.overlay)}>
+      <div {...stylex.props(styles.card)}>
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div {...stylex.props(styles.header)}>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
+            <h2 {...stylex.props(styles.title)}>
               {mode === 'login' ? 'Sign In to Catchablepro' : 'Create an Account'}
             </h2>
-            <p className="text-xs text-slate-500">
+            <p {...stylex.props(styles.subtitle)}>
               India's skill-based tech employment exchange.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+            {...stylex.props(styles.closeBtn)}
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
         {/* Tab switch between Login and Register */}
-        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+        <div {...stylex.props(styles.tabs)}>
           <button
             onClick={() => setMode('login')}
-            className={`flex-1 py-1.5 rounded-lg transition-colors ${
-              mode === 'login' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'
-            }`}
+            {...stylex.props(styles.tab, mode === 'login' ? styles.tabActive : styles.tabInactive)}
           >
             Log In
           </button>
           <button
             onClick={() => setMode('register')}
-            className={`flex-1 py-1.5 rounded-lg transition-colors ${
-              mode === 'register' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'
-            }`}
+            {...stylex.props(styles.tab, mode === 'register' ? styles.tabActive : styles.tabInactive)}
           >
             Create Account
           </button>
@@ -78,42 +317,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialRole = 'candidate',
 
         {/* Role toggle if registering */}
         {mode === 'register' && (
-          <div className="grid grid-cols-2 gap-2">
+          <div {...stylex.props(styles.roleGrid)}>
             <button
               type="button"
               onClick={() => setRole('candidate')}
-              className={`p-3 rounded-2xl border text-left transition-all ${
-                role === 'candidate'
-                  ? 'bg-indigo-50/80 border-indigo-400 text-indigo-900 ring-2 ring-indigo-500/20'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
+              {...stylex.props(styles.roleCard, role === 'candidate' && styles.roleCardActive)}
             >
-              <User className="w-4 h-4 mb-1 text-indigo-600" />
-              <div className="font-bold text-xs">Job Seeker</div>
-              <div className="text-[10px] text-slate-400">Match & Auto-Apply</div>
+              <User {...stylex.props(styles.roleIcon)} />
+              <div {...stylex.props(styles.roleCardTitle)}>Job Seeker</div>
+              <div {...stylex.props(styles.roleCardDesc)}>Match &amp; Auto-Apply</div>
             </button>
 
             <button
               type="button"
               onClick={() => setRole('employer')}
-              className={`p-3 rounded-2xl border text-left transition-all ${
-                role === 'employer'
-                  ? 'bg-indigo-50/80 border-indigo-400 text-indigo-900 ring-2 ring-indigo-500/20'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
+              {...stylex.props(styles.roleCard, role === 'employer' && styles.roleCardActive)}
             >
-              <Building2 className="w-4 h-4 mb-1 text-indigo-600" />
-              <div className="font-bold text-xs">Employer</div>
-              <div className="text-[10px] text-slate-400">Post & Rank Candidates</div>
+              <Building2 {...stylex.props(styles.roleIcon)} />
+              <div {...stylex.props(styles.roleCardTitle)}>Employer</div>
+              <div {...stylex.props(styles.roleCardDesc)}>Post &amp; Rank Candidates</div>
             </button>
           </div>
         )}
 
         {/* Credentials Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} {...stylex.props(styles.form)}>
           {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Your Full Name
               </label>
               <input
@@ -121,15 +352,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialRole = 'candidate',
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Rahul Sharma"
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
                 required
               />
             </div>
           )}
 
           {mode === 'register' && role === 'employer' && (
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <div {...stylex.props(styles.formGroup)}>
+              <label {...stylex.props(styles.label)}>
                 Company Name
               </label>
               <input
@@ -137,14 +368,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialRole = 'candidate',
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Acme Tech Solutions"
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {...stylex.props(styles.input)}
                 required
               />
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+          <div {...stylex.props(styles.formGroup)}>
+            <label {...stylex.props(styles.label)}>
               Email Address
             </label>
             <input
@@ -152,26 +383,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialRole = 'candidate',
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g. name@example.com"
-              className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              {...stylex.props(styles.input)}
               required
             />
           </div>
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all"
+            {...stylex.props(styles.submitBtn)}
           >
             {mode === 'login' ? 'Continue' : 'Create Account'}
           </button>
         </form>
 
         {/* Quick Demo Logins Section */}
-        <div className="pt-3 border-t border-slate-100">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+        <div {...stylex.props(styles.demoSection)}>
+          <div {...stylex.props(styles.demoHeader)}>
+            <Sparkles {...stylex.props(styles.demoIcon)} />
             <span>Instant Demo Logins</span>
           </div>
-          <div className="grid grid-cols-2 gap-1.5 text-xs">
+          <div {...stylex.props(styles.demoGrid)}>
             {users.map((u) => (
               <button
                 key={u.id}
@@ -180,10 +411,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialRole = 'candidate',
                   switchUser(u.id);
                   onClose();
                 }}
-                className="p-2 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50 hover:border-indigo-200 text-left transition-colors"
+                {...stylex.props(styles.demoCard)}
               >
-                <div className="font-bold text-slate-800 truncate">{u.name || u.email}</div>
-                <div className="text-[10px] text-slate-500 capitalize">
+                <div {...stylex.props(styles.demoCardName)}>{u.name || u.email}</div>
+                <div {...stylex.props(styles.demoCardRole)}>
                   {u.role === 'employer' ? u.company_name || 'Employer' : 'Candidate'}
                   {u.is_admin ? ' (Admin)' : ''}
                 </div>
