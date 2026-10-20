@@ -4,7 +4,7 @@ set -e
 # Ensure Homebrew and standard paths are in PATH
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 PID_FILE="$PROJECT_DIR/.app.pid"
