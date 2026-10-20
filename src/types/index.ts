@@ -160,3 +160,11 @@ export interface CostState {
   isFree: boolean;
   accruedDisplay: string;
 }
+
+export interface ToastItem {
+  id: string;
+  type: 'success' | 'info' | 'warning' | 'error';
+  title: string;
+  message?: string;
+}
+

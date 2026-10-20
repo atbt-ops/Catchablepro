@@ -13,6 +13,7 @@ import {
   AuditLogEntry,
   FeedbackItem,
   AIDigest,
+  ToastItem,
 } from '../types';
 import {
   INITIAL_USERS,
@@ -40,6 +41,9 @@ interface AppContextType {
   auditLogs: AuditLogEntry[];
   feedbacks: FeedbackItem[];
   aiDigests: AIDigest[];
+  toasts: ToastItem[];
+  showToast: (toast: Omit<ToastItem, 'id'>) => void;
+  dismissToast: (id: string) => void;
 
   // Auth & User
   setCurrentUser: (user: User | null) => void;
@@ -127,6 +131,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     loadStored('feedbacks', INITIAL_FEEDBACK)
   );
   const [aiDigests, setAiDigests] = useState<AIDigest[]>(() => loadStored('ai_digests', []));
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = (toast: Omit<ToastItem, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9) + Date.now();
+    setToasts((prev) => [...prev.slice(-4), { ...toast, id }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3500);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   // Sync state changes to localStorage
   useEffect(() => {
@@ -190,6 +207,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const target = users.find((u) => u.id === userId);
     if (target) {
       setCurrentUser(target);
+      showToast({
+        type: 'info',
+        title: 'Switched Account',
+        message: `Now browsing as ${target.name || target.email} (${target.role})`,
+      });
     }
   };
 
@@ -371,6 +393,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           appliedCount++;
         }
       }
+      showToast({
+        type: 'success',
+        title: 'Auto-Apply Activated ⚡',
+        message:
+          appliedCount > 0
+            ? `Submitted ${appliedCount} matching application${appliedCount === 1 ? '' : 's'}`
+            : 'Looking for jobs matching your skills (≥1%)',
+      });
       addAuditLog(
         'auto_apply.sweep',
         'candidate',
@@ -378,6 +408,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentUser.email,
         `Auto-apply enabled: submitted ${appliedCount} matching applications`
       );
+    } else {
+      showToast({
+        type: 'info',
+        title: 'Auto-Apply Paused',
+        message: 'Automatic applications are currently disabled.',
+      });
     }
   };
 
@@ -418,6 +454,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setApplications((prev) => [newApp, ...prev]);
+    showToast({
+      type: 'success',
+      title: 'Application Sent! 🚀',
+      message: `Applied to ${targetJob.title} at ${targetJob.companyName} (${score}% match)`,
+    });
     addAuditLog(
       source === 'auto' ? 'application.auto_apply' : 'application.apply',
       'job',
@@ -430,11 +471,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const toggleSaveJob = (jobId: number) => {
     if (!currentUser || currentUser.role !== 'candidate') return;
+    const targetJob = jobs.find((j) => j.id === jobId);
+    const jobTitle = targetJob?.title || 'Role';
     setSavedJobs((prev) => {
       const exists = prev.some((s) => s.jobId === jobId && s.candidateId === currentUser.id);
       if (exists) {
+        showToast({
+          type: 'info',
+          title: 'Removed from Saved',
+          message: `Unbookmarked ${jobTitle}`,
+        });
         return prev.filter((s) => !(s.jobId === jobId && s.candidateId === currentUser.id));
       } else {
+        showToast({
+          type: 'success',
+          title: 'Job Saved 📌',
+          message: `Bookmarked ${jobTitle}`,
+        });
         return [...prev, { candidateId: currentUser.id, jobId, createdAt: new Date().toISOString() }];
       }
     });
@@ -524,6 +577,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
+    showToast({
+      type: 'success',
+      title: 'Job Published! 🚀',
+      message: `${newJob.title} is now active (Week 1 Free)`,
+    });
+
     return newJob;
   };
 
@@ -590,6 +649,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } else {
       updateJob(jobId, { status: newStatus });
     }
+    showToast({
+      type: 'info',
+      title: `Job ${newStatus === 'active' ? 'Activated' : newStatus === 'paused' ? 'Paused' : 'Closed'}`,
+      message: `${job.title} is now ${newStatus}`,
+    });
     addAuditLog('job.status_change', 'job', jobId, job.title, `Status: ${job.status} -> ${newStatus}`);
   };
 
@@ -605,6 +669,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
       })
     );
+    showToast({
+      type: 'info',
+      title: 'Hiring Stage Updated',
+      message: `Candidate moved to ${stage.toUpperCase()}`,
+    });
     addAuditLog('pipeline.stage_change', 'application', appId, '', `Moved to ${stage}`);
   };
 
@@ -638,6 +707,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setWalletTransactions((prev) => [tx, ...prev]);
+    showToast({
+      type: 'success',
+      title: 'Wallet Recharged! 💳',
+      message: `₹${(amountPaise / 100).toLocaleString('en-IN')} added to company wallet`,
+    });
     addAuditLog('wallet.topup', 'user', currentUser.id, currentUser.company_name, `Added ₹${amountPaise / 100}`);
   };
 
@@ -755,6 +829,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         auditLogs,
         feedbacks,
         aiDigests,
+        toasts,
+        showToast,
+        dismissToast,
 
         setCurrentUser,
         switchUser,
