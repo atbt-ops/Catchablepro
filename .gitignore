@@ -25,3 +25,5 @@ monitoring/grafana_token
 .app.pid
 *.log
 app.log
+.DS_Store
+
