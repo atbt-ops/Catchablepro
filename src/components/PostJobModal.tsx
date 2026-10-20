@@ -209,7 +209,7 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    background: 'none',
+    backgroundColor: 'transparent',
     borderWidth: 0,
     cursor: 'pointer',
   },

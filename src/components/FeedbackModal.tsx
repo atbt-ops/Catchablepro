@@ -128,7 +128,7 @@ const styles = stylex.create({
   },
   starBtn: {
     padding: '4px',
-    background: 'none',
+    backgroundColor: 'transparent',
     borderWidth: 0,
     cursor: 'pointer',
     display: 'flex',

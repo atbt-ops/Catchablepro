@@ -137,7 +137,8 @@ const styles = stylex.create({
   matchBanner: {
     padding: spacing.lg,
     borderRadius: radii.lg,
-    background: 'linear-gradient(to right, #eef2ff, #faf5ff, #eef2ff)',
+    backgroundColor: '#eef2ff',
+    backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff, #eef2ff)',
     borderWidth: '1px',
     borderStyle: 'solid',
     borderColor: colors.primaryBorder,

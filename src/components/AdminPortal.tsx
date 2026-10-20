@@ -28,7 +28,8 @@ const styles = stylex.create({
     gap: spacing.lg,
   },
   banner: {
-    background: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
+    backgroundColor: '#0f172a',
+    backgroundImage: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
     borderRadius: radii.xl,
     padding: spacing.xl,
     color: colors.textInverse,

@@ -39,7 +39,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # Also check for any residual process listening on port 3000 (e.g. child vite processes)
-PORT_PIDS=$(lsof -ti :$PORT 2>/dev/null || true)
+PORT_PIDS=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
 if [ -n "$PORT_PIDS" ]; then
   echo "🛑 Terminating remaining process(es) on port $PORT: $PORT_PIDS..."
   for p in $PORT_PIDS; do

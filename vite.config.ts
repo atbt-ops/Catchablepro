@@ -63,9 +63,7 @@ function prometheusMetricsPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    stylex.vite({
-      useCSSLayers: true,
-    }),
+    stylex.vite(),
     react(),
     prometheusMetricsPlugin(),
   ],

@@ -69,7 +69,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: '4px',
-    background: 'none',
+    backgroundColor: 'transparent',
     borderWidth: 0,
     cursor: 'pointer',
     padding: 0,
@@ -130,7 +130,8 @@ const styles = stylex.create({
     width: '32px',
     height: '32px',
     borderRadius: radii.md,
-    background: 'linear-gradient(135deg, #4f46e5, #c026d3)',
+    backgroundColor: '#4f46e5',
+    backgroundImage: 'linear-gradient(135deg, #4f46e5, #c026d3)',
     color: colors.textInverse,
     display: 'flex',
     alignItems: 'center',
@@ -147,7 +148,7 @@ const styles = stylex.create({
     color: colors.textSecondary,
   },
   footerLinkBtn: {
-    background: 'none',
+    backgroundColor: 'transparent',
     borderWidth: 0,
     cursor: 'pointer',
     color: {

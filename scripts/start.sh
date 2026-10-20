@@ -30,7 +30,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # Check if port 3000 is occupied by another process
-OCCUPIED_PID=$(lsof -ti :$PORT 2>/dev/null || true)
+OCCUPIED_PID=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
 if [ -n "$OCCUPIED_PID" ]; then
   echo "⚠️  Port $PORT is already in use by process PID $OCCUPIED_PID."
   echo "   Use './stop.sh' to stop it first or kill process $OCCUPIED_PID."
@@ -45,7 +45,7 @@ fi
 
 echo "🚀 Starting Catchablepro application in background..."
 > "$LOG_FILE"
-nohup npm run dev >> "$LOG_FILE" 2>&1 &
+nohup ./node_modules/.bin/vite --host 0.0.0.0 --port 3000 < /dev/null >> "$LOG_FILE" 2>&1 &
 APP_PID=$!
 disown "$APP_PID" 2>/dev/null || true
 echo "$APP_PID" > "$PID_FILE"

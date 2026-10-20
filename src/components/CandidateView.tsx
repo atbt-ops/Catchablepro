@@ -37,7 +37,8 @@ const styles = stylex.create({
     gap: spacing.lg,
   },
   heroBanner: {
-    background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #3b0764 100%)',
+    backgroundColor: '#0f172a',
+    backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #3b0764 100%)',
     borderRadius: radii.xl,
     color: colors.textInverse,
     padding: spacing.xl,
@@ -300,23 +301,28 @@ const styles = stylex.create({
     fontSize: '0.625rem',
   },
   filterPill: {
-    paddingTop: '4px',
-    paddingBottom: '4px',
+    paddingTop: '5px',
+    paddingBottom: '5px',
     paddingLeft: '12px',
     paddingRight: '12px',
     borderRadius: radii.md,
     fontWeight: 700,
     fontSize: '0.75rem',
     cursor: 'pointer',
-    borderWidth: 0,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'transparent',
     transition: 'all 0.15s ease',
   },
   filterPillActive: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
     color: colors.textInverse,
+    boxShadow: '0 1px 3px rgba(79, 70, 229, 0.25)',
   },
   filterPillInactive: {
     backgroundColor: colors.surfaceSubtle,
+    borderColor: colors.border,
     color: colors.textSecondary,
   },
   filterDivider: {
@@ -467,7 +473,8 @@ const styles = stylex.create({
   profileStrengthBox: {
     padding: spacing.md,
     borderRadius: radii.md,
-    background: 'linear-gradient(to right, #f8fafc, #eef2ff)',
+    backgroundColor: '#f8fafc',
+    backgroundImage: 'linear-gradient(to right, #f8fafc, #eef2ff)',
     borderWidth: '1px',
     borderStyle: 'solid',
     borderColor: colors.primaryBorder,
@@ -484,7 +491,8 @@ const styles = stylex.create({
   },
   strengthBarFill: {
     height: '100%',
-    background: 'linear-gradient(to right, #4f46e5, #c026d3)',
+    backgroundColor: '#4f46e5',
+    backgroundImage: 'linear-gradient(to right, #4f46e5, #c026d3)',
     borderRadius: radii.full,
     transition: 'all 0.5s ease',
   },
@@ -1201,7 +1209,7 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                         {app.job && (
                           <button
                             onClick={() => setSelectedJob(app.job!)}
-                            style={{ padding: '8px', borderRadius: '8px', color: '#94a3b8', background: 'none', border: 0, cursor: 'pointer' }}
+                            style={{ padding: '8px', borderRadius: '8px', color: '#94a3b8', backgroundColor: 'transparent', border: 0, cursor: 'pointer' }}
                             title="View job details"
                           >
                             <ChevronRight size={20} />

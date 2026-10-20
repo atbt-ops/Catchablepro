@@ -26,7 +26,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 if [ $IS_RUNNING -eq 0 ]; then
-  PORT_PID=$(lsof -ti :$PORT 2>/dev/null || true)
+  PORT_PID=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
   if [ -n "$PORT_PID" ]; then
     echo "🟡 Status: Process listening on port $PORT (PID: $PORT_PID)"
     echo "📍 URL:    $URL"

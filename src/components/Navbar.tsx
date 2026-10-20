@@ -56,7 +56,7 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    background: 'none',
+    backgroundColor: 'transparent',
     borderWidth: 0,
     cursor: 'pointer',
     padding: 0,
@@ -66,7 +66,8 @@ const styles = stylex.create({
     width: '36px',
     height: '36px',
     borderRadius: radii.md,
-    background: 'linear-gradient(135deg, #4f46e5, #c026d3)',
+    backgroundColor: '#4f46e5',
+    backgroundImage: 'linear-gradient(135deg, #4f46e5, #c026d3)',
     color: colors.textInverse,
     display: 'flex',
     alignItems: 'center',
@@ -290,7 +291,7 @@ const styles = stylex.create({
       '@media (min-width: 1024px)': 'flex',
     },
     alignItems: 'center',
-    gap: '4px',
+    gap: '6px',
   },
   navLink: {
     paddingTop: '6px',
@@ -305,6 +306,7 @@ const styles = stylex.create({
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
+    whiteSpace: 'nowrap',
     transition: 'all 0.15s ease',
     backgroundColor: 'transparent',
     color: colors.textSecondary,
@@ -379,10 +381,11 @@ const styles = stylex.create({
     width: '36px',
     height: '36px',
     borderRadius: radii.full,
-    background: 'linear-gradient(135deg, #4f46e5, #3730a3)',
+    backgroundColor: '#4f46e5',
+    backgroundImage: 'linear-gradient(135deg, #4f46e5, #3730a3)',
     color: colors.textInverse,
     fontWeight: 800,
-    fontSize: '0.75rem',
+    fontSize: '0.8125rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -724,7 +727,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search jobs, skills (e.g. React, Python)..."
+                  placeholder="Search jobs or skills..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   {...stylex.props(styles.searchInput)}
@@ -732,12 +735,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {searchQuery ? (
                   <button
                     onClick={() => setSearchQuery('')}
-                    style={{ background: 'none', border: 0, cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
+                    style={{ backgroundColor: 'transparent', border: 0, cursor: 'pointer', color: '#94a3b8', padding: '2px', display: 'flex', alignItems: 'center' }}
+                    title="Clear search"
                   >
                     <X size={14} />
                   </button>
                 ) : (
-                  <kbd style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 6px' }}>
+                  <kbd style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', flexShrink: 0, lineHeight: 1 }}>
                     /
                   </kbd>
                 )}

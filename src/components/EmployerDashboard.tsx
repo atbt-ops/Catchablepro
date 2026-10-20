@@ -371,7 +371,7 @@ const PricingMeterVisualizer: React.FC<{ cost: CostState; status: JobStatus }> =
             style={{
               height: '100%',
               width: `${percentElapsed}%`,
-              background: 'linear-gradient(to right, #10b981, #4f46e5, #f59e0b)',
+              backgroundImage: 'linear-gradient(to right, #10b981, #4f46e5, #f59e0b)',
               borderRadius: '9999px',
               transition: 'all 0.5s ease',
             }}
@@ -690,7 +690,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               <span {...stylex.props(styles.statSub)} style={{ color: '#64748b' }}>Ready for on-demand meter</span>
             </div>
 
-            <div {...stylex.props(styles.statCard)} style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)', borderColor: '#c7d2fe' }}>
+            <div {...stylex.props(styles.statCard)} style={{ backgroundColor: '#eef2ff', backgroundImage: 'linear-gradient(135deg, #eef2ff, #faf5ff)', borderColor: '#c7d2fe' }}>
               <span {...stylex.props(styles.statLabel)} style={{ color: '#3730a3' }}>Free Week Policy</span>
               <span {...stylex.props(styles.statVal)} style={{ fontSize: '1.125rem', color: '#1e1b4b' }}>
                 7 Days FREE per job
@@ -829,7 +829,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 <div key={user.id} {...stylex.props(styles.kanbanCard)}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #4f46e5, #3730a3)', color: '#fff', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: '#4f46e5', backgroundImage: 'linear-gradient(135deg, #4f46e5, #3730a3)', color: '#fff', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {user.name[0].toUpperCase()}
                       </div>
                       <div>
@@ -1015,7 +1015,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
       {activeTab === 'wallet' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #1e1b4b, #0f172a)', borderRadius: '24px', padding: '24px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ backgroundColor: '#1e1b4b', backgroundImage: 'linear-gradient(135deg, #1e1b4b, #0f172a)', borderRadius: '24px', padding: '24px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7d2fe' }}>
                   Prepaid Wallet Balance
@@ -1276,7 +1276,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               </div>
               <button
                 onClick={() => setShowTopupModal(false)}
-                style={{ background: 'none', border: 0, cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                style={{ backgroundColor: 'transparent', border: 0, cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
               >
                 <XCircle size={20} />
               </button>
