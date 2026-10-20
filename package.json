@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
+    "start": "./start.sh",
+    "stop": "./stop.sh",
+    "status": "./status.sh",
     "build": "tsc && vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview --port 3000"

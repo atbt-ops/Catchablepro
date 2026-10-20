@@ -20,3 +20,8 @@ public/assets/
 monitoring/prometheus.yml
 monitoring/metrics_token
 monitoring/grafana_token
+
+# Application runtime files
+.app.pid
+*.log
+app.log
