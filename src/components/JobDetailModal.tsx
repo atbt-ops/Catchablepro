@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { Job, CandidateProfile, CompanyProfile } from '../types';
 import { matchDetail } from '../services/matching';
 import { CompanyAvatar } from './CompanyAvatar';
 import { useApp } from '../context/AppContext';
 import {
   X,
-  MapPin,
-  Briefcase,
-  Calendar,
   Building2,
   CheckCircle2,
   AlertCircle,
@@ -17,11 +15,543 @@ import {
   ExternalLink,
   ShieldCheck,
   Share2,
-  Users,
-  Globe,
-  Clock,
-  Layers,
 } from 'lucide-react';
+import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
+
+const styles = stylex.create({
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    overflowY: 'auto',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  modal: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    maxWidth: '768px',
+    width: '100%',
+    maxHeight: '92vh',
+    overflow: 'hidden',
+    boxShadow: shadows.xl,
+    display: 'flex',
+    flexDirection: 'column',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  header: {
+    padding: spacing.lg,
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors.border,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    backgroundColor: colors.surfaceSubtle,
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  tagList: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+    fontSize: '0.75rem',
+  },
+  deptBadge: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    borderRadius: radii.full,
+    fontWeight: 700,
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+  },
+  dot: {
+    color: colors.borderStrong,
+  },
+  metaText: {
+    fontWeight: 600,
+    color: colors.textSecondary,
+  },
+  jobTitle: {
+    fontSize: '1.375rem',
+    fontWeight: 900,
+    color: colors.text,
+    marginTop: '4px',
+    margin: 0,
+    lineHeight: 1.2,
+  },
+  companyName: {
+    fontSize: '0.875rem',
+    fontWeight: 700,
+    color: colors.primary,
+    marginTop: '2px',
+    margin: 0,
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    flexShrink: 0,
+  },
+  iconBtn: {
+    padding: '8px',
+    borderRadius: radii.md,
+    color: {
+      default: colors.textMuted,
+      ':hover': colors.text,
+    },
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': colors.border,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.15s ease',
+  },
+  body: {
+    padding: spacing.lg,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.lg,
+  },
+  matchBanner: {
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    background: 'linear-gradient(to right, #eef2ff, #faf5ff, #eef2ff)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+  matchHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  matchHeaderLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  matchIconBox: {
+    width: '32px',
+    height: '32px',
+    borderRadius: radii.md,
+    backgroundColor: colors.primary,
+    color: colors.textInverse,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+  },
+  matchTitle: {
+    fontWeight: 900,
+    color: colors.text,
+    fontSize: '0.875rem',
+    margin: 0,
+  },
+  matchSubtitle: {
+    fontSize: '0.6875rem',
+    color: colors.textSecondary,
+    margin: 0,
+  },
+  matchBadgeText: {
+    fontSize: '0.75rem',
+    fontWeight: 900,
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: radii.full,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  matchBadgeHigh: {
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+  },
+  matchBadgeMed: {
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+  },
+  matchBadgeLow: {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.textSecondary,
+  },
+  matchGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: spacing.sm,
+    fontSize: '0.75rem',
+  },
+  matchCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: '14px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    boxShadow: shadows.sm,
+  },
+  exactCard: {
+    borderColor: colors.successBorder,
+  },
+  creditCard: {
+    borderColor: colors.primaryBorder,
+  },
+  missingCard: {
+    borderColor: colors.border,
+  },
+  matchCardTitle: {
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginBottom: spacing.sm,
+  },
+  exactTitle: {
+    color: colors.successText,
+  },
+  creditTitle: {
+    color: colors.primaryHover,
+  },
+  missingTitle: {
+    color: colors.textSecondary,
+  },
+  tagRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  creditCol: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  exactTag: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.sm,
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+    fontWeight: 700,
+    fontSize: '0.6875rem',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
+  },
+  creditTag: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.sm,
+    backgroundColor: colors.primaryLight,
+    color: colors.primaryHover,
+    fontWeight: 600,
+    fontSize: '0.6875rem',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '6px',
+    boxSizing: 'border-box',
+  },
+  creditPct: {
+    fontSize: '0.625rem',
+    color: colors.primary,
+    fontWeight: 700,
+  },
+  missingTag: {
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.textSecondary,
+    fontWeight: 500,
+    fontSize: '0.6875rem',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontStyle: 'italic',
+    fontSize: '0.6875rem',
+  },
+  fullCoverageText: {
+    color: colors.success,
+    fontWeight: 700,
+    fontSize: '0.6875rem',
+  },
+  snapshotGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: spacing.sm,
+  },
+  snapshotCard: {
+    padding: '14px',
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSubtle,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  snapshotLabel: {
+    fontSize: '0.625rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.textMuted,
+    display: 'block',
+  },
+  snapshotValue: {
+    fontSize: '0.875rem',
+    fontWeight: 800,
+    color: colors.text,
+    marginTop: '2px',
+    display: 'block',
+  },
+  sectionTitle: {
+    fontSize: '0.75rem',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: colors.text,
+    marginBottom: spacing.sm,
+    margin: 0,
+  },
+  descriptionBox: {
+    fontSize: '0.875rem',
+    color: colors.textSecondary,
+    lineHeight: 1.6,
+    whiteSpace: 'pre-line',
+    backgroundColor: colors.surfaceSubtle,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+  },
+  companyBox: {
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSubtle,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+    fontSize: '0.75rem',
+  },
+  companyTitle: {
+    fontWeight: 700,
+    color: colors.text,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    margin: 0,
+    fontSize: '0.75rem',
+  },
+  companyDesc: {
+    color: colors.textSecondary,
+    lineHeight: 1.5,
+    margin: 0,
+  },
+  companyMetaRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.md,
+    color: colors.textSecondary,
+    paddingTop: '4px',
+  },
+  link: {
+    color: colors.primary,
+    textDecoration: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    fontWeight: 600,
+  },
+  contactForm: {
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.primaryLight,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  contactHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  contactTitle: {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.primaryActive,
+  },
+  cancelBtn: {
+    fontSize: '0.75rem',
+    color: colors.textMuted,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+  },
+  textarea: {
+    width: '100%',
+    fontSize: '0.75rem',
+    padding: '10px 12px',
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.primaryBorder,
+    outline: 'none',
+    boxSizing: 'border-box',
+    backgroundColor: colors.surface,
+    fontFamily: 'inherit',
+    color: colors.text,
+  },
+  submitMessageBtn: {
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    alignSelf: 'flex-start',
+    transition: 'background-color 0.15s ease',
+  },
+  askPromptBtn: {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: colors.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    cursor: 'pointer',
+    padding: 0,
+  },
+  footer: {
+    padding: spacing.md,
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surfaceSubtle,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  bookmarkBtn: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: spacing.md,
+    paddingRight: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  bookmarkSaved: {
+    backgroundColor: colors.warningLight,
+    color: colors.warningText,
+    borderColor: colors.warningBorder,
+  },
+  bookmarkDefault: {
+    backgroundColor: colors.surface,
+    color: colors.textSecondary,
+    borderColor: colors.border,
+  },
+  appliedStatus: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '18px',
+    paddingRight: '18px',
+    borderRadius: radii.md,
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
+    fontSize: '0.75rem',
+    fontWeight: 900,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  applySubmitBtn: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '22px',
+    paddingRight: '22px',
+    borderRadius: radii.md,
+    fontSize: '0.75rem',
+    fontWeight: 900,
+    color: colors.textInverse,
+    backgroundColor: {
+      default: colors.primary,
+      ':hover': colors.primaryHover,
+    },
+    borderWidth: 0,
+    cursor: 'pointer',
+    boxShadow: shadows.md,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'background-color 0.15s ease',
+  },
+});
 
 interface JobDetailModalProps {
   job: Job;
@@ -81,147 +611,142 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
     }, 1500);
   };
 
+  const isHigh = match.pct >= 75;
+  const isMed = match.pct >= 40 && match.pct < 75;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
+    <div {...stylex.props(styles.overlay)}>
+      <div {...stylex.props(styles.modal)}>
         {/* Modal Header */}
-        <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4 bg-slate-50/70">
-          <div className="flex items-start gap-4">
+        <div {...stylex.props(styles.header)}>
+          <div {...stylex.props(styles.headerLeft)}>
             <CompanyAvatar name={job.companyName} size="lg" showVerified={true} />
             <div>
-              <div className="flex items-center gap-2 flex-wrap text-xs">
-                <span className="px-2.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-700">
+              <div {...stylex.props(styles.tagList)}>
+                <span {...stylex.props(styles.deptBadge)}>
                   {job.department || 'Technology'}
                 </span>
-                <span className="text-slate-300">•</span>
-                <span className="font-semibold text-slate-600">{job.employmentType}</span>
-                <span className="text-slate-300">•</span>
-                <span className="font-semibold text-slate-600">{job.workMode}</span>
+                <span {...stylex.props(styles.dot)}>•</span>
+                <span {...stylex.props(styles.metaText)}>{job.employmentType}</span>
+                <span {...stylex.props(styles.dot)}>•</span>
+                <span {...stylex.props(styles.metaText)}>{job.workMode}</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1 leading-tight">
+              <h2 {...stylex.props(styles.jobTitle)}>
                 {job.title}
               </h2>
-              <p className="text-sm font-bold text-indigo-600 mt-0.5">{job.companyName}</p>
+              <p {...stylex.props(styles.companyName)}>{job.companyName}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div {...stylex.props(styles.headerRight)}>
             <button
               onClick={handleShare}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              {...stylex.props(styles.iconBtn)}
               title="Share job"
             >
-              <Share2 className="w-5 h-5" />
+              <Share2 size={20} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              {...stylex.props(styles.iconBtn)}
             >
-              <X className="w-5 h-5" />
+              <X size={20} />
             </button>
           </div>
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div {...stylex.props(styles.body)}>
           {/* Match compatibility banner */}
           {candSkills && (
-            <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-indigo-50/90 border border-indigo-100/90 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
-                    <Sparkles className="w-4 h-4" />
+            <div {...stylex.props(styles.matchBanner)}>
+              <div {...stylex.props(styles.matchHeader)}>
+                <div {...stylex.props(styles.matchHeaderLeft)}>
+                  <div {...stylex.props(styles.matchIconBox)}>
+                    <Sparkles size={16} />
                   </div>
                   <div>
-                    <h4 className="font-black text-slate-900 text-sm">
+                    <h4 {...stylex.props(styles.matchTitle)}>
                       Semantic Skill Compatibility: {match.pct}%
                     </h4>
-                    <p className="text-[11px] text-slate-500">
+                    <p {...stylex.props(styles.matchSubtitle)}>
                       Calculated from your profile tech stack vs job requirements
                     </p>
                   </div>
                 </div>
 
                 <span
-                  className={`text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${
-                    match.pct >= 75
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : match.pct >= 40
-                      ? 'bg-indigo-100 text-indigo-800'
-                      : 'bg-slate-200 text-slate-700'
-                  }`}
+                  {...stylex.props(
+                    styles.matchBadgeText,
+                    isHigh
+                      ? styles.matchBadgeHigh
+                      : isMed
+                      ? styles.matchBadgeMed
+                      : styles.matchBadgeLow
+                  )}
                 >
-                  {match.pct >= 75 ? 'Strong Match' : match.pct >= 40 ? 'Moderate Match' : 'Low Match'}
+                  {isHigh ? 'Strong Match' : isMed ? 'Moderate Match' : 'Low Match'}
                 </span>
               </div>
 
               {/* Breakdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div {...stylex.props(styles.matchGrid)}>
                 {/* Exact Matches */}
-                <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-2xs">
-                  <div className="font-bold text-emerald-800 flex items-center gap-1.5 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <div {...stylex.props(styles.matchCard, styles.exactCard)}>
+                  <div {...stylex.props(styles.matchCardTitle, styles.exactTitle)}>
+                    <CheckCircle2 size={16} />
                     <span>Exact Matches ({match.matched.length})</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div {...stylex.props(styles.tagRow)}>
                     {match.matched.length > 0 ? (
                       match.matched.map((s) => (
-                        <span
-                          key={s}
-                          className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold text-[11px] border border-emerald-100"
-                        >
+                        <span key={s} {...stylex.props(styles.exactTag)}>
                           {s}
                         </span>
                       ))
                     ) : (
-                      <span className="text-slate-400 italic text-[11px]">No exact matches</span>
+                      <span {...stylex.props(styles.emptyText)}>No exact matches</span>
                     )}
                   </div>
                 </div>
 
                 {/* Partial Matches */}
-                <div className="bg-white/90 p-3.5 rounded-2xl border border-indigo-100 shadow-2xs">
-                  <div className="font-bold text-indigo-800 flex items-center gap-1.5 mb-2">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                <div {...stylex.props(styles.matchCard, styles.creditCard)}>
+                  <div {...stylex.props(styles.matchCardTitle, styles.creditTitle)}>
+                    <Sparkles size={16} />
                     <span>Related Credit ({match.partial.length})</span>
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  <div {...stylex.props(styles.creditCol)}>
                     {match.partial.length > 0 ? (
                       match.partial.map((p) => (
-                        <span
-                          key={p.skill}
-                          className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 font-semibold text-[11px] border border-indigo-100 flex items-center justify-between"
-                        >
+                        <span key={p.skill} {...stylex.props(styles.creditTag)}>
                           <span>{p.skill}</span>
-                          <span className="text-[10px] text-indigo-500 font-bold">
+                          <span {...stylex.props(styles.creditPct)}>
                             via {p.via} ({p.pct}%)
                           </span>
                         </span>
                       ))
                     ) : (
-                      <span className="text-slate-400 italic text-[11px]">No related overlaps</span>
+                      <span {...stylex.props(styles.emptyText)}>No related overlaps</span>
                     )}
                   </div>
                 </div>
 
                 {/* Missing Skills */}
-                <div className="bg-white/90 p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-                  <div className="font-bold text-slate-600 flex items-center gap-1.5 mb-2">
-                    <AlertCircle className="w-4 h-4 text-slate-400" />
+                <div {...stylex.props(styles.matchCard, styles.missingCard)}>
+                  <div {...stylex.props(styles.matchCardTitle, styles.missingTitle)}>
+                    <AlertCircle size={16} />
                     <span>Missing Skills ({match.missing.length})</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div {...stylex.props(styles.tagRow)}>
                     {match.missing.length > 0 ? (
                       match.missing.map((s) => (
-                        <span
-                          key={s}
-                          className="px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 font-medium text-[11px] border border-slate-200"
-                        >
+                        <span key={s} {...stylex.props(styles.missingTag)}>
                           {s}
                         </span>
                       ))
                     ) : (
-                      <span className="text-emerald-600 font-bold text-[11px]">None! Full coverage.</span>
+                      <span {...stylex.props(styles.fullCoverageText)}>None! Full coverage.</span>
                     )}
                   </div>
                 </div>
@@ -230,39 +755,31 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
           )}
 
           {/* Quick Snapshot Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Compensation
-              </span>
-              <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">
+          <div {...stylex.props(styles.snapshotGrid)}>
+            <div {...stylex.props(styles.snapshotCard)}>
+              <span {...stylex.props(styles.snapshotLabel)}>Compensation</span>
+              <span {...stylex.props(styles.snapshotValue)}>
                 {job.hideSalary ? 'Undisclosed' : `₹${job.salaryMin} - ${job.salaryMax} LPA`}
               </span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Experience
-              </span>
-              <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">
+            <div {...stylex.props(styles.snapshotCard)}>
+              <span {...stylex.props(styles.snapshotLabel)}>Experience</span>
+              <span {...stylex.props(styles.snapshotValue)}>
                 {job.expMin} - {job.expMax} Years
               </span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Location
-              </span>
-              <span className="text-sm font-extrabold text-slate-900 mt-0.5 block truncate">
+            <div {...stylex.props(styles.snapshotCard)}>
+              <span {...stylex.props(styles.snapshotLabel)}>Location</span>
+              <span {...stylex.props(styles.snapshotValue)} style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                 {job.location}
               </span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Vacancies
-              </span>
-              <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">
+            <div {...stylex.props(styles.snapshotCard)}>
+              <span {...stylex.props(styles.snapshotLabel)}>Vacancies</span>
+              <span {...stylex.props(styles.snapshotValue)}>
                 {job.vacancies} {job.vacancies === 1 ? 'Opening' : 'Openings'}
               </span>
             </div>
@@ -270,23 +787,23 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
 
           {/* Job Description */}
           <div>
-            <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 mb-2">
-              Role Overview & Responsibilities
+            <h3 {...stylex.props(styles.sectionTitle)}>
+              Role Overview &amp; Responsibilities
             </h3>
-            <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+            <div {...stylex.props(styles.descriptionBox)}>
               {job.description}
             </div>
           </div>
 
           {/* Company Profile Details */}
           {companyProfile && (
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-              <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
-                <Building2 className="w-4 h-4 text-indigo-600" />
+            <div {...stylex.props(styles.companyBox)}>
+              <h4 {...stylex.props(styles.companyTitle)}>
+                <Building2 size={16} color="#6366f1" />
                 <span>About {job.companyName}</span>
               </h4>
-              <p className="text-slate-600 leading-relaxed">{companyProfile.about}</p>
-              <div className="flex flex-wrap items-center gap-4 text-slate-500 pt-1">
+              <p {...stylex.props(styles.companyDesc)}>{companyProfile.about}</p>
+              <div {...stylex.props(styles.companyMetaRow)}>
                 <span>HQ: <strong>{companyProfile.hqLocation}</strong></span>
                 <span>Size: <strong>{companyProfile.size}</strong></span>
                 {companyProfile.website && (
@@ -294,10 +811,10 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
                     href={companyProfile.website}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                    {...stylex.props(styles.link)}
                   >
                     <span>Website</span>
-                    <ExternalLink className="w-3 h-3" />
+                    <ExternalLink size={12} />
                   </a>
                 )}
               </div>
@@ -306,15 +823,15 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
 
           {/* In-Modal Recruiter Contact Form */}
           {showContactForm ? (
-            <form onSubmit={handleSendContact} className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-950">
+            <form onSubmit={handleSendContact} {...stylex.props(styles.contactForm)}>
+              <div {...stylex.props(styles.contactHeader)}>
+                <span {...stylex.props(styles.contactTitle)}>
                   Ask Recruiter a Question
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowContactForm(false)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
+                  {...stylex.props(styles.cancelBtn)}
                 >
                   Cancel
                 </button>
@@ -324,24 +841,24 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
                 value={contactMessage}
                 onChange={(e) => setContactMessage(e.target.value)}
                 placeholder="Ask about team structure, tech stack, or visa/relocation requirements..."
-                className="w-full text-xs p-3 rounded-xl border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                {...stylex.props(styles.textarea)}
                 required
               />
               <button
                 type="submit"
                 disabled={contactSent}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+                {...stylex.props(styles.submitMessageBtn)}
               >
-                <Send className="w-3.5 h-3.5" />
+                <Send size={14} />
                 <span>{contactSent ? 'Message Sent!' : 'Send Message'}</span>
               </button>
             </form>
           ) : (
-            <div className="flex justify-start">
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
               <button
                 type="button"
                 onClick={() => setShowContactForm(true)}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                {...stylex.props(styles.askPromptBtn)}
               >
                 Have a question? Inquire with hiring team →
               </button>
@@ -350,29 +867,28 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
         </div>
 
         {/* Modal Sticky Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+        <div {...stylex.props(styles.footer)}>
           <button
             onClick={() => onToggleSave(job.id)}
-            className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-              isSaved
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
+            {...stylex.props(
+              styles.bookmarkBtn,
+              isSaved ? styles.bookmarkSaved : styles.bookmarkDefault
+            )}
           >
-            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+            <Bookmark size={16} fill={isSaved ? 'currentColor' : 'none'} />
             <span>{isSaved ? 'Saved in Bookmarks' : 'Save for Later'}</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {hasApplied ? (
-              <span className="px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-black flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span {...stylex.props(styles.appliedStatus)}>
+                <ShieldCheck size={16} />
                 <span>Application Submitted</span>
               </span>
             ) : (
               <button
                 onClick={() => onApply(job.id)}
-                className="px-6 py-2.5 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2"
+                {...stylex.props(styles.applySubmitBtn)}
               >
                 <span>Apply to Role</span>
               </button>
