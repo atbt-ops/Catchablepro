@@ -1,0 +1,5 @@
+{
+  "name": "Catchablepro",
+  "description": "Skill-based job board with semantic skill matching, candidate auto-apply, employer candidate ranking, hiring pipeline, and on-demand pricing meter.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

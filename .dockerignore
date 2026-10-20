@@ -1,9 +1,5 @@
-.venv/
-__pycache__/
-*.pyc
-data/portal.db
-data/uploads/*
-!data/uploads/.gitkeep
+node_modules/
+dist/
 .git/
-tests/
-.github/
+.env
+.env.local
