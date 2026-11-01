@@ -235,6 +235,8 @@ export interface Interview {
   reminder24hSentAt?: string;
   reminder24hScheduledFor?: string;
   customReminderNotes?: string;
+  candidatePreferredNotes?: string;
+  candidateSelectedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

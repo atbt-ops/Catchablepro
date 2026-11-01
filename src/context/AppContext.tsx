@@ -108,7 +108,12 @@ interface AppContextType {
     advancePipelineStage?: boolean;
     autoConfirmFirstSlot?: boolean;
   }) => Interview;
-  confirmInterviewSlot: (interviewId: number, slotId: string) => void;
+  confirmInterviewSlot: (interviewId: number, slotId: string, isCandidateAction?: boolean) => void;
+  submitCandidateAvailability: (
+    interviewId: number,
+    preferredNotes: string,
+    alternateSlot?: { date: string; time: string; duration: number }
+  ) => void;
   rescheduleInterview: (interviewId: number, newSlots: InterviewSlot[], notes?: string) => void;
   updateInterviewStatus: (interviewId: number, status: InterviewStatus, feedbackOrNote?: string) => void;
   cancelInterview: (interviewId: number, reason?: string) => void;
@@ -886,8 +891,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newInterview;
   };
 
-  const confirmInterviewSlot = (interviewId: number, slotId: string) => {
+  const confirmInterviewSlot = (interviewId: number, slotId: string, isCandidateAction?: boolean) => {
     let chosenSlot: InterviewSlot | undefined;
+    const nowIso = new Date().toISOString();
 
     setInterviews((prev) =>
       prev.map((iv) => {
@@ -899,10 +905,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           ...iv,
           status: 'confirmed',
           confirmedSlot: chosen,
+          candidateSelectedAt: isCandidateAction ? nowIso : iv.candidateSelectedAt || nowIso,
           reminder24hEnabled: true,
           reminder24hSent: false,
           reminder24hScheduledFor: scheduledTime,
-          updatedAt: new Date().toISOString(),
+          updatedAt: nowIso,
         };
       })
     );
@@ -915,12 +922,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
+    const candidate = iv ? users.find((u) => u.id === iv.candidateId) : null;
     showToast({
       type: 'success',
       title: 'Interview Slot Confirmed! 📅',
-      message: 'Interview is officially scheduled on candidate & employer calendars. 24h reminder scheduled.',
+      message: isCandidateAction
+        ? `${candidate?.name || 'Candidate'} selected their preferred availability! Scheduled on calendar.`
+        : 'Interview is officially scheduled on candidate & employer calendars. 24h reminder scheduled.',
     });
     addAuditLog('interview.confirm', 'interview', interviewId, '', `Slot ${slotId} confirmed`);
+  };
+
+  const submitCandidateAvailability = (
+    interviewId: number,
+    preferredNotes: string,
+    alternateSlot?: { date: string; time: string; duration: number }
+  ) => {
+    const nowIso = new Date().toISOString();
+
+    setInterviews((prev) =>
+      prev.map((iv) => {
+        if (iv.id !== interviewId) return iv;
+
+        let slots = [...iv.proposedSlots];
+        if (alternateSlot) {
+          const newSlot: InterviewSlot = {
+            id: `cand_slot_${Date.now()}`,
+            dateTime: `${alternateSlot.date}T${alternateSlot.time}:00`,
+            durationMinutes: alternateSlot.duration || 45,
+            notes: 'Candidate Suggested Alternate Slot',
+          };
+          slots = [newSlot, ...slots];
+        }
+
+        return {
+          ...iv,
+          candidatePreferredNotes: preferredNotes,
+          proposedSlots: slots,
+          updatedAt: nowIso,
+        };
+      })
+    );
+
+    const iv = interviews.find((i) => i.id === interviewId);
+    const candidate = iv ? users.find((u) => u.id === iv.candidateId) : null;
+
+    showToast({
+      type: 'info',
+      title: 'Candidate Availability Submitted 📩',
+      message: `${candidate?.name || 'Candidate'} submitted preferred availability: "${preferredNotes}"`,
+    });
+
+    addAuditLog(
+      'interview.candidate_availability',
+      'interview',
+      interviewId,
+      '',
+      `Candidate submitted availability: ${preferredNotes}`
+    );
   };
 
   const rescheduleInterview = (interviewId: number, newSlots: InterviewSlot[], reason?: string) => {
@@ -1418,6 +1477,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         interviews,
         proposeInterview,
         confirmInterviewSlot,
+        submitCandidateAvailability,
         rescheduleInterview,
         updateInterviewStatus,
         cancelInterview,

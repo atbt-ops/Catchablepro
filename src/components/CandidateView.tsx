@@ -5,6 +5,7 @@ import { Job, ApplicationStage, Interview } from '../types';
 import { JobCard } from './JobCard';
 import { JobDetailModal } from './JobDetailModal';
 import { ReminderEmailPreviewModal } from './ReminderEmailPreviewModal';
+import { CandidateSlotSelectionModal } from './CandidateSlotSelectionModal';
 import { matchPct, parseSkills } from '../services/matching';
 import {
   Search,
@@ -701,11 +702,13 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
     hasAppliedToJob,
     interviews,
     confirmInterviewSlot,
+    submitCandidateAvailability,
     showToast,
   } = useApp();
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedReminderForPreview, setSelectedReminderForPreview] = useState<Interview | null>(null);
+  const [selectedInterviewForSlotSelection, setSelectedInterviewForSlotSelection] = useState<Interview | null>(null);
 
   // Filters
   const [workModeFilter, setWorkModeFilter] = useState<string>('All');
@@ -1435,14 +1438,32 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                           {/* If proposed: candidate can choose slot */}
                           {isProp && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px solid #fde68a' }}>
-                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#92400e' }}>
-                                Select your preferred time slot to lock in your calendar:
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#92400e' }}>
+                                  Select your preferred time slot to lock in your calendar:
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedInterviewForSlotSelection(candidateInterview)}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: '#4338ca',
+                                    backgroundColor: '#eef2ff',
+                                    border: '1px solid #c7d2fe',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Open Availability Selector
+                                </button>
+                              </div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                 {candidateInterview.proposedSlots.map((slot) => (
                                   <button
                                     key={slot.id}
-                                    onClick={() => confirmInterviewSlot(candidateInterview.id, slot.id)}
+                                    onClick={() => confirmInterviewSlot(candidateInterview.id, slot.id, true)}
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
@@ -1848,6 +1869,23 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
         <ReminderEmailPreviewModal
           interview={selectedReminderForPreview}
           onClose={() => setSelectedReminderForPreview(null)}
+        />
+      )}
+
+      {/* Candidate Availability Slot Selection Modal */}
+      {selectedInterviewForSlotSelection && (
+        <CandidateSlotSelectionModal
+          interview={selectedInterviewForSlotSelection}
+          job={jobs.find((j) => j.id === selectedInterviewForSlotSelection.jobId)}
+          candidate={currentUser || undefined}
+          employerName={
+            jobs.find((j) => j.id === selectedInterviewForSlotSelection.jobId)?.companyName ||
+            'Hiring Partner'
+          }
+          onConfirmSlot={confirmInterviewSlot}
+          onSubmitAlternateAvailability={submitCandidateAvailability}
+          onClose={() => setSelectedInterviewForSlotSelection(null)}
+          isEmployerPreview={false}
         />
       )}
     </div>
