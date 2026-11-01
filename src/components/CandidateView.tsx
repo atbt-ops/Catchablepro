@@ -1167,6 +1167,13 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                   candidateProfile={currentCandidateProfile}
                   hasApplied={hasAppliedToJob(job.id)}
                   isSaved={isJobSaved(job.id)}
+                  isRecommended={
+                    Boolean(
+                      currentCandidateProfile?.skills
+                        ? (job.matchPct || 0) >= 75
+                        : job.id === 1 || job.id === 2
+                    )
+                  }
                   onSelect={(j) => setSelectedJob(j)}
                   onApply={(id) => applyToJob(id, 'manual')}
                   onToggleSave={(id) => toggleSaveJob(id)}
