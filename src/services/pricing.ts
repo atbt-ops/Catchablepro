@@ -18,7 +18,8 @@ export function rateForDay(dayIndex: number): number {
 }
 
 export function activeDays(billableSeconds: number, activeSince: string, now: Date = new Date()): number {
-  let total = Number(billableSeconds || 0);
+  const numSecs = Number(billableSeconds);
+  let total = isNaN(numSecs) || numSecs < 0 ? 0 : numSecs;
   if (activeSince) {
     const since = new Date(activeSince).getTime();
     if (!isNaN(since)) {
@@ -34,8 +35,9 @@ export function computeCostState(
   activeSince: string,
   now: Date = new Date()
 ): CostState {
-  const days = activeDays(billableSeconds, activeSince, now);
-  const completed = Math.min(Math.floor(days), CAP_DAYS);
+  const rawDays = activeDays(billableSeconds, activeSince, now);
+  const days = isNaN(rawDays) || rawDays < 0 ? 0 : rawDays;
+  const completed = Math.max(0, Math.min(Math.floor(days), CAP_DAYS));
 
   let accrued = 0;
   for (let d = 0; d < completed; d++) {

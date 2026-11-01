@@ -20,6 +20,7 @@ import {
   Sparkles,
   Layers,
   Wallet,
+  CalendarClock,
 } from 'lucide-react';
 import { colors, spacing, radii, shadows } from './theme/tokens.stylex';
 
@@ -75,6 +76,8 @@ const styles = stylex.create({
     padding: 0,
     position: 'relative',
     transition: 'color 0.15s ease',
+    flex: 1,
+    minWidth: 0,
   },
   bottomNavBtnActive: {
     color: colors.primary,
@@ -130,13 +133,13 @@ const styles = stylex.create({
     width: '32px',
     height: '32px',
     borderRadius: radii.md,
-    background: 'linear-gradient(135deg, #4f46e5, #c026d3)',
+    backgroundColor: colors.primary,
     color: colors.textInverse,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontWeight: 700,
-    boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.25)',
+    fontWeight: 800,
+    boxShadow: shadows.sm,
   },
   footerLinks: {
     display: 'flex',
@@ -229,6 +232,8 @@ export function App() {
                 ? 'matches'
                 : activeView === 'employer_pipeline'
                 ? 'pipeline'
+                : activeView === 'employer_interviews'
+                ? 'interviews'
                 : activeView === 'employer_wallet'
                 ? 'wallet'
                 : activeView === 'employer_profile'
@@ -290,6 +295,16 @@ export function App() {
             >
               <Layers size={16} />
               <span>Pipeline</span>
+            </button>
+            <button
+              onClick={() => setActiveView('employer_interviews')}
+              {...stylex.props(
+                styles.bottomNavBtn,
+                activeView === 'employer_interviews' ? styles.bottomNavBtnActive : styles.bottomNavBtnInactive
+              )}
+            >
+              <CalendarClock size={16} />
+              <span>Interviews</span>
             </button>
             <button
               onClick={() => setActiveView('employer_wallet')}

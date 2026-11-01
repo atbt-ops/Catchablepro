@@ -6,6 +6,7 @@ import { computeCostState } from '../services/pricing';
 import { matchDetail } from '../services/matching';
 import { CompanyAvatar } from './CompanyAvatar';
 import { PostJobModal } from './PostJobModal';
+import { InterviewScheduler } from './InterviewScheduler';
 import {
   Briefcase,
   Layers,
@@ -24,6 +25,8 @@ import {
   ArrowRight,
   Send,
   ShieldCheck,
+  CalendarClock,
+  ChevronRight,
 } from 'lucide-react';
 import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
 
@@ -74,9 +77,9 @@ const styles = stylex.create({
   badgeVerified: {
     paddingTop: '2px',
     paddingBottom: '2px',
-    paddingLeft: '10px',
-    paddingRight: '10px',
-    borderRadius: radii.full,
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.sm,
     fontSize: '0.75rem',
     fontWeight: 700,
     backgroundColor: colors.primaryLight,
@@ -163,7 +166,7 @@ const styles = stylex.create({
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
     gap: spacing.md,
   },
   statCard: {
@@ -225,10 +228,16 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing.sm,
   },
+  kanbanContainer: {
+    overflowX: 'auto',
+    width: '100%',
+    paddingBottom: '8px',
+  },
   kanbanGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gridTemplateColumns: 'repeat(5, minmax(240px, 1fr))',
     gap: spacing.md,
+    minWidth: '100%',
   },
   kanbanCol: {
     backgroundColor: colors.surfaceSubtle,
@@ -321,8 +330,8 @@ const styles = stylex.create({
 });
 
 interface EmployerDashboardProps {
-  activeTab: 'jobs' | 'matches' | 'pipeline' | 'wallet' | 'profile';
-  setActiveTab: (tab: 'jobs' | 'matches' | 'pipeline' | 'wallet' | 'profile') => void;
+  activeTab: 'jobs' | 'matches' | 'pipeline' | 'interviews' | 'wallet' | 'profile';
+  setActiveTab: (tab: 'jobs' | 'matches' | 'pipeline' | 'interviews' | 'wallet' | 'profile') => void;
 }
 
 const STAGES: ApplicationStage[] = [
@@ -422,6 +431,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
     candidateProfiles,
     companyProfiles,
     applications,
+    interviews,
     walletTransactions,
     setJobStatus,
     updateApplicationStage,
@@ -434,6 +444,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedJobIdForMatches, setSelectedJobIdForMatches] = useState<number | null>(null);
   const [selectedJobIdForPipeline, setSelectedJobIdForPipeline] = useState<number | null>(null);
+  const [selectedAppForInterview, setSelectedAppForInterview] = useState<number | null>(null);
 
   // Wallet topup modal
   const [showTopupModal, setShowTopupModal] = useState(false);
@@ -511,6 +522,12 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [applications, myJobs, selectedJobIdForPipeline, users, candidateProfiles, jobs]);
+
+  // Interviews for employer's jobs
+  const myInterviews = useMemo(() => {
+    const myJobIds = myJobs.map((j) => j.id);
+    return interviews.filter((iv) => myJobIds.includes(iv.jobId) || (currentUser && iv.employerId === currentUser.id));
+  }, [interviews, myJobs, currentUser]);
 
   // Wallet top-up handler
   const handleTopup = (e: React.FormEvent) => {
@@ -646,6 +663,14 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
         >
           <Layers size={16} />
           <span>Hiring Pipeline ({pipelineApplications.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('interviews')}
+          {...stylex.props(styles.tabItem, activeTab === 'interviews' ? styles.tabItemActive : styles.tabItemInactive)}
+        >
+          <CalendarClock size={16} />
+          <span>Interview Scheduler ({myInterviews.length})</span>
         </button>
 
         <button
@@ -809,7 +834,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               <select
                 value={targetJobForMatches?.id || ''}
                 onChange={(e) => setSelectedJobIdForMatches(Number(e.target.value))}
-                style={{ backgroundColor: '#f1f5f9', fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', borderRadius: '10px', padding: '6px 12px', border: 0, outline: 'none', cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', fontSize: '0.75rem', fontWeight: 600, color: '#0f172a', borderRadius: '6px', padding: '4px 10px', border: '1px solid #cbd5e1', outline: 'none', cursor: 'pointer' }}
               >
                 {myJobs.map((j) => (
                   <option key={j.id} value={j.id}>
@@ -885,6 +910,33 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                       </button>
                       <button
                         onClick={() => {
+                          const existingApp = applications.find(
+                            (a) => a.jobId === targetJobForMatches?.id && a.candidateId === user.id
+                          );
+                          if (existingApp) {
+                            setSelectedAppForInterview(existingApp.id);
+                          }
+                          setActiveTab('interviews');
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#4f46e5',
+                          backgroundColor: '#eef2ff',
+                          border: '1px solid #c7d2fe',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <CalendarClock size={13} />
+                        <span>Schedule</span>
+                      </button>
+                      <button
+                        onClick={() => {
                           showToast({
                             type: 'success',
                             title: 'Invitation Sent 📨',
@@ -926,7 +978,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 onChange={(e) =>
                   setSelectedJobIdForPipeline(e.target.value ? Number(e.target.value) : null)
                 }
-                style={{ backgroundColor: '#f1f5f9', fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', borderRadius: '10px', padding: '6px 12px', border: 0, outline: 'none', cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', fontSize: '0.75rem', fontWeight: 600, color: '#0f172a', borderRadius: '6px', padding: '4px 10px', border: '1px solid #cbd5e1', outline: 'none', cursor: 'pointer' }}
               >
                 <option value="">All Job Postings</option>
                 {myJobs.map((j) => (
@@ -941,7 +993,8 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
             </span>
           </div>
 
-          <div {...stylex.props(styles.kanbanGrid)}>
+          <div {...stylex.props(styles.kanbanContainer)}>
+            <div {...stylex.props(styles.kanbanGrid)}>
             {STAGES.map((stg) => {
               const stageApps = pipelineApplications.filter((a) => a.status === stg);
 
@@ -979,13 +1032,97 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                           </p>
                         )}
 
+                        {/* Interview Status Chip if scheduled */}
+                        {(() => {
+                          const appInterview = interviews.find(
+                            (i) => i.applicationId === app.id && i.status !== 'cancelled'
+                          );
+
+                          if (appInterview) {
+                            const isConf = appInterview.status === 'confirmed';
+                            const isCompl = appInterview.status === 'completed';
+                            return (
+                              <div
+                                onClick={() => {
+                                  setSelectedAppForInterview(app.id);
+                                  setActiveTab('interviews');
+                                }}
+                                style={{
+                                  backgroundColor: isConf ? '#ecfdf5' : isCompl ? '#eef2ff' : '#fffbeb',
+                                  border: `1px solid ${isConf ? '#a7f3d0' : isCompl ? '#c7d2fe' : '#fde68a'}`,
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  color: isConf ? '#065f46' : isCompl ? '#3730a3' : '#92400e',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                }}
+                                title="Click to view details in Interview Scheduler"
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <CalendarClock size={12} />
+                                  <span>
+                                    {isConf && appInterview.confirmedSlot
+                                      ? `Confirmed: ${new Date(appInterview.confirmedSlot.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                                      : isCompl
+                                      ? 'Interview Completed ✓'
+                                      : `${appInterview.proposedSlots.length} Slots Proposed`}
+                                  </span>
+                                </span>
+                                <ChevronRight size={11} />
+                              </div>
+                            );
+                          }
+
+                          if (app.status === 'shortlisted' || app.status === 'interview') {
+                            return (
+                              <button
+                                onClick={() => {
+                                  setSelectedAppForInterview(app.id);
+                                  setActiveTab('interviews');
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  backgroundColor: '#eef2ff',
+                                  color: '#4338ca',
+                                  border: '1px solid #c7d2fe',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <CalendarClock size={12} />
+                                <span>Propose Interview Times</span>
+                              </button>
+                            );
+                          }
+
+                          return null;
+                        })()}
+
                         <div style={{ paddingTop: '8px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
                           <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8' }}>Move:</span>
                           <select
                             value={app.status}
-                            onChange={(e) =>
-                              updateApplicationStage(app.id, e.target.value as ApplicationStage)
-                            }
+                            onChange={(e) => {
+                              const nextStage = e.target.value as ApplicationStage;
+                              updateApplicationStage(app.id, nextStage);
+                              if (nextStage === 'interview') {
+                                showToast({
+                                  type: 'info',
+                                  title: 'Candidate in Interview Stage',
+                                  message: 'Propose interview time slots in the Interview Scheduler.',
+                                });
+                              }
+                            }}
                             style={{ backgroundColor: '#f1f5f9', fontSize: '11px', fontWeight: 700, color: '#334155', borderRadius: '6px', padding: '4px 8px', border: 0, outline: 'none', cursor: 'pointer' }}
                           >
                             {STAGES.map((s) => (
@@ -1008,29 +1145,42 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
               );
             })}
           </div>
+          </div>
         </div>
+      )}
+
+      {/* TAB: INTERVIEW SCHEDULER & PIPELINE SYNC */}
+      {activeTab === 'interviews' && (
+        <InterviewScheduler
+          initialApplicationId={selectedAppForInterview || undefined}
+          initialJobId={selectedJobIdForPipeline || undefined}
+          onNavigateToPipeline={(jobId) => {
+            if (jobId) setSelectedJobIdForPipeline(jobId);
+            setActiveTab('pipeline');
+          }}
+        />
       )}
 
       {/* TAB 4: PREPAID WALLET & PRICING */}
       {activeTab === 'wallet' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #1e1b4b, #0f172a)', borderRadius: '24px', padding: '24px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px', color: '#0f172a', border: '1px solid #c7d2fe', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#c7d2fe' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4338ca' }}>
                   Prepaid Wallet Balance
                 </span>
-                <Wallet size={20} color="#34d399" />
+                <Wallet size={20} color="#059669" />
               </div>
-              <div style={{ fontSize: '2rem', fontWeight: 900 }}>
+              <div style={{ fontSize: '2.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em' }}>
                 ₹{((currentCompany?.walletBalancePaise || 0) / 100).toLocaleString('en-IN')}
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#e0e7ff', margin: 0 }}>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
                 Covers on-demand daily holding fees after your 7-day free window.
               </p>
               <button
                 onClick={() => setShowTopupModal(true)}
-                style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, color: '#1e1b4b', backgroundColor: '#fff', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, color: '#ffffff', backgroundColor: '#4f46e5', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
                 <Plus size={16} />
                 <span>Recharge Wallet Balance</span>
