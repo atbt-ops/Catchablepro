@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { useApp } from '../context/AppContext';
-import { Job, ApplicationStage } from '../types';
+import { Job, ApplicationStage, Interview } from '../types';
 import { JobCard } from './JobCard';
 import { JobDetailModal } from './JobDetailModal';
+import { ReminderEmailPreviewModal } from './ReminderEmailPreviewModal';
 import { matchPct, parseSkills } from '../services/matching';
 import {
   Search,
@@ -20,6 +21,11 @@ import {
   X,
   TrendingUp,
   RotateCcw,
+  CalendarClock,
+  Video,
+  ExternalLink,
+  CalendarCheck,
+  Mail,
 } from 'lucide-react';
 import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
 
@@ -37,20 +43,15 @@ const styles = stylex.create({
     gap: spacing.lg,
   },
   heroBanner: {
-    background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #3b0764 100%)',
+    backgroundColor: colors.surface,
     borderRadius: radii.xl,
-    color: colors.textInverse,
     padding: spacing.xl,
-    position: 'relative',
-    overflow: 'hidden',
-    boxShadow: shadows.xl,
+    boxShadow: shadows.sm,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: '#312e81',
+    borderColor: colors.border,
   },
   heroContent: {
-    position: 'relative',
-    zIndex: 1,
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
@@ -61,36 +62,30 @@ const styles = stylex.create({
     maxWidth: '580px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '10px',
   },
-  heroPill: {
+  heroKicker: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
-    paddingLeft: '12px',
-    paddingRight: '12px',
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    backdropFilter: 'blur(6px)',
-    color: '#c7d2fe',
+    color: colors.primary,
     fontSize: '0.75rem',
-    fontWeight: 600,
-    alignSelf: 'flex-start',
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
   },
   heroTitle: {
     fontSize: '2rem',
     fontWeight: 900,
     letterSpacing: '-0.025em',
-    color: colors.textInverse,
+    color: colors.text,
     margin: 0,
     lineHeight: 1.15,
   },
   heroSubtitle: {
     fontSize: '0.875rem',
     lineHeight: 1.5,
-    color: '#e0e7ff',
+    color: colors.textSecondary,
     margin: 0,
   },
   heroTrending: {
@@ -98,12 +93,12 @@ const styles = stylex.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: '6px',
-    marginTop: '6px',
+    marginTop: '4px',
   },
   heroTrendingLabel: {
     fontSize: '0.6875rem',
     fontWeight: 700,
-    color: '#c7d2fe',
+    color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
@@ -114,15 +109,15 @@ const styles = stylex.create({
     paddingRight: '10px',
     borderRadius: radii.md,
     fontSize: '0.75rem',
-    fontWeight: 500,
+    fontWeight: 600,
     backgroundColor: {
-      default: 'rgba(255, 255, 255, 0.1)',
-      ':hover': 'rgba(255, 255, 255, 0.2)',
+      default: colors.surfaceSubtle,
+      ':hover': colors.border,
     },
-    color: colors.textInverse,
+    color: colors.textSecondary,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: colors.border,
     cursor: 'pointer',
     transition: 'background-color 0.15s ease',
   },
@@ -130,7 +125,14 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.sm,
-    minWidth: '280px',
+    minWidth: {
+      default: '100%',
+      '@media (min-width: 640px)': '280px',
+    },
+    flex: {
+      default: '1 1 100%',
+      '@media (min-width: 1024px)': '0 0 320px',
+    },
   },
   statsGrid: {
     display: 'grid',
@@ -138,42 +140,40 @@ const styles = stylex.create({
     gap: spacing.sm,
   },
   statCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    backdropFilter: 'blur(8px)',
+    backgroundColor: colors.surfaceSubtle,
     padding: '12px 16px',
     borderRadius: radii.lg,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: colors.border,
   },
   statLabel: {
     fontSize: '0.625rem',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    color: '#c7d2fe',
+    color: colors.textMuted,
     display: 'block',
   },
   statValue: {
     fontSize: '1.5rem',
     fontWeight: 900,
-    color: colors.textInverse,
+    color: colors.text,
     display: 'block',
     marginTop: '2px',
   },
   statSub: {
     fontSize: '0.625rem',
-    color: '#6ee7b7',
-    fontWeight: 600,
+    color: colors.successText,
+    fontWeight: 700,
   },
   autoApplyBox: {
     padding: '14px',
     borderRadius: radii.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    backdropFilter: 'blur(8px)',
+    backgroundColor: colors.surfaceSubtle,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: colors.border,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -194,24 +194,30 @@ const styles = stylex.create({
     flexShrink: 0,
   },
   autoApplyIconActive: {
-    backgroundColor: colors.success,
-    color: colors.textInverse,
+    backgroundColor: colors.successLight,
+    color: colors.successText,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.successBorder,
   },
   autoApplyIconInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    color: colors.textInverse,
+    backgroundColor: colors.surface,
+    color: colors.textMuted,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
   },
   autoApplyTitle: {
     fontWeight: 700,
     fontSize: '0.75rem',
-    color: colors.textInverse,
+    color: colors.text,
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
   },
   autoApplySub: {
     fontSize: '0.625rem',
-    color: '#c7d2fe',
+    color: colors.textSecondary,
     margin: 0,
   },
   autoApplyBtn: {
@@ -223,16 +229,19 @@ const styles = stylex.create({
     fontSize: '0.75rem',
     fontWeight: 700,
     cursor: 'pointer',
-    borderWidth: 0,
+    borderWidth: '1px',
+    borderStyle: 'solid',
     transition: 'all 0.15s ease',
   },
   autoApplyBtnActive: {
-    backgroundColor: colors.surface,
-    color: '#1e1b4b',
-  },
-  autoApplyBtnInactive: {
     backgroundColor: colors.primary,
     color: colors.textInverse,
+    borderColor: colors.primary,
+  },
+  autoApplyBtnInactive: {
+    backgroundColor: colors.surface,
+    color: colors.textSecondary,
+    borderColor: colors.border,
   },
   tabNav: {
     display: 'flex',
@@ -323,22 +332,34 @@ const styles = stylex.create({
     height: '16px',
     width: '1px',
     backgroundColor: colors.border,
+    display: {
+      default: 'none',
+      '@media (min-width: 768px)': 'block',
+    },
   },
   sortGroup: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: '6px',
+    fontSize: '0.6875rem',
   },
   sortSelect: {
-    backgroundColor: colors.surfaceSubtle,
-    fontWeight: 700,
+    backgroundColor: colors.surface,
+    fontWeight: 600,
     color: colors.text,
     borderRadius: radii.md,
-    padding: '6px 12px',
-    borderWidth: 0,
+    paddingTop: '3px',
+    paddingBottom: '3px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
     outline: 'none',
     cursor: 'pointer',
-    fontSize: '0.75rem',
+    fontSize: '0.6875rem',
+    lineHeight: '1.2',
+    fontFamily: 'inherit',
   },
   resetBtn: {
     display: 'flex',
@@ -353,7 +374,7 @@ const styles = stylex.create({
   },
   jobGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
     gap: spacing.lg,
   },
   emptyCard: {
@@ -404,15 +425,20 @@ const styles = stylex.create({
     flexShrink: 0,
     fontSize: '1rem',
   },
+  pipelineWrapper: {
+    width: '100%',
+    overflowX: 'auto',
+  },
   pipelineGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(5, 1fr)',
+    gridTemplateColumns: 'repeat(5, minmax(64px, 1fr))',
     gap: spacing.sm,
     textAlign: 'center',
     paddingTop: '12px',
     borderTopWidth: '1px',
     borderTopStyle: 'solid',
     borderTopColor: colors.border,
+    minWidth: '320px',
   },
   pipelineStepDot: {
     width: '28px',
@@ -449,7 +475,10 @@ const styles = stylex.create({
   },
   profileGrid: {
     display: 'grid',
-    gridTemplateColumns: '2fr 1fr',
+    gridTemplateColumns: {
+      default: '1fr',
+      '@media (min-width: 960px)': '2fr 1fr',
+    },
     gap: spacing.lg,
   },
   profileCard: {
@@ -467,10 +496,10 @@ const styles = stylex.create({
   profileStrengthBox: {
     padding: spacing.md,
     borderRadius: radii.md,
-    background: 'linear-gradient(to right, #f8fafc, #eef2ff)',
+    backgroundColor: colors.surfaceSubtle,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: colors.primaryBorder,
+    borderColor: '#c7d2fe',
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.sm,
@@ -479,13 +508,13 @@ const styles = stylex.create({
     width: '100%',
     backgroundColor: colors.border,
     height: '8px',
-    borderRadius: radii.full,
+    borderRadius: radii.sm,
     overflow: 'hidden',
   },
   strengthBarFill: {
     height: '100%',
-    background: 'linear-gradient(to right, #4f46e5, #c026d3)',
-    borderRadius: radii.full,
+    backgroundColor: colors.primary,
+    borderRadius: radii.sm,
     transition: 'all 0.5s ease',
   },
   skillsBox: {
@@ -670,10 +699,13 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
     toggleSaveJob,
     isJobSaved,
     hasAppliedToJob,
+    interviews,
+    confirmInterviewSlot,
     showToast,
   } = useApp();
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedReminderForPreview, setSelectedReminderForPreview] = useState<Interview | null>(null);
 
   // Filters
   const [workModeFilter, setWorkModeFilter] = useState<string>('All');
@@ -894,8 +926,8 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
       <div {...stylex.props(styles.heroBanner)}>
         <div {...stylex.props(styles.heroContent)}>
           <div {...stylex.props(styles.heroLeft)}>
-            <div {...stylex.props(styles.heroPill)}>
-              <Sparkles size={14} color="#a5b4fc" />
+            <div {...stylex.props(styles.heroKicker)}>
+              <Sparkles size={14} />
               <span>Semantic Skill Matching Engine</span>
             </div>
             <h1 {...stylex.props(styles.heroTitle)}>
@@ -960,9 +992,6 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                 <div>
                   <div {...stylex.props(styles.autoApplyTitle)}>
                     <span>Auto-Apply</span>
-                    {currentCandidateProfile?.autoApply && (
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#34d399' }} />
-                    )}
                   </div>
                   <p {...stylex.props(styles.autoApplySub)}>
                     {currentCandidateProfile?.autoApply ? 'Applying to ≥1% match' : 'Automated apply is off'}
@@ -1101,15 +1130,28 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
               )}
 
               <div {...stylex.props(styles.sortGroup)}>
-                <ArrowUpDown size={14} color="#94a3b8" />
+                <ArrowUpDown size={12} color="#64748b" />
                 <span {...stylex.props(styles.filterLabel)}>Sort:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'match' | 'newest')}
                   {...stylex.props(styles.sortSelect)}
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    height: '26px',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#334155',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
                 >
-                  <option value="match">Match % (High to Low)</option>
-                  <option value="newest">Recently Posted</option>
+                  <option value="match" style={{ fontSize: '11px', fontWeight: 500 }}>Match % (High to Low)</option>
+                  <option value="newest" style={{ fontSize: '11px', fontWeight: 500 }}>Recently Posted</option>
                 </select>
               </div>
             </div>
@@ -1211,34 +1253,36 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                     </div>
 
                     {/* Visual 5-Step Pipeline Progress Indicator */}
-                    <div {...stylex.props(styles.pipelineGrid)}>
-                      {STAGES.map((stg, idx) => {
-                        const isCompleted = currentStageIndex >= idx;
-                        const isCurrent = app.status === stg;
+                    <div {...stylex.props(styles.pipelineWrapper)}>
+                      <div {...stylex.props(styles.pipelineGrid)}>
+                        {STAGES.map((stg, idx) => {
+                          const isCompleted = currentStageIndex >= idx;
+                          const isCurrent = app.status === stg;
 
-                        return (
-                          <div key={stg} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div
-                              {...stylex.props(
-                                styles.pipelineStepDot,
-                                isCurrent
-                                  ? styles.stepActive
-                                  : isCompleted
-                                  ? styles.stepCompleted
-                                  : styles.stepUpcoming
-                              )}
-                            >
-                              {isCompleted && !isCurrent ? '✓' : idx + 1}
+                          return (
+                            <div key={stg} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div
+                                {...stylex.props(
+                                  styles.pipelineStepDot,
+                                  isCurrent
+                                    ? styles.stepActive
+                                    : isCompleted
+                                    ? styles.stepCompleted
+                                    : styles.stepUpcoming
+                                )}
+                              >
+                                {isCompleted && !isCurrent ? '✓' : idx + 1}
+                              </div>
+                              <span
+                                {...stylex.props(styles.stepLabel)}
+                                style={{ color: isCurrent ? '#4f46e5' : isCompleted ? '#0f172a' : '#94a3b8' }}
+                              >
+                                {stg}
+                              </span>
                             </div>
-                            <span
-                              {...stylex.props(styles.stepLabel)}
-                              style={{ color: isCurrent ? '#4f46e5' : isCompleted ? '#0f172a' : '#94a3b8' }}
-                            >
-                              {stg}
-                            </span>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Recruiter Note if any */}
@@ -1248,6 +1292,178 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
                         <span>{app.notes}</span>
                       </div>
                     )}
+
+                    {/* Candidate Interview Invitation / Status */}
+                    {(() => {
+                      const candidateInterview = interviews.find(
+                        (i) => i.applicationId === app.id && i.status !== 'cancelled'
+                      );
+                      if (!candidateInterview) return null;
+
+                      const isConf = candidateInterview.status === 'confirmed';
+                      const isProp = candidateInterview.status === 'proposed';
+
+                      return (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            padding: '14px',
+                            borderRadius: '12px',
+                            backgroundColor: isConf ? '#ecfdf5' : '#fffbeb',
+                            border: `1px solid ${isConf ? '#a7f3d0' : '#fde68a'}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <CalendarClock size={16} color={isConf ? '#059669' : '#d97706'} />
+                              <strong style={{ fontSize: '0.8125rem', color: isConf ? '#065f46' : '#92400e' }}>
+                                {isConf ? 'Interview Confirmed!' : 'Interview Invitation Received!'}
+                              </strong>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                backgroundColor: isConf ? '#a7f3d0' : '#fde68a',
+                                color: isConf ? '#065f46' : '#92400e',
+                              }}
+                            >
+                              {candidateInterview.status}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.75rem', color: '#334155' }}>
+                            <strong>Round:</strong> {candidateInterview.title} ({candidateInterview.interviewType})
+                          </div>
+
+                          {candidateInterview.notes && (
+                            <div style={{ fontSize: '0.75rem', color: '#475569', fontStyle: 'italic' }}>
+                              "{candidateInterview.notes}"
+                            </div>
+                          )}
+
+                          {/* If confirmed: show slot + 24h reminder + video link */}
+                          {isConf && candidateInterview.confirmedSlot && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px solid #a7f3d0' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                <div>
+                                  <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#065f46' }}>
+                                    📅 {new Date(candidateInterview.confirmedSlot.dateTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                                  </span>
+                                  <span style={{ fontSize: '11px', color: '#047857', marginLeft: '6px' }}>
+                                    ({candidateInterview.confirmedSlot.durationMinutes} mins)
+                                  </span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <button
+                                    onClick={() => setSelectedReminderForPreview(candidateInterview)}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#ffffff',
+                                      border: '1px solid #a7f3d0',
+                                      color: '#065f46',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <Mail size={13} color="#059669" />
+                                    <span>View 24h Email Alert</span>
+                                  </button>
+
+                                  {candidateInterview.meetingLink && (
+                                    <a
+                                      href={candidateInterview.meetingLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#059669',
+                                        color: '#fff',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                        textDecoration: 'none',
+                                      }}
+                                    >
+                                      <Video size={13} />
+                                      <span>Join Video Call</span>
+                                      <ExternalLink size={12} />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 24-Hour Reminder Notice for Candidate */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '11px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontWeight: 600 }}>
+                                  <Mail size={13} color="#16a34a" />
+                                  <span>
+                                    {candidateInterview.reminder24hSent
+                                      ? '24-Hour Reminder Alert delivered to your registered email.'
+                                      : 'Automated 24h reminder email alert will be sent 24 hours prior to the session.'}
+                                  </span>
+                                </div>
+                                <span style={{ color: '#047857', fontWeight: 800 }}>
+                                  {candidateInterview.reminder24hSent ? 'Delivered ✓' : 'Scheduled ⏰'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* If proposed: candidate can choose slot */}
+                          {isProp && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px solid #fde68a' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#92400e' }}>
+                                Select your preferred time slot to lock in your calendar:
+                              </span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {candidateInterview.proposedSlots.map((slot) => (
+                                  <button
+                                    key={slot.id}
+                                    onClick={() => confirmInterviewSlot(candidateInterview.id, slot.id)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                      backgroundColor: '#fff',
+                                      color: '#92400e',
+                                      border: '1px solid #f59e0b',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <CalendarCheck size={14} color="#d97706" />
+                                    <span>
+                                      {new Date(slot.dateTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    </span>
+                                    <span style={{ color: '#b45309', fontSize: '10px' }}>({slot.durationMinutes}m)</span>
+                                    <span style={{ marginLeft: '4px', color: '#059669', fontWeight: 800 }}>✓ Accept</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -1617,6 +1833,14 @@ export const CandidateView: React.FC<CandidateViewProps> = ({
           onClose={() => setSelectedJob(null)}
           onApply={(id) => applyToJob(id, 'manual')}
           onToggleSave={(id) => toggleSaveJob(id)}
+        />
+      )}
+
+      {/* 24-Hour Reminder Email Alert Modal */}
+      {selectedReminderForPreview && (
+        <ReminderEmailPreviewModal
+          interview={selectedReminderForPreview}
+          onClose={() => setSelectedReminderForPreview(null)}
         />
       )}
     </div>

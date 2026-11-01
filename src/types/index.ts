@@ -168,3 +168,86 @@ export interface ToastItem {
   message?: string;
 }
 
+export type InterviewStatus = 'proposed' | 'confirmed' | 'completed' | 'rescheduled' | 'cancelled';
+export type InterviewType = 'screening' | 'technical' | 'system_design' | 'cultural' | 'executive';
+export type InterviewMode = 'google_meet' | 'zoom' | 'teams' | 'phone' | 'in_person';
+
+export interface InterviewSlot {
+  id: string;
+  dateTime: string; // ISO string e.g. "2026-10-28T14:30:00"
+  durationMinutes: number; // e.g. 30, 45, 60
+  notes?: string;
+}
+
+export interface InterviewReminderAlert {
+  id: string;
+  interviewId: number;
+  candidateId: number;
+  candidateEmail: string;
+  candidateName: string;
+  employerId: number;
+  companyName: string;
+  jobId: number;
+  jobTitle: string;
+  interviewTitle: string;
+  interviewType: InterviewType;
+  confirmedDateTime: string; // ISO string of interview
+  durationMinutes: number;
+  mode: InterviewMode;
+  meetingLink?: string;
+  locationAddress?: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  notes?: string;
+  customReminderNotes?: string;
+  type: '24h_before';
+  scheduledFor: string; // ISO string 24h prior to interview
+  sentAt?: string; // ISO string when sent
+  status: 'scheduled' | 'sent' | 'cancelled';
+  emailSubject: string;
+  emailBodyHtml?: string;
+  emailBodyText: string;
+  isAutomated: boolean;
+  acknowledgedByCandidate?: boolean;
+}
+
+export interface Interview {
+  id: number;
+  applicationId: number;
+  jobId: number;
+  candidateId: number;
+  employerId: number;
+  title: string;
+  interviewType: InterviewType;
+  proposedSlots: InterviewSlot[];
+  confirmedSlot?: InterviewSlot;
+  mode: InterviewMode;
+  meetingLink?: string;
+  locationAddress?: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  notes?: string;
+  status: InterviewStatus;
+  feedback?: string;
+  // 24-Hour Automated Reminder Tracking
+  reminder24hEnabled?: boolean;
+  reminder24hSent?: boolean;
+  reminder24hSentAt?: string;
+  reminder24hScheduledFor?: string;
+  customReminderNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CalendarBlockType = 'busy' | 'preferred';
+
+export interface CalendarAvailabilityBlock {
+  id: string;
+  employerId: number;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  type: CalendarBlockType;
+  label: string;
+}
+

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
   User,
   Role,
@@ -14,6 +14,14 @@ import {
   FeedbackItem,
   AIDigest,
   ToastItem,
+  Interview,
+  InterviewSlot,
+  InterviewStatus,
+  InterviewType,
+  InterviewMode,
+  CalendarAvailabilityBlock,
+  CalendarBlockType,
+  InterviewReminderAlert,
 } from '../types';
 import {
   INITIAL_USERS,
@@ -25,9 +33,17 @@ import {
   INITIAL_WALLET_TRANSACTIONS,
   INITIAL_AUDIT_LOGS,
   INITIAL_FEEDBACK,
+  INITIAL_INTERVIEWS,
+  INITIAL_AVAILABILITY_BLOCKS,
+  INITIAL_REMINDER_ALERTS,
 } from '../data/initialData';
 import { matchPct, extractSkills } from '../services/matching';
 import { computeCostState } from '../services/pricing';
+import {
+  calculate24hReminderTime,
+  is24hReminderDue,
+  generate24hReminderEmail,
+} from '../services/reminders';
 
 interface AppContextType {
   currentUser: User | null;
@@ -73,6 +89,44 @@ interface AppContextType {
   setJobStatus: (jobId: number, status: JobStatus) => void;
   updateApplicationStage: (appId: number, stage: ApplicationStage, notes?: string) => void;
   topupWallet: (amountPaise: number) => void;
+
+  // Interview Scheduler
+  interviews: Interview[];
+  proposeInterview: (data: {
+    applicationId: number;
+    jobId: number;
+    candidateId: number;
+    title: string;
+    interviewType: InterviewType;
+    proposedSlots: InterviewSlot[];
+    mode: InterviewMode;
+    meetingLink?: string;
+    locationAddress?: string;
+    interviewerName: string;
+    interviewerEmail: string;
+    notes?: string;
+    advancePipelineStage?: boolean;
+    autoConfirmFirstSlot?: boolean;
+  }) => Interview;
+  confirmInterviewSlot: (interviewId: number, slotId: string) => void;
+  rescheduleInterview: (interviewId: number, newSlots: InterviewSlot[], notes?: string) => void;
+  updateInterviewStatus: (interviewId: number, status: InterviewStatus, feedbackOrNote?: string) => void;
+  cancelInterview: (interviewId: number, reason?: string) => void;
+
+  // 24-Hour Automated Reminders
+  reminderAlerts: InterviewReminderAlert[];
+  send24hReminderNow: (interviewId: number) => boolean;
+  toggle24hReminder: (interviewId: number, enabled: boolean) => void;
+  updateCustomReminderNotes: (interviewId: number, notes: string) => void;
+  acknowledgeReminder: (alertId: string) => void;
+  triggerAutomatedReminderCheck: () => number;
+
+  // Weekly Calendar Availability & Time Blocks
+  availabilityBlocks: CalendarAvailabilityBlock[];
+  addAvailabilityBlock: (block: Omit<CalendarAvailabilityBlock, 'id'>) => CalendarAvailabilityBlock;
+  updateAvailabilityBlock: (id: string, fields: Partial<CalendarAvailabilityBlock>) => void;
+  removeAvailabilityBlock: (id: string) => void;
+  applyAvailabilityPreset: (preset: 'standard_hours' | 'block_lunch' | 'clear_all', startDate: string) => void;
 
   // Admin
   toggleUserSuspension: (userId: number, reason?: string) => void;
@@ -131,7 +185,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     loadStored('feedbacks', INITIAL_FEEDBACK)
   );
   const [aiDigests, setAiDigests] = useState<AIDigest[]>(() => loadStored('ai_digests', []));
+  const [interviews, setInterviews] = useState<Interview[]>(() =>
+    loadStored('interviews', INITIAL_INTERVIEWS)
+  );
+  const [reminderAlerts, setReminderAlerts] = useState<InterviewReminderAlert[]>(() =>
+    loadStored('reminder_alerts', INITIAL_REMINDER_ALERTS)
+  );
+  const [availabilityBlocks, setAvailabilityBlocks] = useState<CalendarAvailabilityBlock[]>(() =>
+    loadStored('availability_blocks', INITIAL_AVAILABILITY_BLOCKS)
+  );
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  // Live state refs to guarantee background timer always accesses fresh state
+  const interviewsRef = useRef(interviews);
+  interviewsRef.current = interviews;
+  const usersRef = useRef(users);
+  usersRef.current = users;
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
 
   const showToast = (toast: Omit<ToastItem, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9) + Date.now();
@@ -179,6 +250,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PREFIX + 'ai_digests', JSON.stringify(aiDigests));
   }, [aiDigests]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PREFIX + 'interviews', JSON.stringify(interviews));
+  }, [interviews]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PREFIX + 'reminder_alerts', JSON.stringify(reminderAlerts));
+  }, [reminderAlerts]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PREFIX + 'availability_blocks', JSON.stringify(availabilityBlocks));
+  }, [availabilityBlocks]);
 
   const addAuditLog = (action: string, targetType: string, targetId?: number, targetLabel = '', detail = '') => {
     const entry: AuditLogEntry = {
@@ -219,7 +299,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const target = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
     if (target) {
       if (target.is_suspended) {
-        alert(`This account has been suspended: ${target.suspended_reason || 'Terms violation'}`);
+        showToast({
+          type: 'error',
+          title: 'Account Suspended',
+          message: target.suspended_reason || 'This account has been suspended for terms violation.',
+        });
         return false;
       }
       setCurrentUser(target);
@@ -715,6 +799,478 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('wallet.topup', 'user', currentUser.id, currentUser.company_name, `Added ₹${amountPaise / 100}`);
   };
 
+  // Interview Scheduling & Pipeline Synchronization
+  const proposeInterview = (data: {
+    applicationId: number;
+    jobId: number;
+    candidateId: number;
+    title: string;
+    interviewType: InterviewType;
+    proposedSlots: InterviewSlot[];
+    mode: InterviewMode;
+    meetingLink?: string;
+    locationAddress?: string;
+    interviewerName: string;
+    interviewerEmail: string;
+    notes?: string;
+    advancePipelineStage?: boolean;
+    autoConfirmFirstSlot?: boolean;
+  }): Interview => {
+    const employerId = currentUser?.id || 1;
+    const now = new Date().toISOString();
+    const isAutoConfirmed = Boolean(data.autoConfirmFirstSlot && data.proposedSlots.length > 0);
+    const confirmedSlot = isAutoConfirmed ? data.proposedSlots[0] : undefined;
+
+    const autoLink = data.mode === 'google_meet'
+      ? `https://meet.google.com/cat-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 6)}`
+      : data.mode === 'zoom'
+      ? `https://zoom.us/j/${Math.floor(1000000000 + Math.random() * 9000000000)}`
+      : '';
+
+    const scheduledReminderTime = (isAutoConfirmed && confirmedSlot)
+      ? calculate24hReminderTime(confirmedSlot.dateTime).toISOString()
+      : undefined;
+
+    const newInterview: Interview = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      applicationId: data.applicationId,
+      jobId: data.jobId,
+      candidateId: data.candidateId,
+      employerId,
+      title: data.title,
+      interviewType: data.interviewType,
+      proposedSlots: data.proposedSlots,
+      confirmedSlot,
+      mode: data.mode,
+      meetingLink: data.meetingLink || autoLink,
+      locationAddress: data.locationAddress,
+      interviewerName: data.interviewerName,
+      interviewerEmail: data.interviewerEmail,
+      notes: data.notes,
+      status: isAutoConfirmed ? 'confirmed' : 'proposed',
+      reminder24hEnabled: true,
+      reminder24hSent: false,
+      reminder24hScheduledFor: scheduledReminderTime,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setInterviews((prev) => [newInterview, ...prev]);
+
+    // Automatically sync pipeline state to 'interview'
+    if (data.advancePipelineStage !== false) {
+      const app = applications.find((a) => a.id === data.applicationId);
+      if (app) {
+        const slotDesc = data.proposedSlots.length === 1
+          ? `Interview scheduled: ${data.title}`
+          : `Interview proposed (${data.proposedSlots.length} slots): ${data.title}`;
+        updateApplicationStage(app.id, 'interview', slotDesc);
+      }
+    }
+
+    const candidate = users.find((u) => u.id === data.candidateId);
+    showToast({
+      type: 'success',
+      title: isAutoConfirmed ? 'Interview Confirmed! 📅' : 'Interview Proposed! ✉️',
+      message: `${data.proposedSlots.length} slot(s) for ${candidate?.name || 'Candidate'}. Pipeline stage synced to Interview.`,
+    });
+
+    addAuditLog(
+      'interview.propose',
+      'interview',
+      newInterview.id,
+      data.title,
+      `Proposed ${data.proposedSlots.length} slot(s) to candidate #${data.candidateId}`
+    );
+
+    return newInterview;
+  };
+
+  const confirmInterviewSlot = (interviewId: number, slotId: string) => {
+    let chosenSlot: InterviewSlot | undefined;
+
+    setInterviews((prev) =>
+      prev.map((iv) => {
+        if (iv.id !== interviewId) return iv;
+        const chosen = iv.proposedSlots.find((s) => s.id === slotId) || iv.proposedSlots[0];
+        chosenSlot = chosen;
+        const scheduledTime = calculate24hReminderTime(chosen.dateTime).toISOString();
+        return {
+          ...iv,
+          status: 'confirmed',
+          confirmedSlot: chosen,
+          reminder24hEnabled: true,
+          reminder24hSent: false,
+          reminder24hScheduledFor: scheduledTime,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+
+    const iv = interviews.find((i) => i.id === interviewId);
+    if (iv) {
+      const app = applications.find((a) => a.id === iv.applicationId);
+      if (app && app.status !== 'interview') {
+        updateApplicationStage(app.id, 'interview', `Interview confirmed: ${iv.title}`);
+      }
+    }
+
+    showToast({
+      type: 'success',
+      title: 'Interview Slot Confirmed! 📅',
+      message: 'Interview is officially scheduled on candidate & employer calendars. 24h reminder scheduled.',
+    });
+    addAuditLog('interview.confirm', 'interview', interviewId, '', `Slot ${slotId} confirmed`);
+  };
+
+  const rescheduleInterview = (interviewId: number, newSlots: InterviewSlot[], reason?: string) => {
+    setInterviews((prev) =>
+      prev.map((iv) => {
+        if (iv.id !== interviewId) return iv;
+        return {
+          ...iv,
+          status: 'rescheduled',
+          proposedSlots: newSlots,
+          confirmedSlot: undefined,
+          reminder24hSent: false,
+          reminder24hSentAt: undefined,
+          notes: reason ? (iv.notes ? `${iv.notes} | Rescheduled: ${reason}` : `Rescheduled: ${reason}`) : iv.notes,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+    showToast({
+      type: 'info',
+      title: 'Interview Rescheduled 🔄',
+      message: 'New time slot proposals sent to candidate. Reminder reset.',
+    });
+    addAuditLog('interview.reschedule', 'interview', interviewId, '', reason || 'Rescheduled');
+  };
+
+  const updateInterviewStatus = (interviewId: number, status: InterviewStatus, feedbackOrNote?: string) => {
+    setInterviews((prev) =>
+      prev.map((iv) => {
+        if (iv.id !== interviewId) return iv;
+        return {
+          ...iv,
+          status,
+          feedback: feedbackOrNote !== undefined ? feedbackOrNote : iv.feedback,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+    const iv = interviews.find((i) => i.id === interviewId);
+    if (iv && feedbackOrNote) {
+      const app = applications.find((a) => a.id === iv.applicationId);
+      if (app) {
+        updateApplicationStage(app.id, app.status, `${app.notes ? app.notes + ' • ' : ''}Interview Note: ${feedbackOrNote}`);
+      }
+    }
+    showToast({
+      type: 'info',
+      title: 'Interview Status Updated',
+      message: `Marked as ${status.toUpperCase()}`,
+    });
+    addAuditLog('interview.status_update', 'interview', interviewId, '', `Status: ${status}`);
+  };
+
+  const cancelInterview = (interviewId: number, reason?: string) => {
+    setInterviews((prev) =>
+      prev.map((iv) => {
+        if (iv.id !== interviewId) return iv;
+        return {
+          ...iv,
+          status: 'cancelled',
+          notes: reason ? (iv.notes ? `${iv.notes} | Cancelled: ${reason}` : `Cancelled: ${reason}`) : iv.notes,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+    showToast({
+      type: 'warning',
+      title: 'Interview Cancelled',
+      message: reason || 'Interview cancelled.',
+    });
+    addAuditLog('interview.cancel', 'interview', interviewId, '', reason || 'Cancelled');
+  };
+
+  // 24-Hour Automated Reminder Engine
+  const send24hReminderNow = (interviewId: number): boolean => {
+    const iv = interviews.find((i) => i.id === interviewId);
+    if (!iv) return false;
+
+    const candidate = users.find((u) => u.id === iv.candidateId);
+    const employer = users.find((u) => u.id === iv.employerId);
+    const job = jobs.find((j) => j.id === iv.jobId);
+
+    if (!candidate || !employer) return false;
+
+    const companyName = job?.companyName || employer.company_name || 'Catchablepro Employer';
+    const jobTitle = job?.title || 'Open Position';
+
+    const alert = generate24hReminderEmail(iv, candidate, employer, companyName, jobTitle, false);
+
+    setReminderAlerts((prev) => [alert, ...prev.filter((a) => a.id !== alert.id)]);
+    setInterviews((prev) =>
+      prev.map((item) =>
+        item.id === interviewId
+          ? {
+              ...item,
+              reminder24hSent: true,
+              reminder24hSentAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }
+          : item
+      )
+    );
+
+    showToast({
+      type: 'success',
+      title: '24-Hour Reminder Email Sent! ✉️',
+      message: `Alert dispatched to candidate ${candidate.name} (${candidate.email}) for ${iv.title}.`,
+    });
+
+    addAuditLog(
+      'interview.reminder_24h_manual',
+      'interview',
+      interviewId,
+      iv.title,
+      `Sent 24-hour reminder email alert to ${candidate.email}`
+    );
+
+    return true;
+  };
+
+  const toggle24hReminder = (interviewId: number, enabled: boolean) => {
+    setInterviews((prev) =>
+      prev.map((iv) =>
+        iv.id === interviewId
+          ? { ...iv, reminder24hEnabled: enabled, updatedAt: new Date().toISOString() }
+          : iv
+      )
+    );
+    showToast({
+      type: 'info',
+      title: enabled ? '24h Reminder Enabled 🔔' : '24h Reminder Disabled 🔕',
+      message: enabled
+        ? 'Automated email alert will be sent 24 hours before interview.'
+        : 'Automated 24h reminder has been paused for this interview.',
+    });
+  };
+
+  const updateCustomReminderNotes = (interviewId: number, notes: string) => {
+    setInterviews((prev) =>
+      prev.map((iv) =>
+        iv.id === interviewId
+          ? { ...iv, customReminderNotes: notes, updatedAt: new Date().toISOString() }
+          : iv
+      )
+    );
+    showToast({
+      type: 'success',
+      title: 'Reminder Notes Saved 📝',
+      message: 'Custom preparation instructions will appear in the candidate email alert.',
+    });
+  };
+
+  const acknowledgeReminder = (alertId: string) => {
+    setReminderAlerts((prev) =>
+      prev.map((a) => (a.id === alertId ? { ...a, acknowledgedByCandidate: true } : a))
+    );
+    showToast({
+      type: 'success',
+      title: 'Interview Acknowledged! ✅',
+      message: 'Your interviewer has been notified that you are confirmed and ready.',
+    });
+  };
+
+  const triggerAutomatedReminderCheck = (): number => {
+    const currentInterviews = interviewsRef.current;
+    const currentUsers = usersRef.current;
+    const currentJobs = jobsRef.current;
+
+    let sentCount = 0;
+    const newAlerts: InterviewReminderAlert[] = [];
+    const updatedInterviewIds: number[] = [];
+
+    currentInterviews.forEach((iv) => {
+      if (iv.status !== 'confirmed' || !iv.confirmedSlot) return;
+      if (iv.reminder24hEnabled === false || iv.reminder24hSent) return;
+
+      const isDue = is24hReminderDue(iv.confirmedSlot.dateTime, iv.reminder24hSent, iv.reminder24hEnabled);
+      if (isDue) {
+        const candidate = currentUsers.find((u) => u.id === iv.candidateId);
+        const employer = currentUsers.find((u) => u.id === iv.employerId);
+        const job = currentJobs.find((j) => j.id === iv.jobId);
+        if (candidate && employer) {
+          const companyName = job?.companyName || employer.company_name || 'Catchablepro Employer';
+          const jobTitle = job?.title || 'Open Position';
+          const alert = generate24hReminderEmail(iv, candidate, employer, companyName, jobTitle, true);
+          newAlerts.push(alert);
+          updatedInterviewIds.push(iv.id);
+          sentCount++;
+        }
+      }
+    });
+
+    if (newAlerts.length > 0) {
+      setReminderAlerts((prev) => [...newAlerts, ...prev]);
+      setInterviews((prev) =>
+        prev.map((iv) =>
+          updatedInterviewIds.includes(iv.id)
+            ? {
+                ...iv,
+                reminder24hSent: true,
+                reminder24hSentAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+            : iv
+        )
+      );
+
+      showToast({
+        type: 'info',
+        title: 'Automated 24h Reminder Dispatched! ✉️',
+        message: `Sent 24-hour alert for ${newAlerts.map((a) => a.candidateName).join(', ')}.`,
+      });
+
+      addAuditLog(
+        'interview.reminder_24h_auto',
+        'system',
+        undefined,
+        'Auto 24h Reminder Daemon',
+        `Dispatched ${newAlerts.length} automated 24-hour reminder email(s)`
+      );
+    }
+
+    return sentCount;
+  };
+
+  // Automated 24h Reminder Heartbeat Daemon (runs every 30s with fresh refs)
+  useEffect(() => {
+    triggerAutomatedReminderCheck();
+
+    const interval = setInterval(() => {
+      triggerAutomatedReminderCheck();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Availability Block Management
+  const addAvailabilityBlock = (block: Omit<CalendarAvailabilityBlock, 'id'>): CalendarAvailabilityBlock => {
+    const newBlock: CalendarAvailabilityBlock = {
+      ...block,
+      id: `block_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    };
+    setAvailabilityBlocks((prev) => [...prev, newBlock]);
+    showToast({
+      type: 'success',
+      title: block.type === 'preferred' ? 'Preferred Slot Added ⭐' : 'Busy Block Added ⛔',
+      message: `${block.label} (${block.startTime} - ${block.endTime})`,
+    });
+    return newBlock;
+  };
+
+  const updateAvailabilityBlock = (id: string, fields: Partial<CalendarAvailabilityBlock>) => {
+    setAvailabilityBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...fields } : b))
+    );
+    showToast({
+      type: 'info',
+      title: 'Time Block Updated',
+      message: 'Schedule changes saved.',
+    });
+  };
+
+  const removeAvailabilityBlock = (id: string) => {
+    setAvailabilityBlocks((prev) => prev.filter((b) => b.id !== id));
+    showToast({
+      type: 'info',
+      title: 'Time Block Removed',
+      message: 'Removed from your weekly calendar.',
+    });
+  };
+
+  const applyAvailabilityPreset = (
+    preset: 'standard_hours' | 'block_lunch' | 'clear_all',
+    startDate: string
+  ) => {
+    const empId = currentUser?.id || 1;
+    const start = new Date(startDate);
+
+    const weekDates: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      weekDates.push(d.toISOString().slice(0, 10));
+    }
+
+    if (preset === 'clear_all') {
+      setAvailabilityBlocks((prev) => prev.filter((b) => !weekDates.includes(b.date)));
+      showToast({
+        type: 'info',
+        title: 'Overrides Cleared',
+        message: 'Cleared custom blocks for this work week.',
+      });
+      return;
+    }
+
+    if (preset === 'standard_hours') {
+      const newBlocks: CalendarAvailabilityBlock[] = [];
+      weekDates.forEach((date, i) => {
+        newBlocks.push({
+          id: `preset_morn_${Date.now()}_${i}`,
+          employerId: empId,
+          date,
+          startTime: '10:00',
+          endTime: '13:00',
+          type: 'preferred',
+          label: '⭐ Morning Interview Window',
+        });
+        newBlocks.push({
+          id: `preset_aft_${Date.now()}_${i}`,
+          employerId: empId,
+          date,
+          startTime: '14:00',
+          endTime: '17:00',
+          type: 'preferred',
+          label: '⭐ Afternoon Candidate Slots',
+        });
+      });
+      setAvailabilityBlocks((prev) => [
+        ...prev.filter((b) => !weekDates.includes(b.date) || b.type !== 'preferred'),
+        ...newBlocks,
+      ]);
+      showToast({
+        type: 'success',
+        title: 'Standard Hours Applied! ⭐',
+        message: '10 AM - 1 PM & 2 PM - 5 PM marked preferred for Monday to Friday.',
+      });
+    }
+
+    if (preset === 'block_lunch') {
+      const lunchBlocks: CalendarAvailabilityBlock[] = weekDates.map((date, i) => ({
+        id: `preset_lunch_${Date.now()}_${i}`,
+        employerId: empId,
+        date,
+        startTime: '13:00',
+        endTime: '14:00',
+        type: 'busy',
+        label: 'Lunch & Break 🥪',
+      }));
+      setAvailabilityBlocks((prev) => [
+        ...prev.filter((b) => !(weekDates.includes(b.date) && b.startTime === '13:00' && b.endTime === '14:00')),
+        ...lunchBlocks,
+      ]);
+      showToast({
+        type: 'info',
+        title: 'Lunch Break Blocked 🥪',
+        message: '1:00 PM - 2:00 PM blocked as busy across workdays.',
+      });
+    }
+  };
+
   // Admin Actions
   const toggleUserSuspension = (userId: number, reason: string = 'Administrative review') => {
     setUsers((prev) =>
@@ -858,6 +1414,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setJobStatus,
         updateApplicationStage,
         topupWallet,
+
+        interviews,
+        proposeInterview,
+        confirmInterviewSlot,
+        rescheduleInterview,
+        updateInterviewStatus,
+        cancelInterview,
+
+        reminderAlerts,
+        send24hReminderNow,
+        toggle24hReminder,
+        updateCustomReminderNotes,
+        acknowledgeReminder,
+        triggerAutomatedReminderCheck,
+
+        availabilityBlocks,
+        addAvailabilityBlock,
+        updateAvailabilityBlock,
+        removeAvailabilityBlock,
+        applyAvailabilityPreset,
 
         toggleUserSuspension,
         deleteJobAdmin,

@@ -18,6 +18,7 @@ import {
   X,
   Menu,
   ArrowRightLeft,
+  CalendarClock,
 } from 'lucide-react';
 import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
 
@@ -51,6 +52,7 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing.md,
+    flexShrink: 0,
   },
   logoBtn: {
     display: 'flex',
@@ -66,12 +68,12 @@ const styles = stylex.create({
     width: '36px',
     height: '36px',
     borderRadius: radii.md,
-    background: 'linear-gradient(135deg, #4f46e5, #c026d3)',
+    backgroundColor: colors.primary,
     color: colors.textInverse,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.25)',
+    boxShadow: shadows.sm,
     flexShrink: 0,
   },
   logoTextCol: {
@@ -115,7 +117,7 @@ const styles = stylex.create({
     paddingRight: '12px',
     fontSize: '0.75rem',
     fontWeight: 600,
-    borderRadius: radii.full,
+    borderRadius: radii.md,
     backgroundColor: {
       default: colors.surfaceSubtle,
       ':hover': colors.border,
@@ -132,6 +134,7 @@ const styles = stylex.create({
     left: 0,
     marginTop: '8px',
     width: '280px',
+    maxWidth: 'calc(100vw - 24px)',
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     boxShadow: shadows.xl,
@@ -183,9 +186,9 @@ const styles = stylex.create({
     fontSize: '0.625rem',
     paddingTop: '2px',
     paddingBottom: '2px',
-    paddingLeft: '8px',
-    paddingRight: '8px',
-    borderRadius: radii.full,
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    borderRadius: radii.sm,
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
@@ -196,9 +199,9 @@ const styles = stylex.create({
     fontSize: '0.625rem',
     paddingTop: '2px',
     paddingBottom: '2px',
-    paddingLeft: '8px',
-    paddingRight: '8px',
-    borderRadius: radii.full,
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    borderRadius: radii.sm,
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
@@ -211,6 +214,7 @@ const styles = stylex.create({
       '@media (min-width: 768px)': 'flex',
     },
     flex: 1,
+    minWidth: 0,
     maxWidth: '480px',
     alignItems: 'center',
     backgroundColor: colors.surfaceSubtle,
@@ -258,6 +262,7 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing.sm,
+    flexShrink: 0,
   },
   roleSwitchBtn: {
     display: {
@@ -379,7 +384,7 @@ const styles = stylex.create({
     width: '36px',
     height: '36px',
     borderRadius: radii.full,
-    background: 'linear-gradient(135deg, #4f46e5, #3730a3)',
+    backgroundColor: colors.primary,
     color: colors.textInverse,
     fontWeight: 800,
     fontSize: '0.75rem',
@@ -393,6 +398,7 @@ const styles = stylex.create({
     right: 0,
     marginTop: '8px',
     width: '260px',
+    maxWidth: 'calc(100vw - 24px)',
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     boxShadow: shadows.xl,
@@ -653,7 +659,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <div {...stylex.props(styles.logoTextCol)}>
                 <span {...stylex.props(styles.logoText)}>
-                  Catch <span {...stylex.props(styles.logoHighlight)}>Able Pro</span>
+                  Catchable<span {...stylex.props(styles.logoHighlight)}>pro</span>
                 </span>
                 <span {...stylex.props(styles.logoSub)}>
                   Semantic Hiring
@@ -668,8 +674,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {...stylex.props(styles.demoPill)}
                 title="Switch test accounts"
               >
-                <Sparkles size={14} color="#4f46e5" />
-                <span>Demo As: {currentUser?.name || 'Visitor'}</span>
+                <ArrowRightLeft size={13} color="#4f46e5" />
+                <span>Persona: {currentUser?.name || 'Visitor'}</span>
                 <ChevronDown size={12} />
               </button>
 
@@ -832,6 +838,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <Layers size={16} />
                       <span>Pipeline</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveView('employer_interviews')}
+                      {...stylex.props(styles.navLink, activeView === 'employer_interviews' && styles.navLinkActive)}
+                    >
+                      <CalendarClock size={16} />
+                      <span>Interviews</span>
                     </button>
                     <button
                       onClick={() => setActiveView('employer_wallet')}

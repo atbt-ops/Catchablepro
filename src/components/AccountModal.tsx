@@ -165,9 +165,9 @@ const styles = stylex.create({
   statusBadgeActive: {
     paddingTop: '2px',
     paddingBottom: '2px',
-    paddingLeft: '10px',
-    paddingRight: '10px',
-    borderRadius: radii.full,
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.sm,
     fontSize: '0.75rem',
     fontWeight: 700,
     backgroundColor: colors.successLight,
@@ -179,13 +179,16 @@ const styles = stylex.create({
   statusBadgeInactive: {
     paddingTop: '2px',
     paddingBottom: '2px',
-    paddingLeft: '10px',
-    paddingRight: '10px',
-    borderRadius: radii.full,
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    borderRadius: radii.sm,
     fontSize: '0.75rem',
     fontWeight: 700,
     backgroundColor: colors.surfaceSubtle,
     color: colors.textSecondary,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors.border,
   },
   totpBox: {
     padding: spacing.md,
@@ -357,15 +360,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
     URL.revokeObjectURL(url);
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const handleDeleteAccount = () => {
-    if (
-      window.confirm(
-        'Are you sure you want to delete your account? All jobs, applications, and profile data will be permanently wiped.'
-      )
-    ) {
-      deleteAccount(currentUser.id);
-      onClose();
-    }
+    deleteAccount(currentUser.id);
+    onClose();
   };
 
   return (
@@ -561,13 +560,48 @@ export const AccountModal: React.FC<AccountModalProps> = ({ onClose }) => {
                   Permanently delete this account and all linked records.
                 </p>
               </div>
-              <button
-                onClick={handleDeleteAccount}
-                {...stylex.props(styles.deleteBtn)}
-              >
-                <Trash2 size={14} />
-                <span>Delete Account</span>
-              </button>
+              {confirmDelete ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={handleDeleteAccount}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      backgroundColor: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Confirm Wipe
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  {...stylex.props(styles.deleteBtn)}
+                >
+                  <Trash2 size={14} />
+                  <span>Delete Account</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
