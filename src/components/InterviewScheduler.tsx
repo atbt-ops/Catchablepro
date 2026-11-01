@@ -14,6 +14,7 @@ import {
 import { WeeklyCalendarView } from './WeeklyCalendarView';
 import { InterviewRemindersTab } from './InterviewRemindersTab';
 import { ReminderEmailPreviewModal } from './ReminderEmailPreviewModal';
+import { CandidateSlotSelectionModal } from './CandidateSlotSelectionModal';
 import { getReminderScheduleInfo } from '../services/reminders';
 import {
   Calendar,
@@ -571,6 +572,7 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
     interviews,
     proposeInterview,
     confirmInterviewSlot,
+    submitCandidateAvailability,
     rescheduleInterview,
     updateInterviewStatus,
     cancelInterview,
@@ -611,6 +613,9 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
   // Preview Email Modal
   const [previewEmailInterview, setPreviewEmailInterview] = useState<Interview | null>(null);
 
+  // Candidate Availability Selection / Booking Simulator Modal
+  const [candidateBookingModalInterview, setCandidateBookingModalInterview] = useState<Interview | null>(null);
+
   // Propose Modal state
   const [showProposeModal, setShowProposeModal] = useState(false);
   const [formApplicationId, setFormApplicationId] = useState<number>(initialApplicationId || 0);
@@ -630,6 +635,23 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
     { date: defaultSlotDate, time: '14:00', duration: 45 },
     { date: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10), time: '16:00', duration: 45 },
   ]);
+
+  // Quick smart slot suggestions helper
+  const addQuickSmartSlots = () => {
+    const d1 = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+    const d2 = new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10);
+    const d3 = new Date(Date.now() + 86400000 * 4).toISOString().slice(0, 10);
+    setFormSlots([
+      { date: d1, time: '11:00', duration: 45 },
+      { date: d2, time: '14:00', duration: 45 },
+      { date: d3, time: '16:00', duration: 45 },
+    ]);
+    showToast({
+      type: 'info',
+      title: 'Smart Slots Generated ⚡',
+      message: 'Added 3 staggered business-hour slots for candidate selection.',
+    });
+  };
 
   // Feedback / Complete Modal
   const [feedbackModalInterview, setFeedbackModalInterview] = useState<Interview | null>(null);
@@ -1167,22 +1189,101 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
 
                 {/* Proposed / Confirmed Slots Box */}
                 <div {...stylex.props(styles.slotsContainer)}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '0.75rem' }}>
                     <span style={{ fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CalendarClock size={15} color="#4f46e5" />
                       <span>
                         {isConfirmed
                           ? 'Confirmed Interview Time'
-                          : `Proposed Options (${iv.proposedSlots.length} slot${iv.proposedSlots.length > 1 ? 's' : ''} sent to candidate)`}
+                          : `Suggested Options (${iv.proposedSlots.length} slot${iv.proposedSlots.length > 1 ? 's' : ''} sent to candidate)`}
                       </span>
                     </span>
 
                     {isProposed && (
-                      <span style={{ fontSize: '11px', color: '#d97706', fontWeight: 700 }}>
-                        Candidate choice pending
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setCandidateBookingModalInterview(iv)}
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#4338ca',
+                            backgroundColor: '#eef2ff',
+                            border: '1px solid #c7d2fe',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Open Candidate Availability Portal to preview or select slot on candidate's behalf"
+                        >
+                          <UserCheck size={12} />
+                          <span>Candidate Availability Portal</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://catchablepro.in/interviews/${iv.id}/schedule`);
+                            showToast({
+                              type: 'success',
+                              title: 'Candidate Link Copied 📋',
+                              message: 'Shareable availability booking link copied to clipboard.',
+                            });
+                          }}
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Copy candidate availability booking link"
+                        >
+                          <Share2 size={12} />
+                          <span>Copy Link</span>
+                        </button>
+                      </div>
                     )}
                   </div>
+
+                  {/* Candidate Stated Availability Alert */}
+                  {iv.candidatePreferredNotes && (
+                    <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '11px', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CalendarCheck size={14} color="#2563eb" />
+                        <span><strong>Candidate Availability Note:</strong> "{iv.candidatePreferredNotes}"</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setRescheduleModalInterview(iv);
+                          setRescheduleSlots([
+                            { date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10), time: '11:00', duration: 45 },
+                          ]);
+                        }}
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: '#1e40af',
+                          backgroundColor: '#dbeafe',
+                          border: 'none',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Adjust to Fit
+                      </button>
+                    </div>
+                  )}
 
                   {/* Render slots */}
                   {isConfirmed && iv.confirmedSlot ? (
@@ -1421,6 +1522,30 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
                       </>
                     )}
 
+                    {/* Candidate Availability Selection Portal Simulator */}
+                    {!isConfirmed && !isCancelled && !isCompleted && (
+                      <button
+                        onClick={() => setCandidateBookingModalInterview(iv)}
+                        style={{
+                          fontSize: '11px',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontWeight: 700,
+                          color: '#4338ca',
+                          backgroundColor: '#eef2ff',
+                          border: '1px solid #c7d2fe',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                        title="Open candidate availability portal to select preferred slot"
+                      >
+                        <UserCheck size={12} />
+                        <span>Candidate Booking Portal</span>
+                      </button>
+                    )}
+
                     {/* Reschedule */}
                     {!isCancelled && !isCompleted && (
                       <button
@@ -1606,29 +1731,53 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
 
               {/* Time Slots Section (Multiple candidate proposals) */}
               <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <CalendarClock size={16} color="#4f46e5" />
-                    <span>Proposed Time Slots (Candidates choose one) *</span>
+                    <span>Suggested Time Slots (Candidates select preferred availability) *</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={addSlotRow}
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#4f46e5',
-                      background: 'none',
-                      border: 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <Plus size={13} />
-                    <span>Add Another Option</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={addQuickSmartSlots}
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#059669',
+                        backgroundColor: '#ecfdf5',
+                        border: '1px solid #a7f3d0',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                      title="Quickly suggest 3 staggered business-hour slots"
+                    >
+                      <Sparkles size={12} />
+                      <span>Suggest 3 Smart Slots</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={addSlotRow}
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#4f46e5',
+                        background: 'none',
+                        border: 0,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Plus size={13} />
+                      <span>Add Option</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Preferred slots quick-picker */}
@@ -2116,6 +2265,20 @@ export const InterviewScheduler: React.FC<InterviewSchedulerProps> = ({
         <ReminderEmailPreviewModal
           interview={previewEmailInterview}
           onClose={() => setPreviewEmailInterview(null)}
+        />
+      )}
+
+      {/* MODAL: CANDIDATE AVAILABILITY PORTAL SIMULATOR */}
+      {candidateBookingModalInterview && (
+        <CandidateSlotSelectionModal
+          interview={candidateBookingModalInterview}
+          job={jobs.find((j) => j.id === candidateBookingModalInterview.jobId)}
+          candidate={users.find((u) => u.id === candidateBookingModalInterview.candidateId)}
+          employerName={currentUser?.company_name || 'Catchablepro Hiring Partner'}
+          onConfirmSlot={confirmInterviewSlot}
+          onSubmitAlternateAvailability={submitCandidateAvailability}
+          onClose={() => setCandidateBookingModalInterview(null)}
+          isEmployerPreview={true}
         />
       )}
     </div>
