@@ -7,6 +7,8 @@ import { matchDetail } from '../services/matching';
 import { CompanyAvatar } from './CompanyAvatar';
 import { PostJobModal } from './PostJobModal';
 import { InterviewScheduler } from './InterviewScheduler';
+import { SkillRadarChart } from './SkillRadarChart';
+import { CandidateRadarDetailModal } from './CandidateRadarDetailModal';
 import {
   Briefcase,
   Layers,
@@ -27,6 +29,7 @@ import {
   ShieldCheck,
   CalendarClock,
   ChevronRight,
+  Maximize2,
 } from 'lucide-react';
 import { colors, spacing, radii, shadows } from '../theme/tokens.stylex';
 
@@ -446,6 +449,14 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
   const [selectedJobIdForPipeline, setSelectedJobIdForPipeline] = useState<number | null>(null);
   const [selectedAppForInterview, setSelectedAppForInterview] = useState<number | null>(null);
 
+  // D3 Radar Chart state
+  const [selectedCandidateForRadarModal, setSelectedCandidateForRadarModal] = useState<{
+    user: (typeof users)[0];
+    profile?: (typeof candidateProfiles)[number];
+    match: ReturnType<typeof matchDetail>;
+  } | null>(null);
+  const [showCardRadars, setShowCardRadars] = useState(true);
+
   // Wallet topup modal
   const [showTopupModal, setShowTopupModal] = useState(false);
   const [topupAmountINR, setTopupAmountINR] = useState(1000);
@@ -826,15 +837,15 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
       {/* TAB 2: RANKED CANDIDATE MATCHES */}
       {activeTab === 'matches' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ backgroundColor: '#fff', padding: '16px 20px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Matching Candidates For:
               </span>
               <select
                 value={targetJobForMatches?.id || ''}
                 onChange={(e) => setSelectedJobIdForMatches(Number(e.target.value))}
-                style={{ backgroundColor: '#ffffff', fontSize: '0.75rem', fontWeight: 600, color: '#0f172a', borderRadius: '6px', padding: '4px 10px', border: '1px solid #cbd5e1', outline: 'none', cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', fontSize: '0.75rem', fontWeight: 600, color: '#0f172a', borderRadius: '8px', padding: '6px 12px', border: '1px solid #cbd5e1', outline: 'none', cursor: 'pointer' }}
               >
                 {myJobs.map((j) => (
                   <option key={j.id} value={j.id}>
@@ -843,35 +854,144 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                 ))}
               </select>
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              Required skills: <code style={{ backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontFamily: 'monospace' }}>{targetJobForMatches?.requiredSkills}</code>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                Required skills: <code style={{ backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontFamily: 'monospace', color: '#334155' }}>{targetJobForMatches?.requiredSkills}</code>
+              </div>
+
+              {/* Toggle Radar Charts Visibility */}
+              <button
+                onClick={() => setShowCardRadars(!showCardRadars)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: showCardRadars ? '#4338ca' : '#475569',
+                  backgroundColor: showCardRadars ? '#eef2ff' : '#f8fafc',
+                  border: `1px solid ${showCardRadars ? '#c7d2fe' : '#e2e8f0'}`,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Sparkles size={13} color={showCardRadars ? '#4f46e5' : '#64748b'} />
+                <span>{showCardRadars ? 'Radar Charts: Visible' : 'Radar Charts: Hidden'}</span>
+              </button>
             </div>
           </div>
 
           {rankedCandidates.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
               {rankedCandidates.map(({ user, profile, match }) => (
-                <div key={user.id} {...stylex.props(styles.kanbanCard)}>
+                <div key={user.id} {...stylex.props(styles.kanbanCard)} style={{ padding: '20px' }}>
+                  {/* Top Candidate Summary */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #4f46e5, #3730a3)', color: '#fff', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: 'linear-gradient(135deg, #4f46e5, #3730a3)', color: '#fff', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem' }}>
                         {user.name[0].toUpperCase()}
                       </div>
                       <div>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>{user.name}</h3>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{user.name}</h3>
                         <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>{user.email}</p>
                         <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4338ca', margin: '2px 0 0' }}>{profile?.headline || 'Candidate Profile'}</p>
                       </div>
                     </div>
-                    <span style={{ padding: '4px 10px', borderRadius: '9999px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Sparkles size={14} color="#059669" />
+                    <span style={{ padding: '4px 10px', borderRadius: '9999px', backgroundColor: match.pct >= 75 ? '#ecfdf5' : '#fffbeb', border: `1px solid ${match.pct >= 75 ? '#a7f3d0' : '#fde68a'}`, color: match.pct >= 75 ? '#065f46' : '#92400e', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <Sparkles size={14} color={match.pct >= 75 ? '#059669' : '#d97706'} />
                       <span>{match.pct}% Match</span>
                     </span>
                   </div>
 
+                  {/* D3 Skill Radar Chart Visualizer */}
+                  {showCardRadars && targetJobForMatches && (
+                    <div
+                      style={{
+                        marginTop: '14px',
+                        padding: '12px 10px 8px',
+                        borderRadius: '16px',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        position: 'relative',
+                        boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.02)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0 4px 6px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            color: '#4f46e5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Sparkles size={11} color="#6366f1" />
+                          <span>D3 Radar Skill Topology</span>
+                        </span>
+                        <button
+                          onClick={() =>
+                            setSelectedCandidateForRadarModal({
+                              user,
+                              profile,
+                              match,
+                            })
+                          }
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            color: '#4338ca',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #c7d2fe',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            transition: 'background-color 0.15s ease',
+                          }}
+                          title="Open full interactive radar comparison and gap analysis"
+                        >
+                          <Maximize2 size={11} />
+                          <span>Deep Dive</span>
+                        </button>
+                      </div>
+
+                      <SkillRadarChart
+                        requiredSkillsStr={targetJobForMatches.requiredSkills}
+                        candidateSkillsStr={profile?.skills || ''}
+                        candidateName={user.name}
+                        jobTitle={targetJobForMatches.title}
+                        size="sm"
+                        showLegend={true}
+                        showLabels={true}
+                        interactive={true}
+                      />
+                    </div>
+                  )}
+
+                  {/* Skills tags */}
                   <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
-                      Candidate Skills
+                      Profile Skills Breakdown
                     </span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {profile?.skills.split(',').map((s) => {
@@ -897,14 +1017,42 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {/* Footer Actions */}
+                  <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                       {profile?.autoApply ? '⚡ Auto-Apply Active' : 'Direct Search'}
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() =>
+                          setSelectedCandidateForRadarModal({
+                            user,
+                            profile,
+                            match,
+                          })
+                        }
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#475569',
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                        title="Open D3 radar chart deep dive"
+                      >
+                        <Maximize2 size={12} />
+                        <span>Radar</span>
+                      </button>
+
                       <button
                         onClick={() => handleShortlistCandidate(user.id)}
-                        style={{ padding: '6px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, color: '#4338ca', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', cursor: 'pointer' }}
+                        style={{ padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, color: '#4338ca', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', cursor: 'pointer' }}
                       >
                         Shortlist
                       </button>
@@ -919,7 +1067,7 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
                           setActiveTab('interviews');
                         }}
                         style={{
-                          padding: '6px 12px',
+                          padding: '6px 10px',
                           borderRadius: '10px',
                           fontSize: '0.75rem',
                           fontWeight: 700,
@@ -1569,6 +1717,34 @@ export const EmployerDashboard: React.FC<EmployerDashboardProps> = ({
         <PostJobModal
           initialJob={editingJob}
           onClose={() => setShowPostModal(false)}
+        />
+      )}
+
+      {/* Candidate D3 Radar Detail & Gap Analysis Modal */}
+      {selectedCandidateForRadarModal && targetJobForMatches && (
+        <CandidateRadarDetailModal
+          user={selectedCandidateForRadarModal.user}
+          profile={selectedCandidateForRadarModal.profile}
+          job={targetJobForMatches}
+          matchPct={selectedCandidateForRadarModal.match.pct}
+          onClose={() => setSelectedCandidateForRadarModal(null)}
+          onShortlist={handleShortlistCandidate}
+          onSchedule={(candId) => {
+            const existingApp = applications.find(
+              (a) => a.jobId === targetJobForMatches?.id && a.candidateId === candId
+            );
+            if (existingApp) {
+              setSelectedAppForInterview(existingApp.id);
+            }
+            setActiveTab('interviews');
+          }}
+          onInvite={(cand) => {
+            showToast({
+              type: 'success',
+              title: 'Invitation Sent 📨',
+              message: `Direct interview invite sent to ${cand.name} for ${targetJobForMatches?.title}`,
+            });
+          }}
         />
       )}
     </div>
