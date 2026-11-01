@@ -887,12 +887,39 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
                 <span>Application Submitted</span>
               </span>
             ) : (
-              <button
-                onClick={() => onApply(job.id)}
-                {...stylex.props(styles.applySubmitBtn)}
-              >
-                <span>Apply to Role</span>
-              </button>
+              (() => {
+                const isRecommendedRole = candSkills ? isHigh : match.pct >= 50 || job.id === 1 || job.id === 2;
+                const btnProps = stylex.props(styles.applySubmitBtn);
+                const combinedClassName = [
+                  btnProps.className,
+                  isRecommendedRole ? 'recommended-apply-btn' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+
+                return (
+                  <button
+                    onClick={() => onApply(job.id)}
+                    className={combinedClassName}
+                    title={
+                      isRecommendedRole
+                        ? 'Recommended Opportunity • Apply to Role'
+                        : 'Apply to Role'
+                    }
+                  >
+                    {isRecommendedRole && (
+                      <span
+                        className="sparkle-icon-animated"
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
+                        aria-hidden="true"
+                      >
+                        <Sparkles size={14} />
+                      </span>
+                    )}
+                    <span>Apply to Role</span>
+                  </button>
+                );
+              })()
             )}
           </div>
         </div>

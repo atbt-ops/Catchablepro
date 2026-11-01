@@ -73,3 +73,76 @@ textarea:focus-visible {
   outline: 2px solid #6366f1;
   outline-offset: 2px;
 }
+
+/* Subtle sparkle shimmer & aura animations for recommended job Apply buttons */
+@keyframes sparkleShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes sparklePulse {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
+  }
+  50% {
+    transform: scale(1.22) rotate(14deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(254, 240, 138, 0.95));
+  }
+}
+
+@keyframes sparkleGlowPulse {
+  0%, 100% {
+    box-shadow: 0 1px 3px rgba(79, 70, 229, 0.28), 0 0 0 1px rgba(99, 102, 241, 0.2);
+  }
+  50% {
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.42), 0 0 0 2px rgba(165, 180, 252, 0.55);
+  }
+}
+
+.recommended-apply-btn {
+  position: relative !important;
+  overflow: hidden !important;
+  background: linear-gradient(
+    115deg,
+    #4338ca 0%,
+    #4f46e5 24%,
+    #6366f1 42%,
+    #e0e7ff 50%,
+    #6366f1 58%,
+    #4f46e5 76%,
+    #4338ca 100%
+  ) !important;
+  background-size: 240% 100% !important;
+  animation: sparkleShimmer 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite, sparkleGlowPulse 2.8s ease-in-out infinite !important;
+}
+
+.recommended-apply-btn:hover {
+  background-size: 200% 100% !important;
+  animation: sparkleShimmer 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite, sparkleGlowPulse 1.8s ease-in-out infinite !important;
+}
+
+.sparkle-icon-animated {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  animation: sparklePulse 2.4s ease-in-out infinite !important;
+  color: #fbbf24 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recommended-apply-btn {
+    animation: none !important;
+    background: #4f46e5 !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  }
+  .sparkle-icon-animated {
+    animation: none !important;
+  }
+}

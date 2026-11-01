@@ -392,6 +392,16 @@ const styles = stylex.create({
     gap: '6px',
     transition: 'background-color 0.15s ease, transform 0.1s ease',
   },
+  applyBtnRecommended: {
+    fontWeight: 700,
+    letterSpacing: '0.01em',
+  },
+  sparkleIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
 });
 
 interface JobCardProps {
@@ -399,6 +409,7 @@ interface JobCardProps {
   candidateProfile: CandidateProfile | null;
   hasApplied: boolean;
   isSaved: boolean;
+  isRecommended?: boolean;
   onSelect: (job: Job) => void;
   onApply: (jobId: number) => void;
   onToggleSave: (jobId: number) => void;
@@ -409,6 +420,7 @@ export const JobCard: React.FC<JobCardProps> = ({
   candidateProfile,
   hasApplied,
   isSaved,
+  isRecommended,
   onSelect,
   onApply,
   onToggleSave,
@@ -422,6 +434,12 @@ export const JobCard: React.FC<JobCardProps> = ({
   // Match score visual styling
   const isHighMatch = match.pct >= 75;
   const isMedMatch = match.pct >= 40 && match.pct < 75;
+
+  // Determine if this is a recommended job opportunity
+  const isRecommendedJob =
+    isRecommended !== undefined
+      ? isRecommended
+      : Boolean(candSkills ? isHighMatch : match.pct >= 50 || job.id === 1 || job.id === 2);
 
   const isNew =
     new Date().getTime() - new Date(job.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000;
@@ -616,12 +634,37 @@ export const JobCard: React.FC<JobCardProps> = ({
             Applied
           </span>
         ) : (
-          <button
-            onClick={() => onApply(job.id)}
-            {...stylex.props(styles.applyBtn)}
-          >
-            Apply Now
-          </button>
+          (() => {
+            const btnProps = stylex.props(
+              styles.applyBtn,
+              isRecommendedJob && styles.applyBtnRecommended
+            );
+            const combinedClassName = [
+              btnProps.className,
+              isRecommendedJob ? 'recommended-apply-btn' : null,
+            ]
+              .filter(Boolean)
+              .join(' ');
+
+            return (
+              <button
+                onClick={() => onApply(job.id)}
+                className={combinedClassName}
+                title={
+                  isRecommendedJob
+                    ? 'Recommended Opportunity • Apply Now'
+                    : 'Apply Now'
+                }
+              >
+                {isRecommendedJob && (
+                  <span className="sparkle-icon-animated" aria-hidden="true">
+                    <Sparkles size={13} />
+                  </span>
+                )}
+                <span>Apply Now</span>
+              </button>
+            );
+          })()
         )}
       </div>
     </div>
